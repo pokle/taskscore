@@ -8,14 +8,17 @@
     "dev": "npm run dev --workspace=pages",
     "build": "npm run build --workspace=pages",
     "deploy": "npm run deploy --workspace=pages",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "workspaces": [
     "pages",
     "workers/*"
   ],
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260109.0",
     "typescript": "^5.7.3",
+    "vitest": "^3.2.4",
     "wrangler": "^4.6.0"
   },
   "engines": {

@@ -8,11 +8,17 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
-    "noEmit": true
+    "noEmit": true,
+    "types": ["@cloudflare/workers-types"]
   },
-  "references": [
-    { "path": "./pages" }
+  "include": [
+    "pages/src/**/*",
+    "workers/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/node_modules",
+    "explorations"
   ]
 }
