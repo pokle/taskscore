@@ -29,3 +29,22 @@ Example of flight analysis:
 - 1:40pm landed in bombout paddock, 7km from NCORGL (30 bombout points)
 
 In the last example, it's useful to know the distance to the next waypoint in the task set.
+
+## Development
+
+**Prerequisites:** Node.js 20+
+
+```bash
+npm install          # Install dependencies
+npm run dev          # Local development server
+npm run typecheck    # Type checking
+npm run test         # Run tests
+```
+
+**Deployment:**
+- Push to `master` → deploys to production
+- Push to other branches → deploys to preview URL
+
+**URLs:**
+- Production: https://taskscore.shonky.info
+- Previews: https://{branch}.taskscore.pages.dev

@@ -31,18 +31,37 @@ Frontend (Pages) ←→ API Worker ←→ R2 + D1
 
 ## Build & Development
 
-*Project is in early design phase - no build system configured yet.*
+**Commands:**
+```bash
+npm install          # Install dependencies
+npm run dev          # Local development server (Pages)
+npm run typecheck    # TypeScript type checking
+npm run test         # Run tests with vitest
+npm run deploy       # Manual deploy to Cloudflare Pages
+```
 
-When implemented:
-- `wrangler dev` - Local development server
-- `wrangler deploy` - Deploy to production
-- `wrangler d1 migrations apply` - Apply database migrations
+**CI/CD:**
+- GitHub Actions runs on every push
+- Runs typecheck → tests → deploy
+- `master` branch deploys to production
+- Other branches deploy to preview environments
 
-Domain: `taskscore.shonky.info`
+**URLs:**
+- Production: https://taskscore.shonky.info (also https://taskscore.pages.dev)
+- Preview: https://{branch}.taskscore.pages.dev
+
+**Required Secrets (GitHub Actions):**
+- `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID
+- `CLOUDFLARE_API_TOKEN` - API token with Pages write access
 
 ## Project Structure
 
 ```
+/pages/           - Cloudflare Pages frontend
+  /public/        - Static assets (HTML, CSS, etc.)
+  /src/           - TypeScript source
+/workers/         - Cloudflare Workers (Email, API)
+/tests/           - Test files
 /specs/           - Feature and architecture specifications
 /explorations/    - Experimental code (NOT for production use)
 ```
