@@ -54,24 +54,40 @@ Receives and processes pilot track log submissions via email.
 
 **Responsibilities:**
 - Receive incoming emails at `submit@{domain}`
+- Archive raw email to R2 (audit trail)
 - Validate sender against authorized pilot list (D1 lookup)
 - Parse email attachments using MIME parser (e.g., `postal-mime`)
 - Validate attachment is a valid IGC file
 - Store IGC file in R2 with appropriate metadata
 - Record submission in D1 database
-- Optionally send confirmation reply to pilot
+- Send confirmation reply to pilot
+- Forward errors/failures to admin inbox for review
 
 **Email Processing Flow:**
 1. Pilot emails IGC attachment to submission address
 2. Email Worker receives the message
-3. Extract sender email from headers
-4. Query D1 to check if sender is authorized for any active competition
-5. If unauthorized, reject (optionally notify sender)
-6. Parse MIME content to extract attachments
-7. Validate IGC file format
-8. Generate unique filename and store in R2
-9. Insert submission record in D1
-10. Send confirmation email (optional)
+3. **Archive raw email to R2** (always, before any processing)
+4. Extract sender email from headers
+5. Parse MIME content to extract attachments
+6. Validate IGC file format
+7. **Compute SHA-256 hash** of IGC file content
+8. **Check if hash exists** in `igc_files` table
+9. **Always store IGC file** - if new, store at `/igc/{hash}.igc` in R2 and insert into `igc_files`
+10. **Look up sender email** in `pilot_emails` table
+11. **Always create submission record** with sender email, IGC hash, and pilot_id (if found)
+12. If pilot found: check `pilot_competitions` for active competitions
+13. If entered in competition: link submission to competition, status = `entered`, send success confirmation
+14. If pilot found but not in competition: status = `matched`, notify pilot flight is stored
+15. If pilot not found: status = `unmatched`, **forward to admin inbox**, notify sender their flight is stored but not yet linked to a pilot
+16. Log metadata to D1 (links to raw email archive)
+
+**Email Archival Strategy:**
+
+Cloudflare Email Workers do not store emails after processing - they are discarded once the Worker completes. To maintain an audit trail and allow manual review:
+
+1. **Always archive raw email to R2** - Store the complete `.eml` file before any processing, ensuring nothing is lost even if processing fails
+2. **Forward failures to admin inbox** - Unauthorized senders, invalid attachments, and processing errors are forwarded to the admin's email for human review
+3. **Log metadata to D1** - Each submission record links to its raw email archive for later retrieval
 
 ### API Worker
 
@@ -92,16 +108,34 @@ RESTful API for frontend operations and admin functions.
 
 ### R2 Storage
 
-Object storage for IGC track log files.
+Object storage for IGC track log files and email archives.
 
 **Structure:**
 ```
-/competitions/{competition_id}/flights/{submission_id}.igc
+/igc/{sha256}.igc          # Content-addressed IGC storage
+/emails/{timestamp}-{from}.eml
 ```
 
 **Access:**
 - Public read access for viewing/downloading flight logs
+- Private access for email archives (admin only)
 - Write access only via Email Worker and API Worker
+
+**IGC Deduplication:**
+
+IGC files are stored using content-addressing (SHA-256 checksum as filename):
+
+1. On submission, compute SHA-256 hash of IGC file content
+2. Check if `/igc/{hash}.igc` already exists in R2
+3. If exists, skip upload (file already stored)
+4. If new, store file at `/igc/{hash}.igc`
+5. Flight submission record references the hash
+
+Benefits:
+- Re-submissions don't create duplicates
+- Same flight submitted to multiple competitions shares one file
+- Hash serves as unique identifier and integrity check
+- Storage costs minimized
 
 ### D1 Database
 
@@ -110,8 +144,39 @@ SQLite database for relational data.
 **Tables:**
 - `competitions` - Competition definitions
 - `tasks` - Task definitions with turn points
-- `pilots` - Authorized pilots with email addresses
-- `flights` - Flight submissions with metadata
+- `pilots` - Pilot records (name, ID, etc.) - the canonical identity
+- `pilot_emails` - Email addresses linked to pilots (many-to-one)
+- `pilot_competitions` - Pilots registered for competitions (many-to-many)
+- `igc_files` - IGC file registry (hash, original filename, upload date, size)
+- `submissions` - Flight submissions storing: sender email, IGC hash, pilot_id (nullable), competition_id (nullable)
+
+**Key Concept: Pilot is the Identity**
+
+- A pilot can have multiple email addresses (e.g., personal, work, old address)
+- Email addresses can be added or changed over time
+- IGC files are ultimately associated with the pilot, not the email
+- The sender email is always recorded for audit, but the pilot linkage is what matters
+
+**Submission States:**
+- `unmatched` - IGC stored, sender email not recognized
+- `matched` - IGC linked to a pilot (via email lookup)
+- `entered` - IGC linked to pilot AND a specific competition
+
+**Email-to-Pilot Resolution:**
+
+When a submission arrives:
+1. Look up sender email in `pilot_emails`
+2. If found → link submission to that pilot
+3. If not found → submission remains `unmatched`, awaiting admin action
+
+**Late Registration / Email Addition Flow:**
+
+When admin adds an email address to a pilot:
+1. Insert into `pilot_emails`
+2. Query `submissions` for any `unmatched` entries from that email
+3. Update those submissions to link to the pilot
+4. If pilot is registered for competitions, check if submissions should be entered
+5. Notify pilot of any newly linked flights
 
 ## Authentication Strategy
 
@@ -155,21 +220,23 @@ All components operate within Cloudflare's free tier for typical competition usa
 | Pages | Unlimited bandwidth | Static assets |
 | Email Routing | Free | Receiving submissions |
 | Workers | 100,000 requests/day | API + Email processing |
-| R2 | 10 GB storage, 10M reads/month | IGC files (~100KB each) |
+| R2 | 10 GB storage, 10M reads/month | IGC files (~100KB) + email archives |
 | D1 | 5 GB storage, 5M reads/day | Metadata queries |
 | Access | 50 users | Admin auth (optional) |
 
 ## Design Principles
 
-1. **Client-Heavy Processing** - IGC parsing and analysis runs in the browser, reducing backend complexity and costs
+1. **No Flight Data Lost** - Every valid IGC file is stored, regardless of pilot registration status. Administrative issues (late registration, typos in email) must never cause flight data to be discarded. Sorting out associations can happen later.
 
-2. **Email as Interface** - Pilots submit via email, eliminating the need for user accounts and login flows
+2. **Client-Heavy Processing** - IGC parsing and analysis runs in the browser, reducing backend complexity and costs
 
-3. **Progressive Enhancement** - Start with static site, add Workers incrementally as needed
+3. **Email as Interface** - Pilots submit via email, eliminating the need for user accounts and login flows
 
-4. **Single Vendor** - All infrastructure on Cloudflare for operational simplicity
+4. **Progressive Enhancement** - Start with static site, add Workers incrementally as needed
 
-5. **Generous Free Tier** - Architecture designed to operate within free tier limits for small to medium competitions
+5. **Single Vendor** - All infrastructure on Cloudflare for operational simplicity
+
+6. **Generous Free Tier** - Architecture designed to operate within free tier limits for small to medium competitions
 
 ## Future Considerations
 
