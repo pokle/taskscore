@@ -43,6 +43,7 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
     let taskLine: any = null;
     let taskCircles: any[] = [];
     let taskMarkers: any[] = [];
+    let taskSegmentLabels: any[] = [];  // Labels for task line segments
     let eventMarkers: any[] = [];
     let highlightPath: any = null;
     let activeInfoWindow: any = null;
@@ -154,7 +155,7 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
             renderTrackWithEvents();
         },
 
-        setTask(task: XCTask) {
+        async setTask(task: XCTask) {
             currentTask = task;
 
             // Clear existing task elements
@@ -170,13 +171,19 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
                 marker.map = null;
             }
             taskMarkers = [];
+            for (const label of taskSegmentLabels) {
+                label.map = null;
+            }
+            taskSegmentLabels = [];
 
             if (!task || task.turnpoints.length === 0) return;
 
-            // Create task line
-            const linePath = task.turnpoints.map(tp => ({
-                lat: tp.waypoint.lat,
-                lng: tp.waypoint.lon,
+            // Create optimized task line that tags cylinder edges
+            const { calculateOptimizedTaskLine, getOptimizedSegmentDistances } = await import('./xctsk-parser');
+            const optimizedPath = calculateOptimizedTaskLine(task);
+            const linePath = optimizedPath.map(p => ({
+                lat: p.lat,
+                lng: p.lon,
             }));
 
             taskLine = new google.maps.Polyline({
@@ -188,6 +195,41 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
                 strokePattern: [4, 4],
                 map,
             });
+
+            // Add distance labels to each segment
+            const segmentDistances = getOptimizedSegmentDistances(task);
+            for (let i = 0; i < optimizedPath.length - 1; i++) {
+                const p1 = optimizedPath[i];
+                const p2 = optimizedPath[i + 1];
+                const distance = segmentDistances[i];
+
+                // Calculate midpoint
+                const midLat = (p1.lat + p2.lat) / 2;
+                const midLng = (p1.lon + p2.lon) / 2;
+
+                // Create label element
+                const labelEl = document.createElement('div');
+                const distanceKm = (distance / 1000).toFixed(1);
+                labelEl.style.cssText = `
+                    background: white;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: #6366f1;
+                    border: 1px solid #6366f1;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                    white-space: nowrap;
+                `;
+                labelEl.textContent = `${distanceKm} km`;
+
+                const labelMarker = new AdvancedMarkerElement({
+                    map,
+                    position: { lat: midLat, lng: midLng },
+                    content: labelEl,
+                });
+                taskSegmentLabels.push(labelMarker);
+            }
 
             // Create cylinders and markers
             for (const tp of task.turnpoints) {
