@@ -57,6 +57,7 @@ export function createMapLibreProvider(container: HTMLElement): Promise<MapProvi
       function addCustomLayers(): void {
         // Remove existing custom layers to ensure correct ordering
         const customLayers = [
+          'task-segment-labels',
           'task-labels',
           'task-points',
           'highlight-segment',
@@ -74,7 +75,7 @@ export function createMapLibreProvider(container: HTMLElement): Promise<MapProvi
         }
 
         // Add sources (only if they don't exist)
-        const sourcesToAdd = ['track', 'task-line', 'task-points', 'task-cylinders', 'highlight-segment'];
+        const sourcesToAdd = ['track', 'task-line', 'task-points', 'task-cylinders', 'task-segment-labels', 'highlight-segment'];
         for (const sourceId of sourcesToAdd) {
           const exists = !!map.getSource(sourceId);
           console.log(`[MapRenderer] Source ${sourceId} exists: ${exists}`);
@@ -233,6 +234,24 @@ export function createMapLibreProvider(container: HTMLElement): Promise<MapProvi
             'text-halo-width': 2,
           },
         });
+
+        // 8. Task segment distance labels
+        map.addLayer({
+          id: 'task-segment-labels',
+          type: 'symbol',
+          source: 'task-segment-labels',
+          layout: {
+            'text-field': ['get', 'distance'],
+            'text-size': 11,
+            'text-offset': [0, 0],
+            'text-anchor': 'center',
+          },
+          paint: {
+            'text-color': '#6366f1',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 2,
+          },
+        });
       }
 
       /**
@@ -345,7 +364,7 @@ export function createMapLibreProvider(container: HTMLElement): Promise<MapProvi
           );
         },
 
-        setTask(task: XCTask) {
+        async setTask(task: XCTask) {
           currentTask = task;
 
           if (!task || task.turnpoints.length === 0) {
@@ -361,14 +380,17 @@ export function createMapLibreProvider(container: HTMLElement): Promise<MapProvi
               type: 'FeatureCollection',
               features: [],
             });
+            (map.getSource('task-segment-labels') as maplibregl.GeoJSONSource)?.setData({
+              type: 'FeatureCollection',
+              features: [],
+            });
             return;
           }
 
-          // Create task line
-          const lineCoords = task.turnpoints.map(tp => [
-            tp.waypoint.lon,
-            tp.waypoint.lat,
-          ]);
+          // Create optimized task line that tags cylinder edges
+          const { calculateOptimizedTaskLine, getOptimizedSegmentDistances } = await import('./xctsk-parser');
+          const optimizedPath = calculateOptimizedTaskLine(task);
+          const lineCoords = optimizedPath.map(p => [p.lon, p.lat]);
 
           (map.getSource('task-line') as maplibregl.GeoJSONSource)?.setData({
             type: 'FeatureCollection',
@@ -382,6 +404,36 @@ export function createMapLibreProvider(container: HTMLElement): Promise<MapProvi
                 },
               },
             ],
+          });
+
+          // Create segment distance labels
+          const segmentDistances = getOptimizedSegmentDistances(task);
+          const segmentLabelFeatures = [];
+          for (let i = 0; i < optimizedPath.length - 1; i++) {
+            const p1 = optimizedPath[i];
+            const p2 = optimizedPath[i + 1];
+            const distance = segmentDistances[i];
+
+            // Calculate midpoint
+            const midLon = (p1.lon + p2.lon) / 2;
+            const midLat = (p1.lat + p2.lat) / 2;
+
+            const distanceKm = (distance / 1000).toFixed(1);
+            segmentLabelFeatures.push({
+              type: 'Feature' as const,
+              properties: {
+                distance: `${distanceKm} km`,
+              },
+              geometry: {
+                type: 'Point' as const,
+                coordinates: [midLon, midLat],
+              },
+            });
+          }
+
+          (map.getSource('task-segment-labels') as maplibregl.GeoJSONSource)?.setData({
+            type: 'FeatureCollection',
+            features: segmentLabelFeatures,
           });
 
           // Create turnpoint markers

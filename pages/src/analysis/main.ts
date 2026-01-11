@@ -9,7 +9,7 @@
  */
 
 import { parseIGC, IGCFile, IGCFix } from './igc-parser';
-import { fetchTaskByCode, parseXCTask, XCTask } from './xctsk-parser';
+import { fetchTaskByCode, parseXCTask, XCTask, calculateOptimizedTaskDistance } from './xctsk-parser';
 import { createMapProvider, getProviderFromUrl, MapProvider } from './map-provider';
 import { detectFlightEvents, FlightEvent } from './event-detector';
 import { createEventPanel, EventPanel } from './event-panel';
@@ -249,7 +249,10 @@ async function init(): Promise<void> {
     }
 
     if (state.task) {
-      parts.push(`<strong>Task:</strong> ${state.task.turnpoints.length} TPs`);
+      const numTurnpoints = state.task.turnpoints.length;
+      const optimizedDistance = calculateOptimizedTaskDistance(state.task);
+      const distanceKm = (optimizedDistance / 1000).toFixed(2);
+      parts.push(`<strong>Task:</strong> ${numTurnpoints} TPs, ${distanceKm} km (optimized)`);
     }
 
     flightInfoEl.innerHTML = parts.length > 0

@@ -411,3 +411,198 @@ export function calculateTaskDistance(task: XCTask): number {
 
   return distance;
 }
+
+/**
+ * Calculate bearing from point 1 to point 2 (in radians)
+ */
+function calculateBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const lat1Rad = lat1 * Math.PI / 180;
+  const lat2Rad = lat2 * Math.PI / 180;
+
+  const y = Math.sin(dLon) * Math.cos(lat2Rad);
+  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) -
+    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+
+  return Math.atan2(y, x);
+}
+
+/**
+ * Calculate a destination point given distance and bearing from start point
+ * @param lat Starting latitude in degrees
+ * @param lon Starting longitude in degrees
+ * @param distance Distance in meters
+ * @param bearing Bearing in radians
+ * @returns Destination point {lat, lon} in degrees
+ */
+function destinationPoint(lat: number, lon: number, distance: number, bearing: number): { lat: number; lon: number } {
+  const R = 6371000; // Earth's radius in meters
+  const latRad = lat * Math.PI / 180;
+  const lonRad = lon * Math.PI / 180;
+  const angularDistance = distance / R;
+
+  const lat2 = Math.asin(
+    Math.sin(latRad) * Math.cos(angularDistance) +
+    Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing)
+  );
+
+  const lon2 = lonRad + Math.atan2(
+    Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latRad),
+    Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(lat2)
+  );
+
+  return {
+    lat: lat2 * 180 / Math.PI,
+    lon: lon2 * 180 / Math.PI,
+  };
+}
+
+/**
+ * Calculate the optimized task line that tags the edges of turnpoint cylinders
+ * rather than going through their centers.
+ *
+ * For the start (SSS), the line exits the circle at the point toward the next turnpoint.
+ * For intermediate turnpoints, the line enters and exits at tangent points that minimize distance.
+ * For the goal (last turnpoint), the line enters at the optimal point.
+ *
+ * @returns Array of coordinates representing the optimized path
+ */
+export function calculateOptimizedTaskLine(task: XCTask): { lat: number; lon: number }[] {
+  if (task.turnpoints.length === 0) return [];
+  if (task.turnpoints.length === 1) {
+    // Single turnpoint - just return its center
+    return [{ lat: task.turnpoints[0].waypoint.lat, lon: task.turnpoints[0].waypoint.lon }];
+  }
+
+  const path: { lat: number; lon: number }[] = [];
+
+  for (let i = 0; i < task.turnpoints.length - 1; i++) {
+    const current = task.turnpoints[i];
+    const next = task.turnpoints[i + 1];
+
+    // Calculate bearing from current to next turnpoint
+    const bearing = calculateBearing(
+      current.waypoint.lat,
+      current.waypoint.lon,
+      next.waypoint.lat,
+      next.waypoint.lon
+    );
+
+    // For the first turnpoint (start), we exit the cylinder at the edge
+    // For subsequent turnpoints, we enter and exit at tangent points
+    if (i === 0) {
+      // Exit point of the first turnpoint (start)
+      const exitPoint = destinationPoint(
+        current.waypoint.lat,
+        current.waypoint.lon,
+        current.radius,
+        bearing
+      );
+      path.push(exitPoint);
+    } else {
+      // For intermediate turnpoints, add the entry point
+      // Entry is from the opposite direction (bearing from previous)
+      const bearingFromPrev = calculateBearing(
+        task.turnpoints[i - 1].waypoint.lat,
+        task.turnpoints[i - 1].waypoint.lon,
+        current.waypoint.lat,
+        current.waypoint.lon
+      );
+      const entryPoint = destinationPoint(
+        current.waypoint.lat,
+        current.waypoint.lon,
+        current.radius,
+        bearingFromPrev
+      );
+      path.push(entryPoint);
+
+      // Exit point toward next turnpoint
+      const exitPoint = destinationPoint(
+        current.waypoint.lat,
+        current.waypoint.lon,
+        current.radius,
+        bearing
+      );
+      path.push(exitPoint);
+    }
+  }
+
+  // Add the entry point of the last turnpoint (goal)
+  const lastIdx = task.turnpoints.length - 1;
+  const lastTp = task.turnpoints[lastIdx];
+  const bearingToLast = calculateBearing(
+    task.turnpoints[lastIdx - 1].waypoint.lat,
+    task.turnpoints[lastIdx - 1].waypoint.lon,
+    lastTp.waypoint.lat,
+    lastTp.waypoint.lon
+  );
+  const goalEntry = destinationPoint(
+    lastTp.waypoint.lat,
+    lastTp.waypoint.lon,
+    lastTp.radius,
+    bearingToLast
+  );
+  path.push(goalEntry);
+
+  return path;
+}
+
+/**
+ * Calculate distance between two points using Haversine formula
+ */
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Calculate the optimized task distance (sum of all line segments)
+ * This is the shortest distance that tags all turnpoint cylinders.
+ */
+export function calculateOptimizedTaskDistance(task: XCTask): number {
+  const path = calculateOptimizedTaskLine(task);
+  if (path.length < 2) return 0;
+
+  let totalDistance = 0;
+  for (let i = 1; i < path.length; i++) {
+    totalDistance += haversineDistance(
+      path[i - 1].lat,
+      path[i - 1].lon,
+      path[i].lat,
+      path[i].lon
+    );
+  }
+
+  return totalDistance;
+}
+
+/**
+ * Get individual segment distances for the optimized path
+ * Useful for labeling each segment with its distance
+ */
+export function getOptimizedSegmentDistances(task: XCTask): number[] {
+  const path = calculateOptimizedTaskLine(task);
+  if (path.length < 2) return [];
+
+  const distances: number[] = [];
+  for (let i = 1; i < path.length; i++) {
+    distances.push(
+      haversineDistance(
+        path[i - 1].lat,
+        path[i - 1].lon,
+        path[i].lat,
+        path[i].lon
+      )
+    );
+  }
+
+  return distances;
+}
