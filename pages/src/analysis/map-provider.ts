@@ -27,7 +27,7 @@ export interface MapProvider {
     setTrack(fixes: IGCFix[]): void;
 
     /** Render task turnpoints and cylinders */
-    setTask(task: XCTask): void;
+    setTask(task: XCTask): Promise<void>;
 
     /** Render event markers on the map */
     setEvents(events: FlightEvent[]): void;
