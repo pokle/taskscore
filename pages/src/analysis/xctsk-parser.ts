@@ -458,63 +458,69 @@ function destinationPoint(lat: number, lon: number, distance: number, bearing: n
 }
 
 /**
- * Calculate external tangent points between two circles
- * Returns the tangent points on both circles for the shortest external tangent line
+ * Find the optimal point on a circle that minimizes total path distance.
  *
- * The external tangent is the line that touches both circles without crossing between them.
+ * For a circle at position (centerLat, centerLon) with radius r, find the point
+ * on its perimeter that minimizes: distance(prevPoint, circlePoint) + distance(circlePoint, nextPoint)
+ *
+ * Uses golden section search for optimization.
  */
-function calculateExternalTangent(
-  lat1: number, lon1: number, r1: number,
-  lat2: number, lon2: number, r2: number
-): { p1: { lat: number; lon: number }, p2: { lat: number; lon: number } } {
-  // Calculate distance between centers
-  const d = haversineDistance(lat1, lon1, lat2, lon2);
-
-  // If circles overlap, fall back to direct approach
-  if (d < Math.abs(r1 - r2)) {
-    const bearing = calculateBearing(lat1, lon1, lat2, lon2);
-    return {
-      p1: destinationPoint(lat1, lon1, r1, bearing),
-      p2: destinationPoint(lat2, lon2, r2, bearing + Math.PI)
-    };
-  }
-
-  // Calculate bearing from center1 to center2
-  const bearingC1toC2 = calculateBearing(lat1, lon1, lat2, lon2);
-
-  // For external tangent calculation:
-  // The angle γ represents the deviation from perpendicular due to different radii
-  const radiusDiff = r1 - r2;
-
-  // Handle equal-radius circles (tangent is exactly perpendicular)
-  if (Math.abs(radiusDiff) < 0.1) {
-    const perpAngle = bearingC1toC2 + Math.PI / 2;
-    return {
-      p1: destinationPoint(lat1, lon1, r1, perpAngle),
-      p2: destinationPoint(lat2, lon2, r2, perpAngle)
-    };
-  }
-
-  // For different radii: calculate the angle offset
-  // γ is the angle offset from perpendicular due to the radius difference
-  const gamma = Math.asin(radiusDiff / d);
-
-  // The external tangent point angle from each center is the perpendicular angle minus γ
-  // This gives us the "right-hand" external tangent (could also use + to get left-hand)
-  const tangentAngle1 = bearingC1toC2 + Math.PI / 2 - gamma;
-  const tangentAngle2 = bearingC1toC2 + Math.PI / 2 - gamma;
-
-  return {
-    p1: destinationPoint(lat1, lon1, r1, tangentAngle1),
-    p2: destinationPoint(lat2, lon2, r2, tangentAngle2)
+function findOptimalCirclePoint(
+  prevLat: number,
+  prevLon: number,
+  centerLat: number,
+  centerLon: number,
+  radius: number,
+  nextLat: number,
+  nextLon: number
+): { lat: number; lon: number } {
+  // Cost function: total distance through a point on the circle
+  const cost = (angle: number): number => {
+    const point = destinationPoint(centerLat, centerLon, radius, angle);
+    const d1 = haversineDistance(prevLat, prevLon, point.lat, point.lon);
+    const d2 = haversineDistance(point.lat, point.lon, nextLat, nextLon);
+    return d1 + d2;
   };
+
+  // Golden section search for minimum
+  const phi = (1 + Math.sqrt(5)) / 2;
+  const resphi = 2 - phi;
+
+  let a = 0;
+  let b = 2 * Math.PI;
+  const tol = 1e-5;
+
+  let x1 = a + resphi * (b - a);
+  let x2 = b - resphi * (b - a);
+  let f1 = cost(x1);
+  let f2 = cost(x2);
+
+  while (Math.abs(b - a) > tol) {
+    if (f1 < f2) {
+      b = x2;
+      x2 = x1;
+      f2 = f1;
+      x1 = a + resphi * (b - a);
+      f1 = cost(x1);
+    } else {
+      a = x1;
+      x1 = x2;
+      f1 = f2;
+      x2 = b - resphi * (b - a);
+      f2 = cost(x2);
+    }
+  }
+
+  const optimalAngle = (a + b) / 2;
+  return destinationPoint(centerLat, centerLon, radius, optimalAngle);
 }
 
 /**
  * Calculate the optimized task line that tags the edges of turnpoint cylinders
  * rather than going through their centers.
  *
- * Uses external tangent lines between consecutive cylinders to find the shortest path.
+ * For each turnpoint cylinder, finds the single optimal point that minimizes
+ * the total path distance. This is the approach used by XContest, XCTrack, and AirScore.
  *
  * @returns Array of coordinates representing the optimized path
  */
@@ -525,25 +531,67 @@ export function calculateOptimizedTaskLine(task: XCTask): { lat: number; lon: nu
     return [{ lat: task.turnpoints[0].waypoint.lat, lon: task.turnpoints[0].waypoint.lon }];
   }
 
-  const path: { lat: number; lon: number }[] = [];
+  if (task.turnpoints.length === 2) {
+    // Two turnpoints - simple case: find points along line between centers
+    const tp1 = task.turnpoints[0];
+    const tp2 = task.turnpoints[1];
 
-  // Calculate tangent points between each pair of consecutive turnpoints
-  for (let i = 0; i < task.turnpoints.length - 1; i++) {
-    const current = task.turnpoints[i];
-    const next = task.turnpoints[i + 1];
-
-    const tangent = calculateExternalTangent(
-      current.waypoint.lat,
-      current.waypoint.lon,
-      current.radius,
-      next.waypoint.lat,
-      next.waypoint.lon,
-      next.radius
+    const bearing = calculateBearing(
+      tp1.waypoint.lat,
+      tp1.waypoint.lon,
+      tp2.waypoint.lat,
+      tp2.waypoint.lon
     );
 
-    // Add the exit point of current cylinder and entry point of next cylinder
-    path.push(tangent.p1);
-    path.push(tangent.p2);
+    return [
+      destinationPoint(tp1.waypoint.lat, tp1.waypoint.lon, tp1.radius, bearing),
+      destinationPoint(tp2.waypoint.lat, tp2.waypoint.lon, tp2.radius, bearing + Math.PI)
+    ];
+  }
+
+  // Three or more turnpoints - optimize each point
+  const path: { lat: number; lon: number }[] = [];
+
+  for (let i = 0; i < task.turnpoints.length; i++) {
+    const tp = task.turnpoints[i];
+
+    if (i === 0) {
+      // First turnpoint: point along line towards next
+      const next = task.turnpoints[i + 1];
+      const bearing = calculateBearing(
+        tp.waypoint.lat,
+        tp.waypoint.lon,
+        next.waypoint.lat,
+        next.waypoint.lon
+      );
+      path.push(destinationPoint(tp.waypoint.lat, tp.waypoint.lon, tp.radius, bearing));
+    } else if (i === task.turnpoints.length - 1) {
+      // Last turnpoint: point along line from previous
+      const prev = task.turnpoints[i - 1];
+      const bearing = calculateBearing(
+        prev.waypoint.lat,
+        prev.waypoint.lon,
+        tp.waypoint.lat,
+        tp.waypoint.lon
+      );
+      path.push(destinationPoint(tp.waypoint.lat, tp.waypoint.lon, tp.radius, bearing));
+    } else {
+      // Intermediate turnpoint: find optimal point minimizing total distance
+      const prevPoint = path[path.length - 1]; // Use the already optimized previous point
+      const next = task.turnpoints[i + 1];
+
+      const optimal = findOptimalCirclePoint(
+        prevPoint.lat,
+        prevPoint.lon,
+        tp.waypoint.lat,
+        tp.waypoint.lon,
+        tp.radius,
+        next.waypoint.lat,
+        next.waypoint.lon
+      );
+
+      path.push(optimal);
+    }
   }
 
   return path;
