@@ -44,6 +44,21 @@ The tool automatically detects and displays:
 - Events grouped by category (Key Events, Thermals, Glides, Turnpoints, Statistics)
 - Click-to-pan: clicking an event centers the map on that location
 
+### Event Selection Visualization
+When an event is selected from the panel:
+
+- **Segment Highlighting**: For thermal and glide events, the corresponding track segment is highlighted with a bright cyan line (6px width) to clearly show the extent of the segment
+- **Auto-Popup**: A popup appears showing event details (description, time, altitude) anchored to:
+  - Entry/start point for thermal_entry and glide_start events
+  - Exit/end point for thermal_exit and glide_end events
+  - Event location for point events (takeoff, max altitude, etc.)
+- **Segment Markers**: For segment events (thermals, glides), two markers are displayed:
+  - **Start marker**: Ring/outline style circle at the segment start
+  - **End marker**: Filled circle at the segment end
+- **Point Marker**: For non-segment events, a single filled marker at the event location
+
+This visual system helps pilots quickly identify and understand the spatial extent of flight phases.
+
 ## Technical Architecture
 
 ```

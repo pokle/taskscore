@@ -167,69 +167,30 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
 
     eventCountEl.textContent = `${filteredEvents.length} of ${allEvents.length} events`;
 
-    // Group events by category
-    const groups: Record<string, FlightEvent[]> = {
-      'Key Events': [],
-      'Thermals': [],
-      'Glides': [],
-      'Turnpoints': [],
-      'Statistics': [],
-    };
+    // Render events as a timeline (already sorted by time from detectFlightEvents)
+    let html = '<div class="event-timeline">';
 
     for (const event of filteredEvents) {
-      if (event.type === 'takeoff' || event.type === 'landing' ||
-          event.type === 'start_crossing' || event.type === 'goal_crossing') {
-        groups['Key Events'].push(event);
-      } else if (event.type.startsWith('thermal')) {
-        groups['Thermals'].push(event);
-      } else if (event.type.startsWith('glide')) {
-        groups['Glides'].push(event);
-      } else if (event.type.startsWith('turnpoint')) {
-        groups['Turnpoints'].push(event);
-      } else {
-        groups['Statistics'].push(event);
-      }
-    }
-
-    let html = '';
-
-    for (const [groupName, events] of Object.entries(groups)) {
-      if (events.length === 0) continue;
+      const style = getEventStyle(event.type);
+      const icon = getEventIcon(event.type);
 
       html += `
-        <details class="event-group" open>
-          <summary class="event-group-header">
-            ${groupName}
-            <span class="event-group-count">${events.length}</span>
-          </summary>
-          <div class="event-group-items">
-      `;
-
-      for (const event of events) {
-        const style = getEventStyle(event.type);
-        const icon = getEventIcon(event.type);
-
-        html += `
-          <button class="event-item" data-event-id="${event.id}">
-            <span class="event-icon" style="color: ${style.color}">
-              ${icon}
+        <button class="event-item" data-event-id="${event.id}">
+          <span class="event-icon" style="color: ${style.color}">
+            ${icon}
+          </span>
+          <div class="event-content">
+            <span class="event-type">${getEventTypeLabel(event.type)}</span>
+            <span class="event-desc">${event.description}</span>
+            <span class="event-meta">
+              ${formatTime(event.time)} | ${event.altitude.toFixed(0)}m
             </span>
-            <div class="event-content">
-              <span class="event-type">${getEventTypeLabel(event.type)}</span>
-              <span class="event-desc">${event.description}</span>
-              <span class="event-meta">
-                ${formatTime(event.time)} | ${event.altitude.toFixed(0)}m
-              </span>
-            </div>
-          </button>
-        `;
-      }
-
-      html += `
           </div>
-        </details>
+        </button>
       `;
     }
+
+    html += '</div>';
 
     listContainer.innerHTML = html;
 

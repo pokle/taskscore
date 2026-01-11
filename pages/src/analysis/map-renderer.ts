@@ -51,6 +51,7 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
       let currentEvents: FlightEvent[] = [];
       const eventMarkers: maplibregl.Marker[] = [];
       let activePopup: maplibregl.Popup | null = null;
+      let activeMarkers: maplibregl.Marker[] = [];
 
       /**
        * Add custom sources and layers for track/task visualization
@@ -491,11 +492,15 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
         },
 
         panToEvent(event: FlightEvent) {
-          // Close any existing popup
+          // Close any existing popup and markers
           if (activePopup) {
             activePopup.remove();
             activePopup = null;
           }
+          for (const marker of activeMarkers) {
+            marker.remove();
+          }
+          activeMarkers = [];
 
           // Highlight segment if event has one
           if (event.segment && currentFixes.length > 0) {
@@ -525,6 +530,21 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
             });
           }
 
+          // Determine popup location
+          // For segment events, position at start or end based on event type
+          let popupLng = event.longitude;
+          let popupLat = event.latitude;
+
+          if (event.segment && currentFixes.length > 0) {
+            const isStartEvent = event.type === 'thermal_entry' || event.type === 'glide_start';
+            const fixIndex = isStartEvent ? event.segment.startIndex : event.segment.endIndex;
+            const fix = currentFixes[fixIndex];
+            if (fix) {
+              popupLng = fix.longitude;
+              popupLat = fix.latitude;
+            }
+          }
+
           // Create and show popup
           const style = getEventStyle(event.type);
           activePopup = new maplibregl.Popup({
@@ -532,7 +552,7 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
             closeOnClick: false,
             offset: 25,
           })
-            .setLngLat([event.longitude, event.latitude])
+            .setLngLat([popupLng, popupLat])
             .setHTML(`
               <div style="min-width: 150px;">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
@@ -545,6 +565,56 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
               </div>
             `)
             .addTo(map);
+
+          // Create markers at segment endpoints or event point
+
+          if (event.segment && currentFixes.length > 0) {
+            // For segment events, show start and end markers
+            const startFix = currentFixes[event.segment.startIndex];
+            const endFix = currentFixes[event.segment.endIndex];
+
+            // Start marker (ring/outline style)
+            const startEl = document.createElement('div');
+            startEl.style.width = '14px';
+            startEl.style.height = '14px';
+            startEl.style.borderRadius = '50%';
+            startEl.style.backgroundColor = 'transparent';
+            startEl.style.border = `3px solid ${style.color}`;
+            startEl.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+
+            const startMarker = new maplibregl.Marker({ element: startEl })
+              .setLngLat([startFix.longitude, startFix.latitude])
+              .addTo(map);
+            activeMarkers.push(startMarker);
+
+            // End marker (filled style)
+            const endEl = document.createElement('div');
+            endEl.style.width = '14px';
+            endEl.style.height = '14px';
+            endEl.style.borderRadius = '50%';
+            endEl.style.backgroundColor = style.color;
+            endEl.style.border = '3px solid white';
+            endEl.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+
+            const endMarker = new maplibregl.Marker({ element: endEl })
+              .setLngLat([endFix.longitude, endFix.latitude])
+              .addTo(map);
+            activeMarkers.push(endMarker);
+          } else {
+            // For point events, show single marker
+            const markerEl = document.createElement('div');
+            markerEl.style.width = '16px';
+            markerEl.style.height = '16px';
+            markerEl.style.borderRadius = '50%';
+            markerEl.style.backgroundColor = style.color;
+            markerEl.style.border = '3px solid white';
+            markerEl.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+
+            const marker = new maplibregl.Marker({ element: markerEl })
+              .setLngLat([event.longitude, event.latitude])
+              .addTo(map);
+            activeMarkers.push(marker);
+          }
 
           // Pan to the event location
           map.flyTo({
