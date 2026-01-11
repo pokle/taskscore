@@ -12,7 +12,7 @@
 import maplibregl from 'maplibre-gl';
 import { IGCFix, getBoundingBox } from './igc-parser';
 import { XCTask } from './xctsk-parser';
-import { FlightEvent, getEventStyle } from './event-detector';
+import { FlightEvent, getEventStyle, TrackSegment } from './event-detector';
 import { StyleSelectorControl, MAP_STYLES, getStyleById } from './map-styles';
 
 export interface MapRenderer {
@@ -50,6 +50,7 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
       let currentTask: XCTask | null = null;
       let currentEvents: FlightEvent[] = [];
       const eventMarkers: maplibregl.Marker[] = [];
+      let activePopup: maplibregl.Popup | null = null;
 
       /**
        * Add custom sources and layers for track/task visualization
@@ -68,6 +69,7 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
         const customLayers = [
           'task-labels',
           'task-points',
+          'highlight-segment',
           'track-line',
           'track-line-outline',
           'task-cylinders-stroke',
@@ -82,7 +84,7 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
         }
 
         // Add sources (only if they don't exist)
-        const sourcesToAdd = ['track', 'task-line', 'task-points', 'task-cylinders'];
+        const sourcesToAdd = ['track', 'task-line', 'task-points', 'task-cylinders', 'highlight-segment'];
         for (const sourceId of sourcesToAdd) {
           const exists = !!map.getSource(sourceId);
           console.log(`[MapRenderer] Source ${sourceId} exists: ${exists}`);
@@ -185,6 +187,22 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
               3000, '#ef4444',
             ],
             'line-width': 3,
+            'line-opacity': 0.9,
+          },
+        });
+
+        // 5b. Highlight segment (for selected events)
+        map.addLayer({
+          id: 'highlight-segment',
+          type: 'line',
+          source: 'highlight-segment',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': '#00ffff',
+            'line-width': 6,
             'line-opacity': 0.9,
           },
         });
@@ -473,6 +491,62 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
         },
 
         panToEvent(event: FlightEvent) {
+          // Close any existing popup
+          if (activePopup) {
+            activePopup.remove();
+            activePopup = null;
+          }
+
+          // Highlight segment if event has one
+          if (event.segment && currentFixes.length > 0) {
+            const { startIndex, endIndex } = event.segment;
+            const segmentFixes = currentFixes.slice(startIndex, endIndex + 1);
+
+            if (segmentFixes.length > 1) {
+              const coordinates = segmentFixes.map(fix => [fix.longitude, fix.latitude]);
+
+              (map.getSource('highlight-segment') as maplibregl.GeoJSONSource)?.setData({
+                type: 'FeatureCollection',
+                features: [{
+                  type: 'Feature',
+                  properties: {},
+                  geometry: {
+                    type: 'LineString',
+                    coordinates,
+                  },
+                }],
+              });
+            }
+          } else {
+            // Clear highlight for point events
+            (map.getSource('highlight-segment') as maplibregl.GeoJSONSource)?.setData({
+              type: 'FeatureCollection',
+              features: [],
+            });
+          }
+
+          // Create and show popup
+          const style = getEventStyle(event.type);
+          activePopup = new maplibregl.Popup({
+            closeButton: true,
+            closeOnClick: false,
+            offset: 25,
+          })
+            .setLngLat([event.longitude, event.latitude])
+            .setHTML(`
+              <div style="min-width: 150px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                  <span style="width: 10px; height: 10px; border-radius: 50%; background: ${style.color};"></span>
+                  <strong>${event.description}</strong>
+                </div>
+                <div style="color: #94a3b8; font-size: 0.8125rem;">
+                  ${event.time.toLocaleTimeString()} | ${event.altitude.toFixed(0)}m
+                </div>
+              </div>
+            `)
+            .addTo(map);
+
+          // Pan to the event location
           map.flyTo({
             center: [event.longitude, event.latitude],
             zoom: 14,
