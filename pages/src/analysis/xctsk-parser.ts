@@ -320,45 +320,47 @@ export function parseXCTask(content: string): XCTask {
 
 /**
  * Fetch task from XContest by task code
+ *
+ * Note: According to https://tools.xcontest.org/xctsk, task codes are numeric.
+ * The v1 API (/api/xctsk/load/) returns the original format.
+ * The v2 API (/api/xctsk/loadV2/) returns compact QR code format.
  */
 export async function fetchTaskByCode(code: string): Promise<XCTask> {
-  // Clean up code - remove spaces, convert to uppercase
-  const cleanCode = code.trim().toUpperCase();
+  // Clean up code - trim whitespace only (codes are numeric, don't uppercase)
+  const cleanCode = code.trim();
 
-  // Try v1 API first (more reliable format), then v2
-  const urls = [
-    `https://tools.xcontest.org/api/xctsk/load/${cleanCode}`,
-    `https://tools.xcontest.org/api/xctsk/loadV2/${cleanCode}`,
-  ];
-
-  let lastError: Error | null = null;
-
-  for (const url of urls) {
-    try {
-      const response = await fetch(url);
-
-      if (response.ok) {
-        const text = await response.text();
-        const task = parseXCTask(text);
-
-        // Validate the parsed task has valid coordinates
-        if (isValidTask(task)) {
-          return task;
-        } else {
-          lastError = new Error('Parsed task has invalid coordinates');
-          // Continue to next URL
-        }
-      } else if (response.status === 404) {
-        // Only throw 404 error if this is the last URL
-        lastError = new Error(`Task code "${cleanCode}" not found`);
-      }
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      // Continue to next URL
-    }
+  if (!cleanCode) {
+    throw new Error('Task code cannot be empty');
   }
 
-  throw lastError || new Error(`Failed to fetch task: ${cleanCode}`);
+  // Use only the v1 API which returns the original format
+  // The v2 API returns a compact format that requires different parsing
+  const url = `https://tools.xcontest.org/api/xctsk/load/${encodeURIComponent(cleanCode)}`;
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error(`Task code "${cleanCode}" not found`);
+    }
+    throw new Error(`Failed to fetch task: HTTP ${response.status}`);
+  }
+
+  const text = await response.text();
+
+  // Validate that we got JSON back
+  if (!text.trim().startsWith('{')) {
+    throw new Error(`Invalid response from server: expected JSON`);
+  }
+
+  const task = parseXCTask(text);
+
+  // Validate the parsed task has valid coordinates
+  if (!isValidTask(task)) {
+    throw new Error('Task has invalid or missing coordinates');
+  }
+
+  return task;
 }
 
 /**
