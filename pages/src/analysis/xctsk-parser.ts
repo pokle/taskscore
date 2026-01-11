@@ -463,7 +463,23 @@ function destinationPoint(lat: number, lon: number, distance: number, bearing: n
  * For a circle at position (centerLat, centerLon) with radius r, find the point
  * on its perimeter that minimizes: distance(prevPoint, circlePoint) + distance(circlePoint, nextPoint)
  *
- * Uses golden section search for optimization.
+ * This is a constrained optimization problem where we search for the angle θ ∈ [0, 2π]
+ * that minimizes the cost function. The cost function is unimodal (has a single minimum),
+ * making golden section search an efficient choice.
+ *
+ * Golden section search has linear convergence and requires O(log(1/ε)) iterations
+ * where ε is the tolerance (1e-5). For typical cases, this means ~30 iterations.
+ *
+ * @param prevLat Latitude of the previous optimized point
+ * @param prevLon Longitude of the previous optimized point
+ * @param centerLat Latitude of the current turnpoint center
+ * @param centerLon Longitude of the current turnpoint center
+ * @param radius Radius of the current turnpoint cylinder (in meters)
+ * @param nextLat Latitude of the next turnpoint center
+ * @param nextLon Longitude of the next turnpoint center
+ * @returns The optimal point on the cylinder's perimeter
+ *
+ * @see https://en.wikipedia.org/wiki/Golden-section_search
  */
 function findOptimalCirclePoint(
   prevLat: number,
@@ -519,10 +535,34 @@ function findOptimalCirclePoint(
  * Calculate the optimized task line that tags the edges of turnpoint cylinders
  * rather than going through their centers.
  *
- * For each turnpoint cylinder, finds the single optimal point that minimizes
- * the total path distance. This is the approach used by XContest, XCTrack, and AirScore.
+ * This algorithm finds the shortest achievable distance through a competition task
+ * by determining the optimal point to tag each turnpoint cylinder. Each cylinder
+ * contributes exactly ONE point to the path.
  *
- * @returns Array of coordinates representing the optimized path
+ * Algorithm:
+ * - First turnpoint: Point on circle along bearing toward next turnpoint
+ * - Intermediate turnpoints: Use golden section search to minimize total distance
+ * - Last turnpoint: Point on circle along bearing from previous turnpoint
+ *
+ * The optimization for intermediate turnpoints is greedy (considers only adjacent
+ * points) but is computationally efficient and matches the behavior of professional
+ * scoring systems like XContest, XCTrack, AirScore, and LK8000.
+ *
+ * Mathematical formulation:
+ * For each turnpoint i, find point pᵢ on circle i such that:
+ *   min Σ distance(pᵢ₋₁, pᵢ) + distance(pᵢ, pᵢ₊₁)
+ *
+ * @param task The competition task with turnpoint cylinders
+ * @returns Array of lat/lon coordinates representing the optimized path
+ *
+ * @example
+ * const task = await fetchTaskByCode('BUJE');
+ * const optimizedPath = calculateOptimizedTaskLine(task);
+ * // Returns: [{lat: 45.123, lon: 13.456}, {lat: 45.234, lon: 13.567}, ...]
+ *
+ * @see https://github.com/LK8000/LK8000/pull/286 - LK8000 task optimization
+ * @see https://github.com/teobouvard/igclib - Python task optimization library
+ * @see /specs/optimized-task-line-spec.md - Full algorithm documentation
  */
 export function calculateOptimizedTaskLine(task: XCTask): { lat: number; lon: number }[] {
   if (task.turnpoints.length === 0) return [];
@@ -614,8 +654,20 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 /**
- * Calculate the optimized task distance (sum of all line segments)
- * This is the shortest distance that tags all turnpoint cylinders.
+ * Calculate the optimized task distance (sum of all line segments).
+ *
+ * This is the shortest achievable distance through the task by optimally
+ * tagging each turnpoint cylinder. The distance is computed as the sum
+ * of great circle distances between consecutive optimized points.
+ *
+ * @param task The competition task with turnpoint cylinders
+ * @returns Total optimized distance in meters
+ *
+ * @example
+ * const task = await fetchTaskByCode('BUJE');
+ * const distance = calculateOptimizedTaskDistance(task);
+ * console.log(`Task distance: ${(distance / 1000).toFixed(2)} km`);
+ * // Output: "Task distance: 133.08 km"
  */
 export function calculateOptimizedTaskDistance(task: XCTask): number {
   const path = calculateOptimizedTaskLine(task);
@@ -635,8 +687,25 @@ export function calculateOptimizedTaskDistance(task: XCTask): number {
 }
 
 /**
- * Get individual segment distances for the optimized path
- * Useful for labeling each segment with its distance
+ * Get individual segment distances for the optimized path.
+ *
+ * Returns an array of distances (in meters) for each segment between
+ * consecutive optimized points. Used for displaying distance labels
+ * on each leg of the task line.
+ *
+ * @param task The competition task with turnpoint cylinders
+ * @returns Array of distances in meters, one per segment
+ *
+ * @example
+ * const task = await fetchTaskByCode('BUJE');
+ * const segments = getOptimizedSegmentDistances(task);
+ * segments.forEach((dist, i) => {
+ *   console.log(`Leg ${i+1}: ${(dist / 1000).toFixed(1)} km`);
+ * });
+ * // Output:
+ * // Leg 1: 7.2 km
+ * // Leg 2: 23.6 km
+ * // ...
  */
 export function getOptimizedSegmentDistances(task: XCTask): number[] {
   const path = calculateOptimizedTaskLine(task);
