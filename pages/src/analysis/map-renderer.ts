@@ -53,179 +53,178 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
 
       /**
        * Add custom sources and layers for track/task visualization
+       *
+       * Layer order (bottom to top):
+       * 1. task-line (dashed route line)
+       * 2. task-cylinders-fill (cylinder fill)
+       * 3. task-cylinders-stroke (cylinder outline)
+       * 4. track-line-outline (track shadow)
+       * 5. track-line (main track)
+       * 6. task-points (turnpoint circles)
+       * 7. task-labels (turnpoint names)
        */
       function addCustomLayers(): void {
-        // Add empty sources for track and task
-        if (!map.getSource('track')) {
-          map.addSource('track', {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: [] },
-          });
+        // Remove existing custom layers to ensure correct ordering
+        const customLayers = [
+          'task-labels',
+          'task-points',
+          'track-line',
+          'track-line-outline',
+          'task-cylinders-stroke',
+          'task-cylinders-fill',
+          'task-line',
+        ];
+        for (const layerId of customLayers) {
+          if (map.getLayer(layerId)) {
+            console.log(`[MapRenderer] Removing existing layer: ${layerId}`);
+            map.removeLayer(layerId);
+          }
         }
 
-        if (!map.getSource('task-line')) {
-          map.addSource('task-line', {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: [] },
-          });
+        // Add sources (only if they don't exist)
+        const sourcesToAdd = ['track', 'task-line', 'task-points', 'task-cylinders'];
+        for (const sourceId of sourcesToAdd) {
+          const exists = !!map.getSource(sourceId);
+          console.log(`[MapRenderer] Source ${sourceId} exists: ${exists}`);
+          if (!exists) {
+            map.addSource(sourceId, {
+              type: 'geojson',
+              data: { type: 'FeatureCollection', features: [] },
+            });
+            console.log(`[MapRenderer] Added source: ${sourceId}`);
+          }
         }
 
-        if (!map.getSource('task-points')) {
-          map.addSource('task-points', {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: [] },
-          });
-        }
+        // Add layers in order from bottom to top (no beforeId needed)
 
-        if (!map.getSource('task-cylinders')) {
-          map.addSource('task-cylinders', {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: [] },
-          });
-        }
+        // 1. Task line (dashed route)
+        map.addLayer({
+          id: 'task-line',
+          type: 'line',
+          source: 'task-line',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': '#6366f1',
+            'line-width': 2,
+            'line-dasharray': [4, 4],
+            'line-opacity': 0.8,
+          },
+        });
 
-        // Add track layer with altitude-based coloring
-        if (!map.getLayer('track-line')) {
-          map.addLayer({
-            id: 'track-line',
-            type: 'line',
-            source: 'track',
-            layout: {
-              'line-join': 'round',
-              'line-cap': 'round',
-            },
-            paint: {
-              'line-color': [
-                'interpolate',
-                ['linear'],
-                ['get', 'altitude'],
-                0, '#3b82f6',
-                1000, '#22c55e',
-                2000, '#eab308',
-                3000, '#ef4444',
-              ],
-              'line-width': 3,
-              'line-opacity': 0.9,
-            },
-          });
-        }
+        // 2. Task cylinders fill
+        map.addLayer({
+          id: 'task-cylinders-fill',
+          type: 'fill',
+          source: 'task-cylinders',
+          paint: {
+            'fill-color': [
+              'case',
+              ['==', ['get', 'type'], 'SSS'], '#22c55e',
+              ['==', ['get', 'type'], 'ESS'], '#eab308',
+              ['==', ['get', 'type'], 'TAKEOFF'], '#3b82f6',
+              '#a855f7',
+            ],
+            'fill-opacity': 0.15,
+          },
+        });
 
-        // Add track outline for visibility
-        if (!map.getLayer('track-line-outline')) {
-          map.addLayer({
-            id: 'track-line-outline',
-            type: 'line',
-            source: 'track',
-            layout: {
-              'line-join': 'round',
-              'line-cap': 'round',
-            },
-            paint: {
-              'line-color': '#000000',
-              'line-width': 5,
-              'line-opacity': 0.3,
-            },
-          }, 'track-line');
-        }
+        // 3. Task cylinders stroke
+        map.addLayer({
+          id: 'task-cylinders-stroke',
+          type: 'line',
+          source: 'task-cylinders',
+          paint: {
+            'line-color': [
+              'case',
+              ['==', ['get', 'type'], 'SSS'], '#22c55e',
+              ['==', ['get', 'type'], 'ESS'], '#eab308',
+              ['==', ['get', 'type'], 'TAKEOFF'], '#3b82f6',
+              '#a855f7',
+            ],
+            'line-width': 2,
+            'line-opacity': 0.8,
+          },
+        });
 
-        // Add task cylinders layer (fill)
-        if (!map.getLayer('task-cylinders-fill')) {
-          map.addLayer({
-            id: 'task-cylinders-fill',
-            type: 'fill',
-            source: 'task-cylinders',
-            paint: {
-              'fill-color': [
-                'case',
-                ['==', ['get', 'type'], 'SSS'], '#22c55e',
-                ['==', ['get', 'type'], 'ESS'], '#eab308',
-                ['==', ['get', 'type'], 'TAKEOFF'], '#3b82f6',
-                '#a855f7',
-              ],
-              'fill-opacity': 0.15,
-            },
-          }, 'track-line-outline');
-        }
+        // 4. Track outline (shadow for visibility)
+        map.addLayer({
+          id: 'track-line-outline',
+          type: 'line',
+          source: 'track',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': '#000000',
+            'line-width': 5,
+            'line-opacity': 0.3,
+          },
+        });
 
-        // Add task cylinders layer (stroke)
-        if (!map.getLayer('task-cylinders-stroke')) {
-          map.addLayer({
-            id: 'task-cylinders-stroke',
-            type: 'line',
-            source: 'task-cylinders',
-            paint: {
-              'line-color': [
-                'case',
-                ['==', ['get', 'type'], 'SSS'], '#22c55e',
-                ['==', ['get', 'type'], 'ESS'], '#eab308',
-                ['==', ['get', 'type'], 'TAKEOFF'], '#3b82f6',
-                '#a855f7',
-              ],
-              'line-width': 2,
-              'line-opacity': 0.8,
-            },
-          }, 'track-line-outline');
-        }
+        // 5. Track line with altitude-based coloring
+        map.addLayer({
+          id: 'track-line',
+          type: 'line',
+          source: 'track',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': [
+              'interpolate',
+              ['linear'],
+              ['get', 'altitude'],
+              0, '#3b82f6',
+              1000, '#22c55e',
+              2000, '#eab308',
+              3000, '#ef4444',
+            ],
+            'line-width': 3,
+            'line-opacity': 0.9,
+          },
+        });
 
-        // Add task line layer
-        if (!map.getLayer('task-line')) {
-          map.addLayer({
-            id: 'task-line',
-            type: 'line',
-            source: 'task-line',
-            layout: {
-              'line-join': 'round',
-              'line-cap': 'round',
-            },
-            paint: {
-              'line-color': '#6366f1',
-              'line-width': 2,
-              'line-dasharray': [4, 4],
-              'line-opacity': 0.8,
-            },
-          }, 'task-cylinders-fill');
-        }
+        // 6. Task points (turnpoint circles)
+        map.addLayer({
+          id: 'task-points',
+          type: 'circle',
+          source: 'task-points',
+          paint: {
+            'circle-radius': 6,
+            'circle-color': [
+              'case',
+              ['==', ['get', 'type'], 'SSS'], '#22c55e',
+              ['==', ['get', 'type'], 'ESS'], '#eab308',
+              ['==', ['get', 'type'], 'TAKEOFF'], '#3b82f6',
+              '#a855f7',
+            ],
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#ffffff',
+          },
+        });
 
-        // Add task points layer
-        if (!map.getLayer('task-points')) {
-          map.addLayer({
-            id: 'task-points',
-            type: 'circle',
-            source: 'task-points',
-            paint: {
-              'circle-radius': 6,
-              'circle-color': [
-                'case',
-                ['==', ['get', 'type'], 'SSS'], '#22c55e',
-                ['==', ['get', 'type'], 'ESS'], '#eab308',
-                ['==', ['get', 'type'], 'TAKEOFF'], '#3b82f6',
-                '#a855f7',
-              ],
-              'circle-stroke-width': 2,
-              'circle-stroke-color': '#ffffff',
-            },
-          });
-        }
-
-        // Add task point labels
-        if (!map.getLayer('task-labels')) {
-          map.addLayer({
-            id: 'task-labels',
-            type: 'symbol',
-            source: 'task-points',
-            layout: {
-              'text-field': ['get', 'name'],
-              'text-size': 12,
-              'text-offset': [0, 1.5],
-              'text-anchor': 'top',
-            },
-            paint: {
-              'text-color': '#1e293b',
-              'text-halo-color': '#ffffff',
-              'text-halo-width': 2,
-            },
-          });
-        }
+        // 7. Task point labels
+        map.addLayer({
+          id: 'task-labels',
+          type: 'symbol',
+          source: 'task-points',
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-size': 12,
+            'text-offset': [0, 1.5],
+            'text-anchor': 'top',
+          },
+          paint: {
+            'text-color': '#1e293b',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 2,
+          },
+        });
       }
 
       /**
@@ -245,7 +244,6 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
 
       // Add navigation controls
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }));
-      map.addControl(new maplibregl.TerrainControl({ source: 'terrain-dem', exaggeration: 1 }));
       map.addControl(new maplibregl.ScaleControl({ maxWidth: 200 }));
       map.addControl(new maplibregl.FullscreenControl());
 
@@ -258,14 +256,20 @@ export function createMap(container: HTMLElement): Promise<MapRenderer> {
       });
       map.addControl(styleSelector, 'top-left');
 
-      // Re-add custom layers after style change
+      // Handle style changes - style.load fires on initial load AND on setStyle
+      let isInitialLoad = true;
       map.on('style.load', () => {
+        console.log('[MapRenderer] style.load fired, isInitialLoad:', isInitialLoad);
         addCustomLayers();
-        restoreData();
+        if (!isInitialLoad) {
+          // Only restore data on style changes, not initial load
+          restoreData();
+        }
       });
 
       map.on('load', () => {
-        addCustomLayers();
+        console.log('[MapRenderer] load event fired');
+        isInitialLoad = false;
         resolve(renderer);
       });
 

@@ -270,6 +270,53 @@ async function init(): Promise<void> {
   }
 
   showStatus('Ready - drop an IGC file or use the file picker', 'info');
+
+  // Load from query params if present (e.g., ?task=buje&track=sample.igc)
+  await loadFromQueryParams(loadTask, loadIGCFile);
+}
+
+/**
+ * Parse URL query parameters and load task/track if specified
+ */
+async function loadFromQueryParams(
+  loadTask: (code: string) => Promise<void>,
+  loadIGCFile: (file: File) => Promise<void>
+): Promise<void> {
+  const params = new URLSearchParams(window.location.search);
+
+  const taskCode = params.get('task');
+  const trackFile = params.get('track');
+
+  // Load task first if specified
+  if (taskCode) {
+    await loadTask(taskCode);
+  }
+
+  // Load track from samples folder if specified
+  if (trackFile) {
+    // Security: validate filename to prevent directory traversal
+    // Only allow alphanumeric, dash, underscore, dot, and must end with .igc
+    const safeFilenamePattern = /^[a-zA-Z0-9_\-\.]+\.igc$/i;
+
+    if (!safeFilenamePattern.test(trackFile) || trackFile.includes('..')) {
+      console.error('Invalid track filename:', trackFile);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/samples/${trackFile}`);
+      if (!response.ok) {
+        console.error(`Failed to fetch track: ${response.status}`);
+        return;
+      }
+
+      const content = await response.text();
+      const file = new File([content], trackFile, { type: 'text/plain' });
+      await loadIGCFile(file);
+    } catch (err) {
+      console.error('Failed to load track from URL:', err);
+    }
+  }
 }
 
 // Initialize when DOM is ready
