@@ -120,7 +120,7 @@ ext     - Optional extensions
 ## Dependencies
 
 - **maplibre-gl**: Map rendering with terrain and hillshade
-- **esbuild**: TypeScript bundling for browser
+- **vite**: TypeScript bundling and dev server with HMR
 
 ## URL
 
