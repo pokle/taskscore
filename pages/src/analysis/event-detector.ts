@@ -28,6 +28,15 @@ export type FlightEventType =
   | 'max_climb'
   | 'max_sink';
 
+/**
+ * Base interface for track segments (thermals, glides, etc.)
+ * Contains the fix array indices that define the segment bounds
+ */
+export interface TrackSegment {
+  startIndex: number;
+  endIndex: number;
+}
+
 export interface FlightEvent {
   id: string;
   type: FlightEventType;
@@ -37,11 +46,11 @@ export interface FlightEvent {
   altitude: number;
   description: string;
   details?: Record<string, unknown>;
+  /** For segment events (thermals, glides), contains the track indices */
+  segment?: TrackSegment;
 }
 
-export interface ThermalSegment {
-  startIndex: number;
-  endIndex: number;
+export interface ThermalSegment extends TrackSegment {
   startAltitude: number;
   endAltitude: number;
   avgClimbRate: number;
@@ -49,9 +58,7 @@ export interface ThermalSegment {
   location: { lat: number; lon: number };
 }
 
-export interface GlideSegment {
-  startIndex: number;
-  endIndex: number;
+export interface GlideSegment extends TrackSegment {
   startAltitude: number;
   endAltitude: number;
   distance: number;
@@ -252,7 +259,7 @@ function detectTurnpointCrossings(
       if (inside && !wasInside) {
         // Entry into cylinder
         const eventType = tp.type === 'SSS' ? 'start_crossing' :
-                         (tpIdx === task.turnpoints.length - 1 ? 'goal_crossing' : 'turnpoint_entry');
+          (tpIdx === task.turnpoints.length - 1 ? 'goal_crossing' : 'turnpoint_entry');
 
         events.push({
           id: `tp-entry-${tpIdx}-${i}`,
@@ -469,6 +476,7 @@ export function detectFlightEvents(
         duration: thermal.duration,
         altitudeGain: thermal.endAltitude - thermal.startAltitude,
       },
+      segment: { startIndex: thermal.startIndex, endIndex: thermal.endIndex },
     });
 
     allEvents.push({
@@ -484,6 +492,7 @@ export function detectFlightEvents(
         duration: thermal.duration,
         altitudeGain: thermal.endAltitude - thermal.startAltitude,
       },
+      segment: { startIndex: thermal.startIndex, endIndex: thermal.endIndex },
     });
   }
 
@@ -504,6 +513,7 @@ export function detectFlightEvents(
         glideRatio: glide.glideRatio,
         duration: glide.duration,
       },
+      segment: { startIndex: glide.startIndex, endIndex: glide.endIndex },
     });
 
     allEvents.push({
@@ -519,6 +529,7 @@ export function detectFlightEvents(
         glideRatio: glide.glideRatio,
         altitudeLost: glide.startAltitude - glide.endAltitude,
       },
+      segment: { startIndex: glide.startIndex, endIndex: glide.endIndex },
     });
   }
 
