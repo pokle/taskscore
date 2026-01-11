@@ -48,7 +48,7 @@ export interface MapProvider {
 /**
  * Available map provider types
  */
-export type MapProviderType = 'maplibre' | 'google';
+export type MapProviderType = 'maplibre' | 'google' | 'leaflet';
 
 /**
  * Factory function to create a map provider
@@ -66,6 +66,10 @@ export async function createMapProvider(
             const { createGoogleMapsProvider } = await import('./google-provider');
             return createGoogleMapsProvider(container);
         }
+        case 'leaflet': {
+            const { createLeafletProvider } = await import('./leaflet-provider');
+            return createLeafletProvider(container);
+        }
         default:
             throw new Error(`Unknown map provider: ${type}`);
     }
@@ -80,5 +84,6 @@ export function getProviderFromUrl(): MapProviderType {
     const provider = params.get('provider');
 
     if (provider === 'google') return 'google';
+    if (provider === 'leaflet') return 'leaflet';
     return 'maplibre';
 }
