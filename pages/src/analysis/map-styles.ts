@@ -82,10 +82,7 @@ export const MAP_STYLES: MapStyle[] = [
         },
         hillshadeLayer,
       ],
-      terrain: {
-        source: 'terrain-dem',
-        exaggeration: 1,
-      },
+      // Note: terrain property removed to prevent layers rendering below surface
       sky: {},
     },
   },
@@ -116,10 +113,7 @@ export const MAP_STYLES: MapStyle[] = [
         },
         hillshadeLayer,
       ],
-      terrain: {
-        source: 'terrain-dem',
-        exaggeration: 1,
-      },
+      // Note: terrain property removed to prevent layers rendering below surface
       sky: {},
     },
   },
@@ -152,10 +146,7 @@ export const MAP_STYLES: MapStyle[] = [
         },
         hillshadeLayer,
       ],
-      terrain: {
-        source: 'terrain-dem',
-        exaggeration: 1,
-      },
+      // Note: terrain property removed to prevent layers rendering below surface
       sky: {},
     },
   },
@@ -196,10 +187,7 @@ export const MAP_STYLES: MapStyle[] = [
           },
         } as maplibregl.LayerSpecification,
       ],
-      terrain: {
-        source: 'terrain-dem',
-        exaggeration: 1,
-      },
+      // Note: terrain property removed to prevent layers rendering below surface
       sky: {},
     },
   },

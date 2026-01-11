@@ -214,7 +214,7 @@ html, body {
 .map-overlay {
   position: absolute;
   top: 0;
-  left: 0;
+  left: 160px; /* Clear the style selector widget */
   right: 0;
   z-index: 5;
   padding: 1rem;
@@ -558,6 +558,11 @@ html, body {
   .event-panel.collapsed {
     margin-right: 0;
     margin-bottom: calc(-40vh + 40px);
+  }
+
+  .map-overlay {
+    left: 1rem; /* Reset for mobile - controls stack vertically */
+    top: 50px; /* Below the style selector */
   }
 }
 
