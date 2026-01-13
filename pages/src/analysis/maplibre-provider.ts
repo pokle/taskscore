@@ -687,6 +687,10 @@ export function createMapLibreProvider(container: HTMLElement): Promise<MapProvi
           }
           map.remove();
         },
+
+        invalidateSize() {
+          map.resize();
+        },
       };
 
     } catch (err) {

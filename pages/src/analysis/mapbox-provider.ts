@@ -1105,6 +1105,10 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           }
           map.remove();
         },
+
+        invalidateSize() {
+          map.resize();
+        },
       };
 
     } catch (err) {

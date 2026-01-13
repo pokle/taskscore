@@ -10,10 +10,21 @@ import { FlightEvent, FlightEventType, getEventStyle } from './event-detector';
 export interface EventPanelOptions {
   container: HTMLElement;
   onEventClick: (event: FlightEvent) => void;
+  onToggle?: () => void;  // Called after panel collapse/expand transition
+}
+
+export interface FlightInfo {
+  date?: string;
+  pilot?: string;
+  glider?: string;
+  duration?: string;
+  maxAlt?: string;
+  task?: string;
 }
 
 export interface EventPanel {
   setEvents(events: FlightEvent[]): void;
+  setFlightInfo(info: FlightInfo): void;
   filterByBounds(bounds: { north: number; south: number; east: number; west: number }): void;
   toggle(): void;
   destroy(): void;
@@ -95,6 +106,9 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
         </svg>
       </button>
     </div>
+    <div class="event-panel-flight-info">
+      <div class="flight-info-content">Load an IGC file to see flight info</div>
+    </div>
     <div class="event-panel-filters">
       <label>
         <input type="checkbox" id="filter-view" checked>
@@ -116,6 +130,7 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
   const listContainer = panel.querySelector('.event-panel-list') as HTMLElement;
   const eventCountEl = panel.querySelector('.event-count') as HTMLElement;
   const filterViewCheckbox = panel.querySelector('#filter-view') as HTMLInputElement;
+  const flightInfoEl = panel.querySelector('.flight-info-content') as HTMLElement;
 
   // State
   let allEvents: FlightEvent[] = [];
@@ -126,8 +141,14 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
   // Event handlers
   toggleBtn.addEventListener('click', () => {
     isCollapsed = !isCollapsed;
+    container.classList.toggle('collapsed', isCollapsed);
     panel.classList.toggle('collapsed', isCollapsed);
     toggleBtn.querySelector('svg')!.style.transform = isCollapsed ? 'rotate(180deg)' : '';
+
+    // Call onToggle after transition completes (300ms matches CSS transition)
+    if (options.onToggle) {
+      setTimeout(options.onToggle, 350);
+    }
   });
 
   filterViewCheckbox.addEventListener('change', () => {
@@ -219,6 +240,33 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
       renderEvents();
     },
 
+    setFlightInfo(info: FlightInfo) {
+      const parts: string[] = [];
+
+      if (info.pilot) {
+        parts.push(`<strong>${info.pilot}</strong>`);
+      }
+      if (info.date) {
+        parts.push(info.date);
+      }
+      if (info.glider) {
+        parts.push(info.glider);
+      }
+      if (info.duration) {
+        parts.push(info.duration);
+      }
+      if (info.maxAlt) {
+        parts.push(`Max: ${info.maxAlt}`);
+      }
+      if (info.task) {
+        parts.push(info.task);
+      }
+
+      flightInfoEl.innerHTML = parts.length > 0
+        ? parts.join(' <span class="flight-info-separator">•</span> ')
+        : 'Load an IGC file to see flight info';
+    },
+
     filterByBounds(bounds: { north: number; south: number; east: number; west: number }) {
       currentBounds = bounds;
       updateFilteredEvents();
@@ -227,6 +275,7 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
 
     toggle() {
       isCollapsed = !isCollapsed;
+      container.classList.toggle('collapsed', isCollapsed);
       panel.classList.toggle('collapsed', isCollapsed);
       toggleBtn.querySelector('svg')!.style.transform = isCollapsed ? 'rotate(180deg)' : '';
     },

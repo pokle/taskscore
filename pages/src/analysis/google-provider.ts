@@ -408,6 +408,10 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
             for (const marker of eventMarkers) marker.map = null;
             if (highlightPath) highlightPath.setMap(null);
         },
+
+        invalidateSize() {
+            google.maps.event.trigger(map, 'resize');
+        },
     };
 
     return provider;

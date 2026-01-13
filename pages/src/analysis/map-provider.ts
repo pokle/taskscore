@@ -44,6 +44,9 @@ export interface MapProvider {
     /** Clean up resources */
     destroy(): void;
 
+    /** Tell the map to resize/redraw (call after container size changes) */
+    invalidateSize(): void;
+
     /** Whether this provider supports 3D track rendering */
     supports3D?: boolean;
 

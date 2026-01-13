@@ -720,6 +720,10 @@ export async function createLeafletProvider(container: HTMLElement): Promise<Map
             }
             map.remove();
         },
+
+        invalidateSize() {
+            map.invalidateSize();
+        },
     };
 
     return provider;

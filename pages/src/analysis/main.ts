@@ -12,7 +12,7 @@ import { parseIGC, IGCFile, IGCFix } from './igc-parser';
 import { fetchTaskByCode, parseXCTask, XCTask, calculateOptimizedTaskDistance } from './xctsk-parser';
 import { createMapProvider, getProviderFromUrl, getProviderCode, MapProvider } from './map-provider';
 import { detectFlightEvents, FlightEvent } from './event-detector';
-import { createEventPanel, EventPanel } from './event-panel';
+import { createEventPanel, EventPanel, FlightInfo } from './event-panel';
 
 // CSS for maplibre-gl and mapbox-gl
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -48,7 +48,6 @@ async function init(): Promise<void> {
   const taskCodeInput = document.getElementById('task-code') as HTMLInputElement;
   const loadTaskBtn = document.getElementById('load-task-btn');
   const statusEl = document.getElementById('status');
-  const flightInfoEl = document.getElementById('flight-info');
   const dropZone = document.getElementById('drop-zone');
   const mapProviderSelect = document.getElementById('map-provider') as HTMLSelectElement | null;
 
@@ -171,6 +170,12 @@ async function init(): Promise<void> {
         setTimeout(() => {
           isProgrammaticPan = false;
         }, 1200);
+      }
+    },
+    onToggle: () => {
+      // Resize map when panel is collapsed/expanded
+      if (mapRenderer) {
+        mapRenderer.invalidateSize();
       }
     },
   });
@@ -307,23 +312,23 @@ async function init(): Promise<void> {
    * Update flight info display
    */
   function updateFlightInfo(): void {
-    if (!flightInfoEl) return;
+    if (!eventPanel) return;
 
-    const parts: string[] = [];
+    const info: FlightInfo = {};
 
     if (state.igcFile) {
       const h = state.igcFile.header;
 
       if (h.date) {
-        parts.push(`<strong>Date:</strong> ${h.date.toLocaleDateString()}`);
+        info.date = h.date.toLocaleDateString();
       }
 
       if (h.pilot) {
-        parts.push(`<strong>Pilot:</strong> ${h.pilot}`);
+        info.pilot = h.pilot;
       }
 
       if (h.gliderType) {
-        parts.push(`<strong>Glider:</strong> ${h.gliderType}`);
+        info.glider = h.gliderType;
       }
 
       if (state.fixes.length > 0) {
@@ -331,11 +336,11 @@ async function init(): Promise<void> {
           state.fixes[0].time.getTime();
         const hours = Math.floor(duration / 3600000);
         const mins = Math.floor((duration % 3600000) / 60000);
-        parts.push(`<strong>Duration:</strong> ${hours}h ${mins}m`);
+        info.duration = `${hours}h ${mins}m`;
 
         // Calculate max altitude
         const maxAlt = Math.max(...state.fixes.map(f => f.gnssAltitude));
-        parts.push(`<strong>Max Alt:</strong> ${maxAlt}m`);
+        info.maxAlt = `${maxAlt}m`;
       }
     }
 
@@ -343,12 +348,10 @@ async function init(): Promise<void> {
       const numTurnpoints = state.task.turnpoints.length;
       const optimizedDistance = calculateOptimizedTaskDistance(state.task);
       const distanceKm = (optimizedDistance / 1000).toFixed(2);
-      parts.push(`<strong>Task:</strong> ${numTurnpoints} TPs, ${distanceKm} km (optimized)`);
+      info.task = `${numTurnpoints} TPs, ${distanceKm} km`;
     }
 
-    flightInfoEl.innerHTML = parts.length > 0
-      ? parts.join(' | ')
-      : 'Load an IGC file to see flight info';
+    eventPanel.setFlightInfo(info);
   }
 
   /**

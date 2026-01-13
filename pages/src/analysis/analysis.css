@@ -27,7 +27,8 @@
   --panel-width: 320px;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--color-bg);
@@ -246,25 +247,12 @@ html, body {
 .map-overlay {
   position: absolute;
   top: 0;
-  left: 160px; /* Clear the style selector widget */
+  left: 160px;
+  /* Clear the style selector widget */
   right: 0;
   z-index: 5;
   padding: 1rem;
   pointer-events: none;
-}
-
-.flight-info {
-  display: inline-block;
-  padding: 0.5rem 0.75rem;
-  background: rgba(30, 41, 59, 0.9);
-  border-radius: var(--radius);
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-  backdrop-filter: blur(8px);
-}
-
-.flight-info strong {
-  color: var(--color-text);
 }
 
 .status {
@@ -303,17 +291,27 @@ html, body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.3s ease;
+}
+
+.event-panel-container.collapsed {
+  width: 48px;
 }
 
 .event-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
-  transition: margin-right 0.3s;
+  min-width: var(--panel-width);
 }
 
-.event-panel.collapsed {
-  margin-right: calc(-1 * var(--panel-width) + 40px);
+.event-panel.collapsed .event-panel-header h2,
+.event-panel.collapsed .event-panel-flight-info,
+.event-panel.collapsed .event-panel-filters,
+.event-panel.collapsed .event-panel-stats,
+.event-panel.collapsed .event-panel-list {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .event-panel-header {
@@ -328,6 +326,29 @@ html, body {
 .event-panel-header h2 {
   font-size: 1rem;
   font-weight: 600;
+}
+
+.event-panel-flight-info {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+  flex-shrink: 0;
+}
+
+.flight-info-content {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.flight-info-content strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.flight-info-separator {
+  color: var(--color-border);
+  margin: 0 0.125rem;
 }
 
 .event-panel-toggle {
@@ -587,14 +608,16 @@ html, body {
     border-top: 1px solid var(--color-border);
   }
 
-  .event-panel.collapsed {
-    margin-right: 0;
-    margin-bottom: calc(-40vh + 40px);
+  .event-panel-container.collapsed {
+    width: 100%;
+    height: 48px;
   }
 
   .map-overlay {
-    left: 1rem; /* Reset for mobile - controls stack vertically */
-    top: 50px; /* Below the style selector */
+    left: 1rem;
+    /* Reset for mobile - controls stack vertically */
+    top: 50px;
+    /* Below the style selector */
   }
 }
 
