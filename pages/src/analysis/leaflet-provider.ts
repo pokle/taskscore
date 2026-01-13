@@ -81,16 +81,30 @@ export async function createLeafletProvider(container: HTMLElement): Promise<Map
         zoomControl: true,
     });
 
-    // Add OpenStreetMap tiles (with terrain option)
+    // === BASE LAYERS ===
+
+    // OpenStreetMap (street view)
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     });
 
-    // OpenTopoMap for terrain view
-    const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    // OpenTopoMap (primary topo)
+    const openTopoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
         maxZoom: 17,
         attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+    });
+
+    // 4UMaps (alternative topo - similar to OpenTopoMap's alternative)
+    const fourUMapsLayer = L.tileLayer('https://tileserver.4umaps.com/{z}/{x}/{y}.png', {
+        maxZoom: 15,
+        attribution: '&copy; <a href="https://www.4umaps.com">4UMaps</a> | Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    });
+
+    // Thunderforest Outdoors (another topo alternative - requires API key for heavy use)
+    const outdoorsLayer = L.tileLayer('https://{s}.tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=', {
+        maxZoom: 22,
+        attribution: '&copy; <a href="https://www.thunderforest.com/">Thunderforest</a>, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     });
 
     // Satellite layer (ESRI)
@@ -99,24 +113,282 @@ export async function createLeafletProvider(container: HTMLElement): Promise<Map
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
     });
 
-    // Add default layer and layer control
-    topoLayer.addTo(map);
-    L.control.layers({
-        'Topo': topoLayer,
-        'Street': osmLayer,
-        'Satellite': satelliteLayer,
+    // Add default layer
+    openTopoLayer.addTo(map);
+
+    // Base layers for control
+    const baseLayers: Record<string, any> = {
+        'OpenTopoMap': openTopoLayer,
+        '4UMaps Topo': fourUMapsLayer,
+        'Street (OSM)': osmLayer,
+        'Satellite (ESRI)': satelliteLayer,
+    };
+
+    // Overlay layers (will be populated with GPX files)
+    const overlayLayers: Record<string, any> = {};
+
+    // Create layer control (we'll keep a reference to update it)
+    let layerControl = L.control.layers(baseLayers, overlayLayers, {
+        collapsed: true,
+        position: 'topright',
     }).addTo(map);
 
     // Add scale control
-    L.control.scale({ maxWidth: 200 }).addTo(map);
+    L.control.scale({ maxWidth: 200, position: 'bottomleft' }).addTo(map);
+
+    // === LOCATE CONTROL ===
+    // Custom locate button control
+    const LocateControl = L.Control.extend({
+        options: { position: 'topleft' },
+        onAdd: function () {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            const button = L.DomUtil.create('a', 'leaflet-control-locate', container);
+            button.href = '#';
+            button.title = 'Show my location';
+            button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;margin:7px;">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 2v4m0 12v4m-10-10h4m12 0h4"></path>
+            </svg>`;
+            button.style.cssText = 'display:flex;align-items:center;justify-content:center;width:30px;height:30px;cursor:pointer;background:white;';
+
+            L.DomEvent.disableClickPropagation(button);
+            L.DomEvent.on(button, 'click', function (e: Event) {
+                e.preventDefault();
+                map.locate({ setView: true, maxZoom: 14 });
+            });
+
+            return container;
+        }
+    });
+    new LocateControl().addTo(map);
+
+    // Handle location found/error
+    let locationMarker: any = null;
+    let locationCircle: any = null;
+
+    map.on('locationfound', (e: any) => {
+        const radius = e.accuracy / 2;
+
+        // Remove previous location marker
+        if (locationMarker) map.removeLayer(locationMarker);
+        if (locationCircle) map.removeLayer(locationCircle);
+
+        // Add new marker and accuracy circle
+        locationMarker = L.marker(e.latlng, {
+            icon: L.divIcon({
+                className: 'leaflet-location-marker',
+                html: '<div style="width:12px;height:12px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>',
+                iconSize: [12, 12],
+                iconAnchor: [6, 6],
+            })
+        }).addTo(map);
+
+        locationCircle = L.circle(e.latlng, {
+            radius,
+            color: '#3b82f6',
+            fillColor: '#3b82f6',
+            fillOpacity: 0.15,
+            weight: 2,
+        }).addTo(map);
+    });
+
+    map.on('locationerror', (e: any) => {
+        console.warn('Location error:', e.message);
+        alert('Could not get your location: ' + e.message);
+    });
+
+    // === GPX LOADER CONTROL ===
+    // Storage for loaded GPX layers
+    const gpxLayers: Map<string, any> = new Map();
+
+    // Custom GPX loader button control
+    const GpxLoaderControl = L.Control.extend({
+        options: { position: 'topleft' },
+        onAdd: function () {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            const button = L.DomUtil.create('a', 'leaflet-control-gpx', container);
+            button.href = '#';
+            button.title = 'Load GPX file';
+            button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;margin:7px;">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="12" y1="18" x2="12" y2="12"></line>
+                <line x1="9" y1="15" x2="15" y2="15"></line>
+            </svg>`;
+            button.style.cssText = 'display:flex;align-items:center;justify-content:center;width:30px;height:30px;cursor:pointer;background:white;';
+
+            // Hidden file input
+            const fileInput = L.DomUtil.create('input', '', container);
+            fileInput.type = 'file';
+            fileInput.accept = '.gpx';
+            fileInput.multiple = true;
+            fileInput.style.display = 'none';
+
+            L.DomEvent.disableClickPropagation(button);
+            L.DomEvent.on(button, 'click', function (e: Event) {
+                e.preventDefault();
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', async (e: Event) => {
+                const input = e.target as HTMLInputElement;
+                const files = input.files;
+                if (!files) return;
+
+                for (const file of Array.from(files)) {
+                    await loadGpxFile(file);
+                }
+
+                // Reset input so same file can be loaded again
+                input.value = '';
+            });
+
+            return container;
+        }
+    });
+    new GpxLoaderControl().addTo(map);
+
+    // Function to parse and display GPX file
+    async function loadGpxFile(file: File): Promise<void> {
+        const text = await file.text();
+        const parser = new DOMParser();
+        const gpx = parser.parseFromString(text, 'text/xml');
+
+        // Parse track points
+        const trackPoints: [number, number][] = [];
+        const trkpts = gpx.querySelectorAll('trkpt');
+
+        for (const trkpt of Array.from(trkpts)) {
+            const lat = parseFloat(trkpt.getAttribute('lat') || '0');
+            const lon = parseFloat(trkpt.getAttribute('lon') || '0');
+            if (lat !== 0 || lon !== 0) {
+                trackPoints.push([lat, lon]);
+            }
+        }
+
+        // Also check for route points (rte/rtept)
+        const rtepts = gpx.querySelectorAll('rtept');
+        for (const rtept of Array.from(rtepts)) {
+            const lat = parseFloat(rtept.getAttribute('lat') || '0');
+            const lon = parseFloat(rtept.getAttribute('lon') || '0');
+            if (lat !== 0 || lon !== 0) {
+                trackPoints.push([lat, lon]);
+            }
+        }
+
+        // Parse waypoints
+        const waypoints: { lat: number; lon: number; name: string }[] = [];
+        const wpts = gpx.querySelectorAll('wpt');
+        for (const wpt of Array.from(wpts)) {
+            const lat = parseFloat(wpt.getAttribute('lat') || '0');
+            const lon = parseFloat(wpt.getAttribute('lon') || '0');
+            const nameEl = wpt.querySelector('name');
+            const name = nameEl?.textContent || '';
+            if (lat !== 0 || lon !== 0) {
+                waypoints.push({ lat, lon, name });
+            }
+        }
+
+        if (trackPoints.length === 0 && waypoints.length === 0) {
+            alert('No tracks or waypoints found in GPX file');
+            return;
+        }
+
+        // Create a layer group for this GPX file
+        const gpxLayerGroup = L.layerGroup();
+
+        // Random color for this GPX track
+        const hue = Math.floor(Math.random() * 360);
+        const color = `hsl(${hue}, 70%, 50%)`;
+
+        // Add track polyline
+        if (trackPoints.length > 0) {
+            const polyline = L.polyline(trackPoints, {
+                color,
+                weight: 3,
+                opacity: 0.9,
+            });
+            gpxLayerGroup.addLayer(polyline);
+        }
+
+        // Add waypoint markers
+        for (const wpt of waypoints) {
+            const marker = L.marker([wpt.lat, wpt.lon], {
+                icon: L.divIcon({
+                    className: 'leaflet-gpx-waypoint',
+                    html: `<div style="width:10px;height:10px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>`,
+                    iconSize: [10, 10],
+                    iconAnchor: [5, 5],
+                })
+            });
+            if (wpt.name) {
+                marker.bindTooltip(wpt.name, { permanent: false, direction: 'top' });
+            }
+            gpxLayerGroup.addLayer(marker);
+        }
+
+        // Add to map
+        gpxLayerGroup.addTo(map);
+
+        // Store reference
+        const fileName = file.name;
+        gpxLayers.set(fileName, gpxLayerGroup);
+
+        // Update layer control - need to recreate it
+        updateLayerControl();
+
+        // Fit bounds to new GPX
+        if (trackPoints.length > 0) {
+            const bounds = L.latLngBounds(trackPoints);
+            map.fitBounds(bounds, { padding: [50, 50] });
+        } else if (waypoints.length > 0) {
+            const bounds = L.latLngBounds(waypoints.map(w => [w.lat, w.lon]));
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+    }
+
+    // Function to update layer control with current GPX layers
+    function updateLayerControl(): void {
+        // Remove old control
+        map.removeControl(layerControl);
+
+        // Build overlay layers
+        const overlays: Record<string, any> = {};
+
+        // Add flight track if present
+        if (trackSegmentsGroup.getLayers().length > 0) {
+            overlays['Flight Track'] = trackSegmentsGroup;
+        }
+
+        // Add task if present
+        if (taskLayerGroup.getLayers().length > 0) {
+            overlays['Task'] = taskLayerGroup;
+        }
+
+        // Add event markers if present
+        if (eventMarkersGroup.getLayers().length > 0) {
+            overlays['Events'] = eventMarkersGroup;
+        }
+
+        // Add GPX files
+        for (const [name, layer] of gpxLayers) {
+            overlays[`📍 ${name}`] = layer;
+        }
+
+        // Create new control
+        layerControl = L.control.layers(baseLayers, overlays, {
+            collapsed: true,
+            position: 'topright',
+        }).addTo(map);
+    }
 
     // State
     let currentFixes: IGCFix[] = [];
     let currentTask: XCTask | null = null;
     let currentEvents: FlightEvent[] = [];
-    let trackSegmentsGroup: any = L.layerGroup().addTo(map);
-    let taskLayerGroup: any = L.layerGroup().addTo(map);
-    let eventMarkersGroup: any = L.layerGroup().addTo(map);
+    const trackSegmentsGroup: any = L.layerGroup().addTo(map);
+    const taskLayerGroup: any = L.layerGroup().addTo(map);
+    const eventMarkersGroup: any = L.layerGroup().addTo(map);
     let highlightLayer: any = null;
     let activePopup: any = null;
     let boundsChangeCallback: (() => void) | null = null;
@@ -214,6 +486,7 @@ export async function createLeafletProvider(container: HTMLElement): Promise<Map
         setTrack(fixes: IGCFix[]) {
             currentFixes = fixes;
             renderTrackWithEvents();
+            updateLayerControl();
         },
 
         setTask(task: XCTask) {
@@ -278,6 +551,7 @@ export async function createLeafletProvider(container: HTMLElement): Promise<Map
                 );
                 map.fitBounds(bounds, { padding: [50, 50] });
             }
+            updateLayerControl();
         },
 
         setEvents(events: FlightEvent[]) {
@@ -322,6 +596,7 @@ export async function createLeafletProvider(container: HTMLElement): Promise<Map
                         <span style="color:#666">${event.time.toLocaleTimeString()}</span>`);
                 eventMarkersGroup.addLayer(marker);
             }
+            updateLayerControl();
         },
 
         panToEvent(event: FlightEvent) {
