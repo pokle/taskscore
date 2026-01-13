@@ -597,12 +597,12 @@ export function createMapLibreProvider(container: HTMLElement): Promise<MapProvi
           })
             .setLngLat([popupLng, popupLat])
             .setHTML(`
-              <div style="min-width: 150px;">
+              <div style="min-width: 150px; color: #1e293b;">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
                   <span style="width: 10px; height: 10px; border-radius: 50%; background: ${style.color};"></span>
                   <strong>${event.description}</strong>
                 </div>
-                <div style="color: #94a3b8; font-size: 0.8125rem;">
+                <div style="color: #64748b; font-size: 0.8125rem;">
                   ${event.time.toLocaleTimeString()} | ${event.altitude.toFixed(0)}m
                 </div>
               </div>
@@ -659,10 +659,10 @@ export function createMapLibreProvider(container: HTMLElement): Promise<MapProvi
             activeMarkers.push(marker);
           }
 
-          // Pan to the event location
+          // Pan to the event location (preserve current zoom level)
           map.flyTo({
             center: [event.longitude, event.latitude],
-            zoom: 14,
+            zoom: map.getZoom(),
             duration: 1000,
           });
         },

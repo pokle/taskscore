@@ -27,5 +27,9 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "mapbox-gl": "^3.17.0",
+    "threebox-plugin": "^2.2.7"
   }
 }

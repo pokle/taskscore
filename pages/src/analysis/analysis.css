@@ -135,6 +135,38 @@ html, body {
   border-color: var(--color-primary);
 }
 
+/* Map provider select */
+.map-select {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.map-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* 3D Toggle */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.toggle-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 /* Button */
 .btn {
   padding: 0.5rem 1rem;

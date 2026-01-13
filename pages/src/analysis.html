@@ -34,6 +34,26 @@
                     <input type="text" id="task-code" placeholder="Task code (e.g., ABCD)" class="task-input">
                     <button id="load-task-btn" class="btn btn-primary">Load Task</button>
                 </div>
+                <div class="control-group">
+                    <select id="map-provider" class="map-select">
+                        <option value="l">Leaflet</option>
+                        <option value="g">Google Maps</option>
+                        <option value="m">MapLibre</option>
+                        <option value="b">MapBox</option>
+                    </select>
+                </div>
+                <div class="control-group" id="altitude-colors-container" style="display: none;">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="altitude-colors-toggle">
+                        <span>Altitude Colors</span>
+                    </label>
+                </div>
+                <div class="control-group" id="3d-toggle-container" style="display: none;">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="3d-toggle">
+                        <span>3D Track</span>
+                    </label>
+                </div>
             </div>
         </header>
 

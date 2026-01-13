@@ -10,12 +10,13 @@
 
 import { parseIGC, IGCFile, IGCFix } from './igc-parser';
 import { fetchTaskByCode, parseXCTask, XCTask, calculateOptimizedTaskDistance } from './xctsk-parser';
-import { createMapProvider, getProviderFromUrl, MapProvider } from './map-provider';
+import { createMapProvider, getProviderFromUrl, getProviderCode, MapProvider } from './map-provider';
 import { detectFlightEvents, FlightEvent } from './event-detector';
 import { createEventPanel, EventPanel } from './event-panel';
 
-// CSS for maplibre-gl (only loaded when MapLibre is used)
+// CSS for maplibre-gl and mapbox-gl
 import 'maplibre-gl/dist/maplibre-gl.css';
+import 'mapbox-gl/dist/mapbox-gl.css';
 // App styles
 import './analysis.css';
 
@@ -35,6 +36,7 @@ const state: AppState = {
 
 let mapRenderer: MapProvider | null = null;
 let eventPanel: EventPanel | null = null;
+let isProgrammaticPan = false;
 
 /**
  * Initialize the application
@@ -48,23 +50,34 @@ async function init(): Promise<void> {
   const statusEl = document.getElementById('status');
   const flightInfoEl = document.getElementById('flight-info');
   const dropZone = document.getElementById('drop-zone');
+  const mapProviderSelect = document.getElementById('map-provider') as HTMLSelectElement | null;
 
   if (!mapContainer || !eventPanelContainer) {
     console.error('Required containers not found');
     return;
   }
 
-  // Get provider from URL (?provider=google or default to maplibre)
+  // Get provider from URL (?m=l for leaflet, ?m=g for google, ?m=m for maplibre)
   const providerType = getProviderFromUrl();
   console.log(`[Analysis] Using map provider: ${providerType}`);
+
+  // Set the select to match current provider and handle changes
+  if (mapProviderSelect) {
+    mapProviderSelect.value = getProviderCode(providerType);
+    mapProviderSelect.addEventListener('change', () => {
+      const params = new URLSearchParams(window.location.search);
+      params.set('m', mapProviderSelect.value);
+      window.location.search = params.toString();
+    });
+  }
 
   // Initialize map with selected provider
   try {
     mapRenderer = await createMapProvider(providerType, mapContainer);
 
-    // Update event panel when map moves
+    // Update event panel when map moves (but not during programmatic pans from event clicks)
     mapRenderer.onBoundsChange(() => {
-      if (eventPanel) {
+      if (eventPanel && !isProgrammaticPan) {
         eventPanel.filterByBounds(mapRenderer!.getBounds());
       }
     });
@@ -74,12 +87,90 @@ async function init(): Promise<void> {
     return;
   }
 
+  // Set up altitude colors toggle (only shown for providers that support it)
+  const altitudeColorsContainer = document.getElementById('altitude-colors-container');
+  const altitudeColorsToggle = document.getElementById('altitude-colors-toggle') as HTMLInputElement | null;
+
+  if (mapRenderer.supportsAltitudeColors && altitudeColorsContainer && altitudeColorsToggle) {
+    // Show the altitude colors toggle
+    altitudeColorsContainer.style.display = 'block';
+
+    // Check URL for initial altitude colors state
+    const params = new URLSearchParams(window.location.search);
+    const isAltitudeColorsEnabled = params.get('alt') === '1';
+    altitudeColorsToggle.checked = isAltitudeColorsEnabled;
+
+    // Apply initial altitude colors state
+    if (isAltitudeColorsEnabled && mapRenderer.setAltitudeColors) {
+      mapRenderer.setAltitudeColors(true);
+    }
+
+    // Handle altitude colors toggle changes
+    altitudeColorsToggle.addEventListener('change', () => {
+      if (mapRenderer?.setAltitudeColors) {
+        mapRenderer.setAltitudeColors(altitudeColorsToggle.checked);
+
+        // Update URL to persist the altitude colors state
+        const params = new URLSearchParams(window.location.search);
+        if (altitudeColorsToggle.checked) {
+          params.set('alt', '1');
+        } else {
+          params.delete('alt');
+        }
+        const newUrl = `${window.location.pathname}?${params.toString()}`;
+        window.history.replaceState({}, '', newUrl);
+      }
+    });
+  }
+
+  // Set up 3D toggle (only shown for providers that support it)
+  const threeDToggleContainer = document.getElementById('3d-toggle-container');
+  const threeDToggle = document.getElementById('3d-toggle') as HTMLInputElement | null;
+
+  if (mapRenderer.supports3D && threeDToggleContainer && threeDToggle) {
+    // Show the 3D toggle
+    threeDToggleContainer.style.display = 'block';
+
+    // Check URL for initial 3D state
+    const params = new URLSearchParams(window.location.search);
+    const is3DEnabled = params.get('3d') === '1';
+    threeDToggle.checked = is3DEnabled;
+
+    // Apply initial 3D state
+    if (is3DEnabled && mapRenderer.set3DMode) {
+      mapRenderer.set3DMode(true);
+    }
+
+    // Handle 3D toggle changes
+    threeDToggle.addEventListener('change', () => {
+      if (mapRenderer?.set3DMode) {
+        mapRenderer.set3DMode(threeDToggle.checked);
+
+        // Update URL to persist the 3D state
+        const params = new URLSearchParams(window.location.search);
+        if (threeDToggle.checked) {
+          params.set('3d', '1');
+        } else {
+          params.delete('3d');
+        }
+        const newUrl = `${window.location.pathname}?${params.toString()}`;
+        window.history.replaceState({}, '', newUrl);
+      }
+    });
+  }
+
   // Initialize event panel
   eventPanel = createEventPanel({
     container: eventPanelContainer,
     onEventClick: (event) => {
       if (mapRenderer) {
+        // Suppress bounds-based filtering during programmatic pan
+        isProgrammaticPan = true;
         mapRenderer.panToEvent(event);
+        // Re-enable filtering after animation completes (~1 second)
+        setTimeout(() => {
+          isProgrammaticPan = false;
+        }, 1200);
       }
     },
   });
