@@ -350,47 +350,193 @@ function detectTurnpointCrossings(
 }
 
 /**
- * Detect takeoff and landing
+ * Detect takeoff and landing using multiple criteria
+ * Based on XCSoar's approach - uses ground speed, altitude gain, and climb rate
  */
 function detectTakeoffLanding(fixes: IGCFix[]): FlightEvent[] {
   const events: FlightEvent[] = [];
 
   if (fixes.length < 10) return events;
 
-  // Find takeoff - first point where ground speed > 5 m/s
+  // Configuration (based on XCSoar)
+  const minGroundSpeed = 5; // m/s (~18 km/h)
+  const minAltitudeGain = 50; // meters above start altitude
+  const minClimbRate = 1.0; // m/s sustained climb
+  const takeoffTimeWindow = 10; // seconds - must sustain criteria
+  const landingTimeWindow = 30; // seconds - asymmetric for safety
+
+  // Find starting altitude (average of first few fixes to reduce noise)
+  let startAltitude = 0;
+  const startSampleSize = Math.min(10, fixes.length);
+  for (let i = 0; i < startSampleSize; i++) {
+    startAltitude += fixes[i].gnssAltitude;
+  }
+  startAltitude /= startSampleSize;
+
+  // === TAKEOFF DETECTION ===
+  // Scan forward to find first point where flight criteria are continuously met
+  let takeoffIndex = -1;
+
   for (let i = 1; i < fixes.length; i++) {
-    const speed = calculateGroundSpeed(fixes[i - 1], fixes[i]);
-    if (speed > 5) {
-      events.push({
-        id: 'takeoff',
-        type: 'takeoff',
-        time: fixes[i].time,
-        latitude: fixes[i].latitude,
-        longitude: fixes[i].longitude,
-        altitude: fixes[i].gnssAltitude,
-        description: 'Takeoff',
-        details: { groundSpeed: speed },
-      });
+    // Calculate criteria at current position
+    let criteriaMetCount = 0;
+
+    // Criteria 1: Instant ground speed check
+    if (i < fixes.length - 1) {
+      const speed = calculateGroundSpeed(fixes[i - 1], fixes[i]);
+      if (speed > minGroundSpeed) {
+        criteriaMetCount++;
+      }
+    }
+
+    // Criteria 2: Current altitude gain above start
+    const altitudeGain = fixes[i].gnssAltitude - startAltitude;
+    if (altitudeGain > minAltitudeGain) {
+      criteriaMetCount++;
+    }
+
+    // Criteria 3: Recent climb rate (over last few fixes)
+    const climbWindowSize = Math.min(5, i); // Look back up to 5 fixes
+    if (climbWindowSize > 0) {
+      const climbStartIdx = i - climbWindowSize;
+      const climbDuration = (fixes[i].time.getTime() - fixes[climbStartIdx].time.getTime()) / 1000;
+      const altitudeChange = fixes[i].gnssAltitude - fixes[climbStartIdx].gnssAltitude;
+      const avgClimbRate = climbDuration > 0 ? altitudeChange / climbDuration : 0;
+
+      if (avgClimbRate > minClimbRate) {
+        criteriaMetCount++;
+      }
+    }
+
+    // Found flight indication - verify it sustains for takeoffTimeWindow
+    if (criteriaMetCount >= 1) {
+      // Check if flight criteria continue for the next N seconds
+      const verifyEndTime = fixes[i].time.getTime() + takeoffTimeWindow * 1000;
+      let verifyEndIndex = i;
+
+      for (let j = i + 1; j < fixes.length; j++) {
+        if (fixes[j].time.getTime() >= verifyEndTime) {
+          verifyEndIndex = j;
+          break;
+        }
+      }
+
+      if (verifyEndIndex > i) {
+        // Check if we're still flying at the end of the window
+        let stillFlying = false;
+
+        // Check sustained altitude gain
+        const futureAltGain = fixes[verifyEndIndex].gnssAltitude - startAltitude;
+        if (futureAltGain > minAltitudeGain) {
+          stillFlying = true;
+        }
+
+        // Check sustained climb over window
+        const windowDuration = (fixes[verifyEndIndex].time.getTime() - fixes[i].time.getTime()) / 1000;
+        const windowAltChange = fixes[verifyEndIndex].gnssAltitude - fixes[i].gnssAltitude;
+        const windowClimbRate = windowDuration > 0 ? windowAltChange / windowDuration : 0;
+
+        if (windowClimbRate > minClimbRate) {
+          stillFlying = true;
+        }
+
+        // Check for any good ground speed in the window
+        for (let j = i; j < verifyEndIndex - 1; j++) {
+          const speed = calculateGroundSpeed(fixes[j], fixes[j + 1]);
+          if (speed > minGroundSpeed) {
+            stillFlying = true;
+            break;
+          }
+        }
+
+        if (stillFlying) {
+          takeoffIndex = i;
+          break;
+        }
+      }
+    }
+  }
+
+  if (takeoffIndex >= 0) {
+    const takeoffFix = fixes[takeoffIndex];
+    events.push({
+      id: 'takeoff',
+      type: 'takeoff',
+      time: takeoffFix.time,
+      latitude: takeoffFix.latitude,
+      longitude: takeoffFix.longitude,
+      altitude: takeoffFix.gnssAltitude,
+      description: 'Takeoff',
+      details: {
+        startAltitude,
+        altitudeGain: takeoffFix.gnssAltitude - startAltitude,
+      },
+    });
+  }
+
+  // === LANDING DETECTION ===
+  // Scan backward to find last sustained flight indication
+  let landingIndex = -1;
+
+  for (let i = fixes.length - 2; i >= landingTimeWindow; i--) {
+    // Check if we're still flying in the time window BEFORE this point
+    let windowStartTime = fixes[i].time.getTime() - landingTimeWindow * 1000;
+
+    // Find the index at start of time window
+    let windowStartIndex = i;
+    for (let j = i; j >= 0; j--) {
+      if (fixes[j].time.getTime() <= windowStartTime) {
+        windowStartIndex = j;
+        break;
+      }
+    }
+
+    if (windowStartIndex === i) continue; // Window too short
+
+    // Check for flight indicators in the window before this point
+    let stillFlying = false;
+
+    // Check 1: Any significant ground speed?
+    for (let j = windowStartIndex; j < i; j++) {
+      const speed = calculateGroundSpeed(fixes[j], fixes[j + 1]);
+      if (speed > minGroundSpeed / 2) {
+        // Lower threshold for landing (hysteresis)
+        stillFlying = true;
+        break;
+      }
+    }
+
+    // Check 2: Still descending? (indicates approach, not landed)
+    if (!stillFlying) {
+      const altChange = fixes[i].gnssAltitude - fixes[windowStartIndex].gnssAltitude;
+      const timeDiff = (fixes[i].time.getTime() - fixes[windowStartIndex].time.getTime()) / 1000;
+      const vario = timeDiff > 0 ? altChange / timeDiff : 0;
+
+      if (vario < -0.5) {
+        // Descending > 0.5 m/s = still on approach
+        stillFlying = true;
+      }
+    }
+
+    // If still flying in the window before this point, this is our landing
+    if (stillFlying) {
+      landingIndex = i;
       break;
     }
   }
 
-  // Find landing - last point where ground speed > 5 m/s
-  for (let i = fixes.length - 1; i > 0; i--) {
-    const speed = calculateGroundSpeed(fixes[i - 1], fixes[i]);
-    if (speed > 5) {
-      events.push({
-        id: 'landing',
-        type: 'landing',
-        time: fixes[i].time,
-        latitude: fixes[i].latitude,
-        longitude: fixes[i].longitude,
-        altitude: fixes[i].gnssAltitude,
-        description: 'Landing',
-        details: { groundSpeed: speed },
-      });
-      break;
-    }
+  if (landingIndex >= 0) {
+    const landingFix = fixes[landingIndex];
+    events.push({
+      id: 'landing',
+      type: 'landing',
+      time: landingFix.time,
+      latitude: landingFix.latitude,
+      longitude: landingFix.longitude,
+      altitude: landingFix.gnssAltitude,
+      description: 'Landing',
+      details: {},
+    });
   }
 
   return events;
