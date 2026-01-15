@@ -522,6 +522,7 @@ export async function createLeafletProvider(container: HTMLElement): Promise<Map
 
                 // Create distance label
                 const distanceKm = (distance / 1000).toFixed(1);
+                const legNumber = i + 1;
                 const labelIcon = L.divIcon({
                     className: 'leaflet-distance-label',
                     html: `<div style="
@@ -534,16 +535,17 @@ export async function createLeafletProvider(container: HTMLElement): Promise<Map
                         border: 1px solid #6366f1;
                         box-shadow: 0 1px 3px rgba(0,0,0,0.2);
                         white-space: nowrap;
-                    ">${distanceKm} km</div>`,
-                    iconSize: [60, 20],
-                    iconAnchor: [30, 10],
+                    ">Leg ${legNumber}: ${distanceKm}km</div>`,
+                    iconSize: [100, 20],
+                    iconAnchor: [50, 10],
                 });
                 const labelMarker = L.marker([midLat, midLng], { icon: labelIcon, interactive: false });
                 taskLayerGroup.addLayer(labelMarker);
             }
 
             // Create cylinders and markers
-            for (const tp of task.turnpoints) {
+            for (let tpIdx = 0; tpIdx < task.turnpoints.length; tpIdx++) {
+                const tp = task.turnpoints[tpIdx];
                 const color = getTurnpointColor(tp.type || '');
 
                 // Create circle (cylinder)
@@ -556,6 +558,16 @@ export async function createLeafletProvider(container: HTMLElement): Promise<Map
                     fillOpacity: 0.15,
                 });
                 taskLayerGroup.addLayer(circle);
+
+                // Build turnpoint label: "NAME, R Xkm, A Ym, ROLE" (with non-breaking spaces)
+                const name = tp.waypoint.name || `TP${tpIdx + 1}`;
+                const radiusKm = (tp.radius / 1000).toFixed(tp.radius >= 1000 ? 0 : 1);
+                const altitude = tp.waypoint.altSmoothed ? `A\u00A0${Math.round(tp.waypoint.altSmoothed)}m` : '';
+                const role = tp.type || '';
+                const labelParts = [name, `R\u00A0${radiusKm}km`];
+                if (altitude) labelParts.push(altitude);
+                if (role) labelParts.push(role);
+                const label = labelParts.join(', ');
 
                 // Create marker
                 const markerIcon = L.divIcon({
@@ -572,7 +584,7 @@ export async function createLeafletProvider(container: HTMLElement): Promise<Map
                     iconAnchor: [6, 6],
                 });
                 const marker = L.marker([tp.waypoint.lat, tp.waypoint.lon], { icon: markerIcon })
-                    .bindTooltip(tp.waypoint.name || '', {
+                    .bindTooltip(label, {
                         permanent: false,
                         direction: 'top',
                     });

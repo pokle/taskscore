@@ -19,8 +19,10 @@ The IGC Analysis Tool is a browser-based flight analysis application that allows
   - Red: Very high altitude (>3000m)
 - **Task Display**:
   - Turnpoint cylinders with color coding (green=SSS, yellow=ESS, purple=intermediate)
-  - Task line connecting turnpoints
-  - Waypoint labels
+    - Label at center of waypoint with name, radius, altitude and role (e.g. "ELLIOT, R 5km, A 3067m, SSS")
+  - Optimised line connecting turnpoints
+    - Dotted
+    - Label in the centre of line with distance and leg number (e.g. "Leg 1: 15.2km")
 
 ### Event Detection
 The tool automatically detects and displays:

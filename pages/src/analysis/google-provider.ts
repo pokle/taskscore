@@ -210,6 +210,7 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
                 // Create label element
                 const labelEl = document.createElement('div');
                 const distanceKm = (distance / 1000).toFixed(1);
+                const legNumber = i + 1;
                 labelEl.style.cssText = `
                     background: white;
                     padding: 2px 6px;
@@ -221,7 +222,7 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
                     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
                     white-space: nowrap;
                 `;
-                labelEl.textContent = `${distanceKm} km`;
+                labelEl.textContent = `Leg ${legNumber}: ${distanceKm}km`;
 
                 const labelMarker = new AdvancedMarkerElement({
                     map,
@@ -232,13 +233,24 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
             }
 
             // Create cylinders and markers
-            for (const tp of task.turnpoints) {
+            for (let tpIdx = 0; tpIdx < task.turnpoints.length; tpIdx++) {
+                const tp = task.turnpoints[tpIdx];
                 const color = tp.type === 'SSS' ? '#22c55e' :
                     tp.type === 'ESS' ? '#eab308' :
                         tp.type === 'TAKEOFF' ? '#3b82f6' : '#a855f7';
 
                 const circle = createCircle(tp.waypoint.lat, tp.waypoint.lon, tp.radius, color);
                 taskCircles.push(circle);
+
+                // Build turnpoint label: "NAME, R Xkm, A Ym, ROLE" (with non-breaking spaces)
+                const name = tp.waypoint.name || `TP${tpIdx + 1}`;
+                const radiusKm = (tp.radius / 1000).toFixed(tp.radius >= 1000 ? 0 : 1);
+                const altitude = tp.waypoint.altSmoothed ? `A\u00A0${Math.round(tp.waypoint.altSmoothed)}m` : '';
+                const role = tp.type || '';
+                const labelParts = [name, `R\u00A0${radiusKm}km`];
+                if (altitude) labelParts.push(altitude);
+                if (role) labelParts.push(role);
+                const label = labelParts.join(', ');
 
                 // Create marker
                 const markerEl = document.createElement('div');
@@ -252,7 +264,7 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
                     map,
                     position: { lat: tp.waypoint.lat, lng: tp.waypoint.lon },
                     content: markerEl,
-                    title: tp.waypoint.name,
+                    title: label,
                 });
                 taskMarkers.push(marker);
             }
