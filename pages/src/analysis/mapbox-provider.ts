@@ -1047,6 +1047,25 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
           const style = getEventStyle(event.type);
 
+          // Inject throbbing animation keyframes if not already present
+          if (!document.getElementById('throb-animation-style')) {
+            const styleSheet = document.createElement('style');
+            styleSheet.id = 'throb-animation-style';
+            styleSheet.textContent = `
+              @keyframes throb {
+                0%, 100% { box-shadow: 0 0 0 0 currentColor; }
+                50% { box-shadow: 0 0 0 20px transparent; }
+              }
+              .throb-marker {
+                animation: throb 0.5s ease-in-out 4;
+              }
+            `;
+            document.head.appendChild(styleSheet);
+          }
+
+          // Determine which marker should throb based on event type
+          const isStartEvent = event.type === 'thermal_entry' || event.type === 'glide_start';
+
           // Create markers at segment endpoints or event point
           if (event.segment && currentFixes.length > 0) {
             const startFix = currentFixes[event.segment.startIndex];
@@ -1060,6 +1079,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             startEl.style.backgroundColor = 'transparent';
             startEl.style.border = `3px solid ${style.color}`;
             startEl.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+            if (isStartEvent) {
+              startEl.classList.add('throb-marker');
+            }
 
             const startMarker = new mapboxgl.Marker({ element: startEl })
               .setLngLat([startFix.longitude, startFix.latitude])
@@ -1074,13 +1096,16 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             endEl.style.backgroundColor = style.color;
             endEl.style.border = '3px solid white';
             endEl.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+            if (!isStartEvent) {
+              endEl.classList.add('throb-marker');
+            }
 
             const endMarker = new mapboxgl.Marker({ element: endEl })
               .setLngLat([endFix.longitude, endFix.latitude])
               .addTo(map);
             activeMarkers.push(endMarker);
           } else {
-            // For point events, show single marker
+            // For point events, show single marker with throb
             const markerEl = document.createElement('div');
             markerEl.style.width = '16px';
             markerEl.style.height = '16px';
@@ -1088,6 +1113,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             markerEl.style.backgroundColor = style.color;
             markerEl.style.border = '3px solid white';
             markerEl.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+            markerEl.classList.add('throb-marker');
 
             const marker = new mapboxgl.Marker({ element: markerEl })
               .setLngLat([event.longitude, event.latitude])
