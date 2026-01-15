@@ -1008,7 +1008,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
                     // Create speed label
                     const labelEl = document.createElement('div');
                     labelEl.style.cssText = `
-                      font-size: 10px;
+                      font-size: 14px;
                       font-weight: 600;
                       color: #3b82f6;
                       white-space: nowrap;
@@ -1045,40 +1045,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             });
           }
 
-          // Determine popup location
-          let popupLng = event.longitude;
-          let popupLat = event.latitude;
-
-          if (event.segment && currentFixes.length > 0) {
-            const isStartEvent = event.type === 'thermal_entry' || event.type === 'glide_start';
-            const fixIndex = isStartEvent ? event.segment.startIndex : event.segment.endIndex;
-            const fix = currentFixes[fixIndex];
-            if (fix) {
-              popupLng = fix.longitude;
-              popupLat = fix.latitude;
-            }
-          }
-
-          // Create and show popup
           const style = getEventStyle(event.type);
-          activePopup = new mapboxgl.Popup({
-            closeButton: true,
-            closeOnClick: false,
-            offset: 25,
-          })
-            .setLngLat([popupLng, popupLat])
-            .setHTML(`
-              <div style="min-width: 150px; color: #1e293b;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                  <span style="width: 10px; height: 10px; border-radius: 50%; background: ${style.color};"></span>
-                  <strong>${event.description}</strong>
-                </div>
-                <div style="color: #64748b; font-size: 0.8125rem;">
-                  ${event.time.toLocaleTimeString()} | ${event.altitude.toFixed(0)}m
-                </div>
-              </div>
-            `)
-            .addTo(map);
 
           // Create markers at segment endpoints or event point
           if (event.segment && currentFixes.length > 0) {
