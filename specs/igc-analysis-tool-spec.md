@@ -58,6 +58,14 @@ When an event is selected from the panel:
   - **Start marker**: Ring/outline style circle at the segment start
   - **End marker**: Filled circle at the segment end
 - **Point Marker**: For non-segment events, a single filled marker at the event location
+- **Glide Direction Chevrons**: When a glide event is selected, chevron markers are displayed along the glide path to indicate flight direction:
+  - Chevrons placed every 500m along the glide trail
+  - Each chevron rotated to match the local track bearing at that point
+  - Blue chevron markers with white outline for visibility
+  - Speed labels displayed 250m before each chevron showing average speed for the 500m segment (MapBox only)
+    - Example: "45km/h" displayed at 250m, chevron at 500m, "42km/h" at 750m, chevron at 1000m, etc.
+    - Speed calculated from time taken to cover each 500m segment
+    - Labels styled with blue text and white text shadow for readability
 
 This visual system helps pilots quickly identify and understand the spatial extent of flight phases.
 

@@ -997,6 +997,131 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
                   },
                 }],
               });
+
+              // For glide events, add direction chevrons every ~500m with speed labels
+              // Speed labels are placed 250m before each chevron (at segment midpoint)
+              if (event.type === 'glide_start' || event.type === 'glide_end') {
+                const CHEVRON_INTERVAL = 500; // meters
+                const LABEL_OFFSET = 250; // meters before chevron
+                
+                // First pass: collect positions with interpolated times at 250m intervals
+                // We need positions at 250m, 500m, 750m, 1000m, etc.
+                // Labels go at 250m, 750m, 1250m, ... (odd multiples of 250)
+                // Chevrons go at 500m, 1000m, 1500m, ... (even multiples of 250)
+                interface PositionData {
+                  lat: number;
+                  lon: number;
+                  bearing: number;
+                  time: number; // timestamp in ms
+                  distance: number; // cumulative distance
+                }
+                const positions: PositionData[] = [];
+                
+                // Calculate cumulative distances along the glide
+                let cumulativeDistance = 0;
+                let nextPositionDistance = LABEL_OFFSET; // Start at 250m for first label
+                
+                for (let i = 1; i < segmentFixes.length; i++) {
+                  const prevFix = segmentFixes[i - 1];
+                  const currFix = segmentFixes[i];
+                  
+                  // Haversine distance
+                  const R = 6371000; // Earth radius in meters
+                  const dLat = (currFix.latitude - prevFix.latitude) * Math.PI / 180;
+                  const dLon = (currFix.longitude - prevFix.longitude) * Math.PI / 180;
+                  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(prevFix.latitude * Math.PI / 180) * Math.cos(currFix.latitude * Math.PI / 180) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  const segmentDistance = R * c;
+                  
+                  const prevTime = prevFix.time.getTime();
+                  const currTime = currFix.time.getTime();
+                  
+                  cumulativeDistance += segmentDistance;
+                  
+                  // Collect positions at each 250m interval
+                  while (cumulativeDistance >= nextPositionDistance) {
+                    // Interpolate position along the segment
+                    const overshoot = cumulativeDistance - nextPositionDistance;
+                    const t = 1 - (overshoot / segmentDistance);
+                    const posLat = prevFix.latitude + t * (currFix.latitude - prevFix.latitude);
+                    const posLon = prevFix.longitude + t * (currFix.longitude - prevFix.longitude);
+                    const posTime = prevTime + t * (currTime - prevTime);
+                    
+                    // Calculate local bearing at this point
+                    const bearingDLon = (currFix.longitude - prevFix.longitude) * Math.PI / 180;
+                    const lat1 = prevFix.latitude * Math.PI / 180;
+                    const lat2 = currFix.latitude * Math.PI / 180;
+                    const y = Math.sin(bearingDLon) * Math.cos(lat2);
+                    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(bearingDLon);
+                    const bearing = Math.atan2(y, x) * 180 / Math.PI;
+                    
+                    positions.push({
+                      lat: posLat,
+                      lon: posLon,
+                      bearing,
+                      time: posTime,
+                      distance: nextPositionDistance,
+                    });
+                    
+                    nextPositionDistance += LABEL_OFFSET;
+                  }
+                }
+                
+                // Second pass: create markers
+                // Positions at 250m, 750m, 1250m, ... are labels (odd index: 0, 2, 4, ...)
+                // Positions at 500m, 1000m, 1500m, ... are chevrons (even index: 1, 3, 5, ...)
+                const startTime = segmentFixes[0].time.getTime();
+                
+                for (let i = 0; i < positions.length; i++) {
+                  const pos = positions[i];
+                  const isLabel = (i % 2 === 0); // 250m, 750m, 1250m, etc.
+                  
+                  if (isLabel) {
+                    // Calculate speed for the 500m segment ending at the next chevron
+                    // This label is at the midpoint of that segment
+                    const segmentStartTime = (i === 0) ? startTime : positions[i - 1].time;
+                    const segmentEndTime = (i + 1 < positions.length) ? positions[i + 1].time : pos.time;
+                    const timeDiffSeconds = (segmentEndTime - segmentStartTime) / 1000;
+                    
+                    let speedKmh = 0;
+                    if (timeDiffSeconds > 0) {
+                      speedKmh = (CHEVRON_INTERVAL / timeDiffSeconds) * 3.6; // m/s to km/h
+                    }
+                    
+                    // Create speed label
+                    const labelEl = document.createElement('div');
+                    labelEl.style.cssText = `
+                      font-size: 10px;
+                      font-weight: 600;
+                      color: #3b82f6;
+                      white-space: nowrap;
+                      text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
+                    `;
+                    labelEl.textContent = `${Math.round(speedKmh)}km/h`;
+                    
+                    const labelMarker = new mapboxgl.Marker({ element: labelEl })
+                      .setLngLat([pos.lon, pos.lat])
+                      .addTo(map);
+                    activeMarkers.push(labelMarker);
+                  } else {
+                    // Create chevron marker
+                    const chevronEl = document.createElement('div');
+                    chevronEl.style.display = 'flex';
+                    chevronEl.style.alignItems = 'center';
+                    chevronEl.style.justifyContent = 'center';
+                    chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12" style="transform: rotate(${pos.bearing}deg);">
+                      <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>`;
+                    
+                    const chevronMarker = new mapboxgl.Marker({ element: chevronEl })
+                      .setLngLat([pos.lon, pos.lat])
+                      .addTo(map);
+                    activeMarkers.push(chevronMarker);
+                  }
+                }
+              }
             }
           } else {
             (map.getSource('highlight-segment') as mapboxgl.GeoJSONSource)?.setData({

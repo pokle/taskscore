@@ -46,6 +46,7 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
     let taskSegmentLabels: any[] = [];  // Labels for task line segments
     let eventMarkers: any[] = [];
     let highlightPath: any = null;
+    let glideChevronMarkers: any[] = [];
     let activeInfoWindow: any = null;
     let boundsChangeCallback: (() => void) | null = null;
 
@@ -330,17 +331,21 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
             }
         },
 
-        panToEvent(event: FlightEvent) {
+        async panToEvent(event: FlightEvent) {
             // Close existing info window
             if (activeInfoWindow) {
                 activeInfoWindow.close();
             }
 
-            // Clear highlight
+            // Clear highlight and glide chevrons
             if (highlightPath) {
                 highlightPath.setMap(null);
                 highlightPath = null;
             }
+            for (const marker of glideChevronMarkers) {
+                marker.map = null;
+            }
+            glideChevronMarkers = [];
 
             // Highlight segment if present
             if (event.segment && currentFixes.length > 0) {
@@ -355,6 +360,65 @@ export async function createGoogleMapsProvider(container: HTMLElement): Promise<
                     strokeWeight: 6,
                     map,
                 });
+
+                // For glide events, add direction chevrons every ~500m
+                if (event.type === 'glide_start' || event.type === 'glide_end') {
+                    const CHEVRON_INTERVAL = 500; // meters
+                    const { AdvancedMarkerElement } = await google.maps.importLibrary('marker');
+                    
+                    // Calculate cumulative distances along the glide
+                    let cumulativeDistance = 0;
+                    let nextChevronDistance = CHEVRON_INTERVAL;
+                    
+                    for (let i = 1; i < segmentFixes.length; i++) {
+                        const prevFix = segmentFixes[i - 1];
+                        const currFix = segmentFixes[i];
+                        
+                        // Haversine distance
+                        const R = 6371000; // Earth radius in meters
+                        const dLat = (currFix.latitude - prevFix.latitude) * Math.PI / 180;
+                        const dLon = (currFix.longitude - prevFix.longitude) * Math.PI / 180;
+                        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                            Math.cos(prevFix.latitude * Math.PI / 180) * Math.cos(currFix.latitude * Math.PI / 180) *
+                            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                        const segmentDistance = R * c;
+                        
+                        cumulativeDistance += segmentDistance;
+                        
+                        // Place chevrons at each 500m interval
+                        while (cumulativeDistance >= nextChevronDistance) {
+                            // Interpolate position along the segment
+                            const overshoot = cumulativeDistance - nextChevronDistance;
+                            const t = 1 - (overshoot / segmentDistance);
+                            const chevronLat = prevFix.latitude + t * (currFix.latitude - prevFix.latitude);
+                            const chevronLon = prevFix.longitude + t * (currFix.longitude - prevFix.longitude);
+                            
+                            // Calculate local bearing at this point
+                            const bearingDLon = (currFix.longitude - prevFix.longitude) * Math.PI / 180;
+                            const lat1 = prevFix.latitude * Math.PI / 180;
+                            const lat2 = currFix.latitude * Math.PI / 180;
+                            const y = Math.sin(bearingDLon) * Math.cos(lat2);
+                            const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(bearingDLon);
+                            const bearing = Math.atan2(y, x) * 180 / Math.PI;
+                            
+                            // Create chevron marker
+                            const chevronEl = document.createElement('div');
+                            chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12" style="transform: rotate(${bearing}deg);">
+                                <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>`;
+                            
+                            const chevronMarker = new AdvancedMarkerElement({
+                                map,
+                                position: { lat: chevronLat, lng: chevronLon },
+                                content: chevronEl,
+                            });
+                            glideChevronMarkers.push(chevronMarker);
+                            
+                            nextChevronDistance += CHEVRON_INTERVAL;
+                        }
+                    }
+                }
             }
 
             // Determine popup location
