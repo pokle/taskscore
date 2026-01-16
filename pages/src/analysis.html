@@ -90,6 +90,46 @@
             position: relative;
         }
 
+        /* Desktop drawer */
+        sl-drawer.desktop-drawer {
+            --size: 360px;
+        }
+
+        sl-drawer.desktop-drawer::part(panel) {
+            background: var(--sl-color-neutral-0);
+        }
+
+        sl-drawer.desktop-drawer::part(overlay) {
+            display: none;
+        }
+
+        sl-drawer.desktop-drawer::part(close-button) {
+            display: none;
+        }
+
+        /* Drawer controls */
+        .drawer-controls {
+            display: flex;
+            flex-direction: column;
+            gap: var(--sl-spacing-small);
+            padding: var(--sl-spacing-medium);
+            border-bottom: 1px solid var(--sl-color-neutral-200);
+            background: var(--sl-color-neutral-50);
+        }
+
+        .drawer-controls sl-button {
+            width: 100%;
+        }
+
+        .task-input-group {
+            display: flex;
+            gap: var(--sl-spacing-x-small);
+        }
+
+        .task-input-group sl-input {
+            flex: 1;
+        }
+
         /* Map container */
         .map-container {
             flex: 1;
@@ -144,28 +184,6 @@
             pointer-events: none;
         }
 
-        /* Event panel (side panel) */
-        .event-panel-wrapper {
-            width: 360px;
-            flex-shrink: 0;
-            background: var(--sl-color-neutral-0);
-            border-left: 1px solid var(--sl-color-neutral-200);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            transition: width 0.3s ease, margin 0.3s ease;
-        }
-
-        .event-panel-wrapper.collapsed {
-            width: 0;
-            border-left: none;
-        }
-
-        .event-panel-wrapper.collapsed .event-panel {
-            opacity: 0;
-            pointer-events: none;
-        }
-
         #event-panel-container {
             display: flex;
             flex-direction: column;
@@ -177,9 +195,8 @@
             display: flex;
             flex-direction: column;
             height: 100%;
-            min-width: 360px;
+            min-width: 100%;
             overflow: hidden;
-            transition: opacity 0.2s;
         }
 
         .event-panel-header {
@@ -294,29 +311,13 @@
             color: var(--sl-color-neutral-500);
         }
 
-        /* View mode: map only hides the panel */
-        .main.view-map .event-panel-wrapper {
-            width: 0;
-            border-left: none;
-        }
-
-        .main.view-map .event-panel-wrapper .event-panel {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        /* View mode: list only hides the map and expands the panel */
+        /* View mode: list only hides the map and expands drawer */
         .main.view-list .map-container {
             display: none;
         }
 
-        .main.view-list .event-panel-wrapper {
-            width: 100%;
-            border-left: none;
-        }
-
-        .main.view-list .event-panel {
-            min-width: 100%;
+        .main.view-list sl-drawer.desktop-drawer {
+            --size: 100%;
         }
 
         .main.view-list .event-panel-list {
@@ -352,7 +353,7 @@
                 display: none;
             }
 
-            .event-panel-wrapper {
+            sl-drawer.desktop-drawer {
                 display: none;
             }
 
@@ -422,17 +423,6 @@
             </div>
 
             <div class="header-controls">
-                <!-- File input -->
-                <sl-button id="file-btn" size="small">
-                    <sl-icon slot="prefix" name="upload"></sl-icon>
-                    Choose IGC
-                </sl-button>
-                <input type="file" id="igc-file" accept=".igc" style="display: none;">
-
-                <!-- Task code input -->
-                <sl-input id="task-code" placeholder="Task code" size="small" style="width: 120px;"></sl-input>
-                <sl-button id="load-task-btn" size="small" variant="primary">Load</sl-button>
-
                 <!-- View mode toggle -->
                 <sl-button-group label="View mode">
                     <sl-button id="view-list" size="small">List</sl-button>
@@ -479,14 +469,36 @@
                 </div>
             </div>
 
-            <!-- Event panel (desktop) -->
-            <div id="event-panel-wrapper" class="event-panel-wrapper">
+            <!-- Event drawer (desktop) -->
+            <sl-drawer id="event-drawer-desktop" class="desktop-drawer" placement="end" contained open>
+                <div class="drawer-controls">
+                    <sl-button id="file-btn" size="small" variant="default">
+                        <sl-icon slot="prefix" name="upload"></sl-icon>
+                        Choose IGC
+                    </sl-button>
+                    <input type="file" id="igc-file" accept=".igc" style="display: none;">
+                    <div class="task-input-group">
+                        <sl-input id="task-code" placeholder="Task code" size="small"></sl-input>
+                        <sl-button id="load-task-btn" size="small" variant="primary">Load</sl-button>
+                    </div>
+                </div>
                 <div id="event-panel-container"></div>
-            </div>
+            </sl-drawer>
         </main>
 
         <!-- Event drawer (mobile) -->
         <sl-drawer id="event-drawer" label="Flight Events" placement="bottom" style="--size: 60vh;">
+            <div class="drawer-controls">
+                <sl-button id="file-btn-mobile" size="small" variant="default">
+                    <sl-icon slot="prefix" name="upload"></sl-icon>
+                    Choose IGC
+                </sl-button>
+                <input type="file" id="igc-file-mobile" accept=".igc" style="display: none;">
+                <div class="task-input-group">
+                    <sl-input id="task-code-mobile" placeholder="Task code" size="small"></sl-input>
+                    <sl-button id="load-task-btn-mobile" size="small" variant="primary">Load</sl-button>
+                </div>
+            </div>
             <div id="event-drawer-container"></div>
         </sl-drawer>
     </div>

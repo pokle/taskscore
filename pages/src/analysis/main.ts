@@ -78,9 +78,14 @@ async function init(): Promise<void> {
   const fileBtn = document.getElementById('file-btn');
   const taskCodeInput = document.getElementById('task-code') as SlInput | null;
   const loadTaskBtn = document.getElementById('load-task-btn');
+  // Mobile controls
+  const igcFileInputMobile = document.getElementById('igc-file-mobile') as HTMLInputElement | null;
+  const fileBtnMobile = document.getElementById('file-btn-mobile');
+  const taskCodeInputMobile = document.getElementById('task-code-mobile') as SlInput | null;
+  const loadTaskBtnMobile = document.getElementById('load-task-btn-mobile');
   const dropZone = document.getElementById('drop-zone');
   const mainContainer = document.getElementById('main-container');
-  const eventPanelWrapper = document.getElementById('event-panel-wrapper');
+  const eventDrawerDesktop = document.getElementById('event-drawer-desktop') as SlDrawer | null;
 
   // View mode buttons
   const viewListBtn = document.getElementById('view-list') as SlButton | null;
@@ -259,14 +264,21 @@ async function init(): Promise<void> {
       mainContainer.classList.add(`view-${mode}`);
     }
 
-    // Handle list-only mode on mobile (show drawer)
-    if (mode === 'list' && window.innerWidth <= 768) {
-      eventDrawer?.show();
-    }
-
-    // Toggle panel visibility
-    if (eventPanelWrapper) {
-      eventPanelWrapper.classList.toggle('collapsed', mode === 'map');
+    // Handle drawer visibility based on mode
+    if (window.innerWidth <= 768) {
+      // Mobile: use bottom drawer
+      if (mode === 'list') {
+        eventDrawer?.show();
+      } else {
+        eventDrawer?.hide();
+      }
+    } else {
+      // Desktop: use side drawer
+      if (mode === 'map') {
+        eventDrawerDesktop?.hide();
+      } else {
+        eventDrawerDesktop?.show();
+      }
     }
 
     // Resize map after layout change
@@ -334,6 +346,34 @@ async function init(): Promise<void> {
   taskCodeInput?.addEventListener('keydown', async (e: Event) => {
     if ((e as KeyboardEvent).key === 'Enter') {
       const code = taskCodeInput.value.trim();
+      if (code) {
+        await loadTask(code);
+      }
+    }
+  });
+
+  // Mobile controls handlers
+  fileBtnMobile?.addEventListener('click', () => {
+    igcFileInputMobile?.click();
+  });
+
+  igcFileInputMobile?.addEventListener('change', async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (file) {
+      await loadIGCFile(file);
+    }
+  });
+
+  loadTaskBtnMobile?.addEventListener('click', async () => {
+    const code = taskCodeInputMobile?.value.trim();
+    if (code) {
+      await loadTask(code);
+    }
+  });
+
+  taskCodeInputMobile?.addEventListener('keydown', async (e: Event) => {
+    if ((e as KeyboardEvent).key === 'Enter') {
+      const code = taskCodeInputMobile.value.trim();
       if (code) {
         await loadTask(code);
       }
