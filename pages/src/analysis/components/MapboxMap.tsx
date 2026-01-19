@@ -3,13 +3,10 @@
  *
  * react-map-gl based map for displaying flight tracks, tasks, and events.
  * Supports 3D terrain and altitude coloring.
- *
- * IMPORTANT: Uses UNCONTROLLED mode - the map manages its own view state internally,
- * and we only use the ref for programmatic operations (fitBounds, flyTo).
- * This component is memoized to prevent re-renders from affecting the map.
+ * Receives all data as props - does NOT use context internally.
  */
 
-import { useEffect, useMemo, useCallback, useState, useRef, memo } from 'react';
+import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import Map, {
   Source,
   Layer,
@@ -21,7 +18,6 @@ import Map, {
 } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-import { useAppContext } from '../context/AppContext';
 import { setBounds } from '../boundsStore';
 import { getEventStyle, type FlightEvent } from '../event-detector';
 import { type IGCFix, getBoundingBox } from '../igc-parser';
@@ -39,6 +35,17 @@ const MAPBOX_STYLES = [
   { id: 'light', name: 'Light', style: 'mapbox://styles/mapbox/light-v11' },
   { id: 'dark', name: 'Dark', style: 'mapbox://styles/mapbox/dark-v11' },
 ];
+
+// Props interface
+export interface MapboxMapProps {
+  fixes: IGCFix[];
+  events: FlightEvent[];
+  task: XCTask | null;
+  selectedEvent: FlightEvent | null;
+  onEventClick: (event: FlightEvent) => void;
+  altitudeColorsEnabled: boolean;
+  is3DMode: boolean;
+}
 
 /**
  * Create a circle polygon (approximation) for cylinder rendering
@@ -143,24 +150,21 @@ function calculateAltitudeGradient(fixes: IGCFix[]): [number, string][] {
   return stops;
 }
 
-// Main exported component - memoized
-export const MapboxMap = memo(function MapboxMap() {
-  const {
-    fixes,
-    events,
-    task,
-    selectedEvent,
-    selectEvent,
-    altitudeColorsEnabled,
-    is3DMode,
-  } = useAppContext();
-
+// Main exported component - receives all data as props
+export function MapboxMap({
+  fixes,
+  events,
+  task,
+  selectedEvent,
+  onEventClick,
+  altitudeColorsEnabled,
+  is3DMode,
+}: MapboxMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [mapStyle, setMapStyle] = useState(MAPBOX_STYLES[0].style);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
 
-  // Track which fixes array we've already fitted bounds to
-  const lastFittedFixesRef = useRef<IGCFix[] | null>(null);
+  // Track which fixes count we've already fitted bounds to
+  const lastFixesCountRef = useRef(0);
   // Track last selected event to avoid duplicate flyTo
   const lastSelectedEventIdRef = useRef<string | null>(null);
   // Debounce timer for bounds updates
@@ -287,26 +291,21 @@ export const MapboxMap = memo(function MapboxMap() {
     return events.filter(e => keyEventTypes.has(e.type));
   }, [events]);
 
-  // Handle map load
-  const handleMapLoad = useCallback(() => {
-    setIsMapLoaded(true);
-  }, []);
-
-  // Fit bounds when fixes change - only run once per new track
+  // Fit bounds when fixes count changes (new track loaded)
   useEffect(() => {
-    if (isMapLoaded && fixes.length > 0 && fixes !== lastFittedFixesRef.current && mapRef.current) {
-      lastFittedFixesRef.current = fixes;
+    if (fixes.length > 0 && fixes.length !== lastFixesCountRef.current && mapRef.current) {
+      lastFixesCountRef.current = fixes.length;
       const bounds = getBoundingBox(fixes);
       mapRef.current.fitBounds(
         [[bounds.minLon, bounds.minLat], [bounds.maxLon, bounds.maxLat]],
         { padding: 50, duration: 500 }
       );
     }
-  }, [isMapLoaded, fixes]);
+  }, [fixes]);
 
   // Pan to selected event - only when event ID changes
   useEffect(() => {
-    if (isMapLoaded && selectedEvent && selectedEvent.id !== lastSelectedEventIdRef.current && mapRef.current) {
+    if (selectedEvent && selectedEvent.id !== lastSelectedEventIdRef.current && mapRef.current) {
       lastSelectedEventIdRef.current = selectedEvent.id;
       mapRef.current.flyTo({
         center: [selectedEvent.longitude, selectedEvent.latitude],
@@ -315,9 +314,9 @@ export const MapboxMap = memo(function MapboxMap() {
     } else if (!selectedEvent) {
       lastSelectedEventIdRef.current = null;
     }
-  }, [isMapLoaded, selectedEvent]);
+  }, [selectedEvent]);
 
-  // Handle bounds change - updates bounds store directly (not React state)
+  // Handle bounds change - updates bounds store directly
   const handleMoveEnd = useCallback(() => {
     if (boundsTimeoutRef.current) {
       clearTimeout(boundsTimeoutRef.current);
@@ -334,7 +333,7 @@ export const MapboxMap = memo(function MapboxMap() {
           });
         }
       }
-    }, 150);
+    }, 200);
   }, []);
 
   // Build gradient expression
@@ -349,11 +348,6 @@ export const MapboxMap = memo(function MapboxMap() {
     return expr;
   }, [altitudeGradient]);
 
-  // Handle event marker click
-  const handleEventClick = useCallback((event: FlightEvent) => {
-    selectEvent(event);
-  }, [selectEvent]);
-
   return (
     <Map
       ref={mapRef}
@@ -364,7 +358,6 @@ export const MapboxMap = memo(function MapboxMap() {
         pitch: 45,
         bearing: 0,
       }}
-      onLoad={handleMapLoad}
       onMoveEnd={handleMoveEnd}
       mapStyle={mapStyle}
       mapboxAccessToken={MAPBOX_TOKEN}
@@ -572,7 +565,7 @@ export const MapboxMap = memo(function MapboxMap() {
             key={event.id}
             longitude={event.longitude}
             latitude={event.latitude}
-            onClick={() => handleEventClick(event)}
+            onClick={() => onEventClick(event)}
           >
             <div
               style={{
@@ -590,4 +583,4 @@ export const MapboxMap = memo(function MapboxMap() {
       })}
     </Map>
   );
-});
+}

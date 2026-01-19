@@ -27,6 +27,13 @@ export function App() {
     loadIGCFile,
     loadTask,
     showStatus,
+    fixes,
+    events,
+    task,
+    selectedEvent,
+    selectEvent,
+    altitudeColorsEnabled,
+    is3DMode,
   } = useAppContext();
 
   const [isDragOver, setIsDragOver] = useState(false);
@@ -128,9 +135,23 @@ export function App() {
 
           {/* Map */}
           {mapProvider === 'leaflet' ? (
-            <LeafletMap />
+            <LeafletMap
+              fixes={fixes}
+              events={events}
+              task={task}
+              selectedEvent={selectedEvent}
+              onEventClick={selectEvent}
+            />
           ) : (
-            <MapboxMap />
+            <MapboxMap
+              fixes={fixes}
+              events={events}
+              task={task}
+              selectedEvent={selectedEvent}
+              onEventClick={selectEvent}
+              altitudeColorsEnabled={altitudeColorsEnabled}
+              is3DMode={is3DMode}
+            />
           )}
 
           {/* Status overlay */}
