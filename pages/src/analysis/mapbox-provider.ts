@@ -52,6 +52,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       const eventMarkers: mapboxgl.Marker[] = [];
       let activePopup: mapboxgl.Popup | null = null;
       let activeMarkers: mapboxgl.Marker[] = [];
+      let glideLegendElement: HTMLElement | null = null;
 
       // 3D rendering state
       let tb: Threebox | null = null;
@@ -61,6 +62,106 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       // Altitude colors state
       let isAltitudeColorsMode = false;
       let altitudeGradientStops: [number, string][] = [];
+
+      /**
+       * Show or hide the glide legend help button
+       */
+      function showGlideLegend(show: boolean): void {
+        if (show) {
+          if (!glideLegendElement) {
+            glideLegendElement = document.createElement('div');
+            glideLegendElement.id = 'glide-legend';
+            glideLegendElement.innerHTML = `
+              <button class="glide-legend-btn" title="Glide metrics help">?</button>
+              <div class="glide-legend-content">
+                <div class="glide-legend-title">Glide Metrics</div>
+                <div class="glide-legend-item"><strong>Chevrons:</strong> 500m segment markers</div>
+                <div class="glide-legend-item"><strong>Speed:</strong> Average speed of segment</div>
+                <div class="glide-legend-item"><strong>L/D:</strong> Glide ratio (distance ÷ altitude lost)</div>
+                <div class="glide-legend-item"><strong>Alt:</strong> Altitude change from segment start to end</div>
+              </div>
+            `;
+            glideLegendElement.style.cssText = `
+              position: absolute;
+              bottom: 30px;
+              right: 10px;
+              z-index: 1000;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            `;
+
+            // Add styles for the legend
+            const style = document.createElement('style');
+            style.id = 'glide-legend-style';
+            style.textContent = `
+              #glide-legend .glide-legend-btn {
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
+                border: none;
+                background: #3b82f6;
+                color: white;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                transition: transform 0.2s;
+              }
+              #glide-legend .glide-legend-btn:hover {
+                transform: scale(1.1);
+              }
+              #glide-legend .glide-legend-content {
+                display: none;
+                position: absolute;
+                bottom: 36px;
+                right: 0;
+                background: white;
+                border-radius: 8px;
+                padding: 12px;
+                min-width: 260px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+              }
+              #glide-legend.expanded .glide-legend-content {
+                display: block;
+              }
+              #glide-legend .glide-legend-title {
+                font-weight: 600;
+                font-size: 14px;
+                margin-bottom: 8px;
+                color: #1e3a5f;
+                border-bottom: 1px solid #e5e7eb;
+                padding-bottom: 6px;
+              }
+              #glide-legend .glide-legend-item {
+                font-size: 12px;
+                color: #374151;
+                margin: 6px 0;
+                line-height: 1.4;
+              }
+              #glide-legend .glide-legend-item strong {
+                color: #3b82f6;
+              }
+            `;
+
+            if (!document.getElementById('glide-legend-style')) {
+              document.head.appendChild(style);
+            }
+
+            // Toggle expanded state on click
+            const btn = glideLegendElement.querySelector('.glide-legend-btn');
+            btn?.addEventListener('click', () => {
+              glideLegendElement?.classList.toggle('expanded');
+            });
+
+            container.appendChild(glideLegendElement);
+          }
+          glideLegendElement.style.display = 'block';
+          glideLegendElement.classList.remove('expanded');
+        } else {
+          if (glideLegendElement) {
+            glideLegendElement.style.display = 'none';
+          }
+        }
+      }
 
       /**
        * Add custom sources and layers for track/task visualization
@@ -978,6 +1079,10 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             marker.remove();
           }
           activeMarkers = [];
+
+          // Show/hide glide legend based on event type
+          const isGlideEvent = event.type === 'glide_start' || event.type === 'glide_end';
+          showGlideLegend(isGlideEvent);
 
           // Highlight segment if event has one
           if (event.segment && currentFixes.length > 0) {

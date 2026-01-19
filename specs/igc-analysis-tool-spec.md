@@ -72,6 +72,10 @@ When an event is selected from the panel:
     - **Altitude change**: Altitude difference in meters (e.g., "-42m" for descent, "+5m" for climb)
     - Example display: "45km/h" on first line, "12:1 -42m" on second line
     - Labels styled with blue text and white text shadow for readability
+- **Glide Metrics Legend**: A help button appears at the bottom-right of the map when a glide event is selected:
+  - Blue circular "?" button that expands on click
+  - Shows explanations for: chevron spacing (500m segments), speed, L/D ratio, and altitude change
+  - Automatically hidden when selecting non-glide events
 
 This visual system helps pilots quickly identify and understand the spatial extent of flight phases.
 
