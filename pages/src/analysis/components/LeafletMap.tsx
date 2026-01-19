@@ -2,9 +2,12 @@
  * Leaflet Map Component
  *
  * React-leaflet based map for displaying flight tracks, tasks, and events.
+ *
+ * IMPORTANT: This component is memoized to prevent re-renders from affecting
+ * the map's internal state (pan/zoom position).
  */
 
-import { useEffect, useMemo, useCallback, useRef, useState } from 'react';
+import { useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -20,7 +23,8 @@ import {
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-import { useAppContext, type MapBounds } from '../context/AppContext';
+import { useAppContext } from '../context/AppContext';
+import { setBounds, type MapBounds } from '../boundsStore';
 import { getEventStyle, type FlightEvent } from '../event-detector';
 import { type IGCFix } from '../igc-parser';
 import { calculateOptimizedTaskLine, getOptimizedSegmentDistances, type XCTask } from '../xctsk-parser';
@@ -33,64 +37,75 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Map bounds change handler - only updates on moveend, doesn't control the map
-function MapEventHandler({ onBoundsChange }: { onBoundsChange: (bounds: MapBounds) => void }) {
+// Map bounds change handler - updates the bounds store directly (not React state)
+function MapBoundsUpdater() {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useMapEvents({
     moveend: (e) => {
-      const map = e.target;
-      const bounds = map.getBounds();
-      onBoundsChange({
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest(),
-      });
+      // Debounce bounds updates
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        const map = e.target;
+        const bounds = map.getBounds();
+        setBounds({
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest(),
+        });
+      }, 150);
     },
   });
 
   return null;
 }
 
-// Fit bounds to track - only when fixes array identity changes (new track loaded)
-function FitBounds({ fixes }: { fixes: IGCFix[] }) {
+// Fit bounds to track - controlled by parent via prop
+function FitBoundsController({ shouldFit, fixes }: { shouldFit: boolean; fixes: IGCFix[] }) {
   const map = useMap();
-  const lastFixesRef = useRef<IGCFix[] | null>(null);
+  const hasFittedRef = useRef(false);
 
   useEffect(() => {
-    // Only fit bounds if this is a new track (different array reference with content)
-    if (fixes.length > 0 && fixes !== lastFixesRef.current) {
-      lastFixesRef.current = fixes;
+    if (shouldFit && fixes.length > 0 && !hasFittedRef.current) {
+      hasFittedRef.current = true;
       const bounds = L.latLngBounds(fixes.map(fix => [fix.latitude, fix.longitude]));
       map.fitBounds(bounds, { padding: [50, 50], animate: false });
     }
-  }, [fixes, map]);
+  }, [shouldFit, fixes, map]);
+
+  // Reset when fixes change completely
+  useEffect(() => {
+    hasFittedRef.current = false;
+  }, [fixes]);
 
   return null;
 }
 
-// Pan to event - only when selected event changes
-function PanToEvent({ event }: { event: FlightEvent | null }) {
+// Pan to event controller
+function PanToEventController({ event }: { event: FlightEvent | null }) {
   const map = useMap();
-  const prevEventIdRef = useRef<string | null>(null);
+  const lastEventIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (event && event.id !== prevEventIdRef.current) {
-      prevEventIdRef.current = event.id;
+    if (event && event.id !== lastEventIdRef.current) {
+      lastEventIdRef.current = event.id;
       map.setView([event.latitude, event.longitude], map.getZoom(), { animate: true });
     } else if (!event) {
-      prevEventIdRef.current = null;
+      lastEventIdRef.current = null;
     }
   }, [event, map]);
 
   return null;
 }
 
-// Track polyline with event-based coloring
-function TrackLine({ fixes, events }: { fixes: IGCFix[]; events: FlightEvent[] }) {
+// Memoized track polyline
+const TrackLine = memo(function TrackLine({ fixes, events }: { fixes: IGCFix[]; events: FlightEvent[] }) {
   const segments = useMemo(() => {
     if (fixes.length === 0) return [];
 
-    // Build a map of fix index -> event type for segments
     const fixEventType: (string | null)[] = new Array(fixes.length).fill(null);
 
     for (const event of events) {
@@ -105,7 +120,6 @@ function TrackLine({ fixes, events }: { fixes: IGCFix[]; events: FlightEvent[] }
       }
     }
 
-    // Create segments with consistent colors
     const result: { positions: [number, number][]; color: string }[] = [];
     let segmentStart = 0;
     let currentType = fixEventType[0];
@@ -139,10 +153,10 @@ function TrackLine({ fixes, events }: { fixes: IGCFix[]; events: FlightEvent[] }
       ))}
     </>
   );
-}
+});
 
-// Task overlay - memoize path calculation
-function TaskOverlay({ task }: { task: XCTask | null }) {
+// Memoized task overlay
+const TaskOverlay = memo(function TaskOverlay({ task }: { task: XCTask | null }) {
   const { optimizedPath, segmentDistances } = useMemo(() => {
     if (!task || task.turnpoints.length === 0) {
       return { optimizedPath: [], segmentDistances: [] };
@@ -166,7 +180,6 @@ function TaskOverlay({ task }: { task: XCTask | null }) {
 
   return (
     <>
-      {/* Task line */}
       {optimizedPath.length > 1 && (
         <Polyline
           positions={optimizedPath.map(p => [p.lat, p.lon] as [number, number])}
@@ -174,7 +187,6 @@ function TaskOverlay({ task }: { task: XCTask | null }) {
         />
       )}
 
-      {/* Distance labels for each segment */}
       {optimizedPath.map((point, i) => {
         if (i >= optimizedPath.length - 1) return null;
         const p1 = optimizedPath[i];
@@ -209,7 +221,6 @@ function TaskOverlay({ task }: { task: XCTask | null }) {
         );
       })}
 
-      {/* Turnpoint cylinders and markers */}
       {task.turnpoints.map((tp, idx) => {
         const color = getTurnpointColor(tp.type);
         const name = tp.waypoint.name || `TP${idx + 1}`;
@@ -257,11 +268,16 @@ function TaskOverlay({ task }: { task: XCTask | null }) {
       })}
     </>
   );
-}
+});
 
-// Event markers
-function EventMarkers({ events, onEventClick }: { events: FlightEvent[]; onEventClick: (event: FlightEvent) => void }) {
-  // Only show key event types
+// Memoized event markers
+const EventMarkers = memo(function EventMarkers({
+  events,
+  onEventClick
+}: {
+  events: FlightEvent[];
+  onEventClick: (event: FlightEvent) => void;
+}) {
   const keyEventTypes = new Set([
     'takeoff', 'landing', 'start_crossing', 'goal_crossing',
     'max_altitude', 'turnpoint_entry',
@@ -308,10 +324,16 @@ function EventMarkers({ events, onEventClick }: { events: FlightEvent[]; onEvent
       })}
     </>
   );
-}
+});
 
 // Highlight segment
-function HighlightSegment({ event, fixes }: { event: FlightEvent | null; fixes: IGCFix[] }) {
+const HighlightSegment = memo(function HighlightSegment({
+  event,
+  fixes
+}: {
+  event: FlightEvent | null;
+  fixes: IGCFix[];
+}) {
   if (!event?.segment || fixes.length === 0) return null;
 
   const segmentFixes = fixes.slice(event.segment.startIndex, event.segment.endIndex + 1);
@@ -323,29 +345,28 @@ function HighlightSegment({ event, fixes }: { event: FlightEvent | null; fixes: 
       pathOptions={{ color: '#00ffff', weight: 6, opacity: 0.9 }}
     />
   );
-}
+});
 
-export function LeafletMap() {
+// Inner map content - separated to use hooks inside MapContainer
+function MapContent() {
   const {
     fixes,
     events,
     task,
     selectedEvent,
-    setMapBounds,
     selectEvent,
   } = useAppContext();
 
+  // Track if we should fit bounds (only on initial load or new track)
+  const shouldFitBounds = fixes.length > 0;
+
+  // Stable callback for event click
   const handleEventClick = useCallback((event: FlightEvent) => {
     selectEvent(event);
   }, [selectEvent]);
 
   return (
-    <MapContainer
-      center={[45, 0]}
-      zoom={5}
-      className="map"
-      style={{ height: '100%', width: '100%' }}
-    >
+    <>
       <LayersControl position="topright">
         <LayersControl.BaseLayer checked name="OpenTopoMap">
           <TileLayer
@@ -372,14 +393,28 @@ export function LeafletMap() {
 
       <ScaleControl position="bottomleft" maxWidth={200} />
 
-      <MapEventHandler onBoundsChange={setMapBounds} />
-      <FitBounds fixes={fixes} />
-      <PanToEvent event={selectedEvent} />
+      <MapBoundsUpdater />
+      <FitBoundsController shouldFit={shouldFitBounds} fixes={fixes} />
+      <PanToEventController event={selectedEvent} />
 
       <TaskOverlay task={task} />
       <TrackLine fixes={fixes} events={events} />
       <HighlightSegment event={selectedEvent} fixes={fixes} />
       <EventMarkers events={events} onEventClick={handleEventClick} />
-    </MapContainer>
+    </>
   );
 }
+
+// Main exported component - memoized to prevent parent re-renders from affecting the map
+export const LeafletMap = memo(function LeafletMap() {
+  return (
+    <MapContainer
+      center={[45, 0]}
+      zoom={5}
+      className="map"
+      style={{ height: '100%', width: '100%' }}
+    >
+      <MapContent />
+    </MapContainer>
+  );
+});

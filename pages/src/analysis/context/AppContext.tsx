@@ -23,13 +23,6 @@ export interface FlightInfo {
   task?: string;
 }
 
-export interface MapBounds {
-  north: number;
-  south: number;
-  east: number;
-  west: number;
-}
-
 interface AppState {
   igcFile: IGCFile | null;
   task: XCTask | null;
@@ -41,7 +34,6 @@ interface AppState {
   altitudeColorsEnabled: boolean;
   is3DMode: boolean;
   selectedEvent: FlightEvent | null;
-  mapBounds: MapBounds | null;
   statusMessage: { text: string; variant: 'primary' | 'success' | 'warning' | 'danger' } | null;
   flightInfo: FlightInfo;
   filterVisibleEvents: boolean;
@@ -56,10 +48,8 @@ interface AppContextType extends AppState {
   setAltitudeColorsEnabled: (enabled: boolean) => void;
   set3DMode: (enabled: boolean) => void;
   selectEvent: (event: FlightEvent | null) => void;
-  setMapBounds: (bounds: MapBounds | null) => void;
   showStatus: (text: string, variant: 'primary' | 'success' | 'warning' | 'danger') => void;
   setFilterVisibleEvents: (enabled: boolean) => void;
-  getFilteredEvents: () => FlightEvent[];
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -118,7 +108,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     altitudeColorsEnabled: getAltitudeColorsFromUrl(),
     is3DMode: get3DModeFromUrl(),
     selectedEvent: null,
-    mapBounds: null,
     statusMessage: { text: 'Ready - drop an IGC file or use the file picker', variant: 'primary' },
     flightInfo: {},
     filterVisibleEvents: true,
@@ -275,27 +264,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, selectedEvent: event }));
   }, []);
 
-  const setMapBounds = useCallback((bounds: MapBounds | null) => {
-    setState(prev => ({ ...prev, mapBounds: bounds }));
-  }, []);
-
   const setFilterVisibleEvents = useCallback((enabled: boolean) => {
     setState(prev => ({ ...prev, filterVisibleEvents: enabled }));
   }, []);
-
-  const getFilteredEvents = useCallback(() => {
-    if (!state.filterVisibleEvents || !state.mapBounds) {
-      return state.events;
-    }
-
-    const bounds = state.mapBounds;
-    return state.events.filter(event =>
-      event.latitude >= bounds.south &&
-      event.latitude <= bounds.north &&
-      event.longitude >= bounds.west &&
-      event.longitude <= bounds.east
-    );
-  }, [state.events, state.mapBounds, state.filterVisibleEvents]);
 
   const value: AppContextType = {
     ...state,
@@ -307,10 +278,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAltitudeColorsEnabled,
     set3DMode,
     selectEvent,
-    setMapBounds,
     showStatus,
     setFilterVisibleEvents,
-    getFilteredEvents,
   };
 
   return (

@@ -8,9 +8,10 @@
 import type { ReactNode } from 'react';
 import * as Switch from '@radix-ui/react-switch';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { type FlightEvent, type FlightEventType, getEventStyle } from '../event-detector';
+import { subscribeToBounds, getBounds, type MapBounds } from '../boundsStore';
 
 // Icons
 const UploadIcon = () => (
@@ -148,17 +149,33 @@ export function EventPanel({ onFileSelect }: EventPanelProps) {
     flightInfo,
     filterVisibleEvents,
     setFilterVisibleEvents,
-    getFilteredEvents,
     selectEvent,
     selectedEvent,
     loadTask,
+    loadIGCFile,
   } = useAppContext();
 
   const [taskCode, setTaskCode] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { loadIGCFile } = useAppContext();
 
-  const filteredEvents = getFilteredEvents();
+  // Subscribe to bounds store for filtering
+  const [mapBounds, setMapBounds] = useState<MapBounds | null>(getBounds);
+  useEffect(() => {
+    return subscribeToBounds(setMapBounds);
+  }, []);
+
+  // Filter events based on current map bounds
+  const filteredEvents = useMemo(() => {
+    if (!filterVisibleEvents || !mapBounds) {
+      return events;
+    }
+    return events.filter(event =>
+      event.latitude >= mapBounds.south &&
+      event.latitude <= mapBounds.north &&
+      event.longitude >= mapBounds.west &&
+      event.longitude <= mapBounds.east
+    );
+  }, [events, mapBounds, filterVisibleEvents]);
 
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

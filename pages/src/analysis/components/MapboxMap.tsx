@@ -4,11 +4,12 @@
  * react-map-gl based map for displaying flight tracks, tasks, and events.
  * Supports 3D terrain and altitude coloring.
  *
- * Uses UNCONTROLLED mode - the map manages its own view state internally,
+ * IMPORTANT: Uses UNCONTROLLED mode - the map manages its own view state internally,
  * and we only use the ref for programmatic operations (fitBounds, flyTo).
+ * This component is memoized to prevent re-renders from affecting the map.
  */
 
-import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
+import { useEffect, useMemo, useCallback, useState, useRef, memo } from 'react';
 import Map, {
   Source,
   Layer,
@@ -20,7 +21,8 @@ import Map, {
 } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-import { useAppContext, type MapBounds } from '../context/AppContext';
+import { useAppContext } from '../context/AppContext';
+import { setBounds } from '../boundsStore';
 import { getEventStyle, type FlightEvent } from '../event-detector';
 import { type IGCFix, getBoundingBox } from '../igc-parser';
 import { calculateOptimizedTaskLine, getOptimizedSegmentDistances, type XCTask } from '../xctsk-parser';
@@ -141,13 +143,13 @@ function calculateAltitudeGradient(fixes: IGCFix[]): [number, string][] {
   return stops;
 }
 
-export function MapboxMap() {
+// Main exported component - memoized
+export const MapboxMap = memo(function MapboxMap() {
   const {
     fixes,
     events,
     task,
     selectedEvent,
-    setMapBounds,
     selectEvent,
     altitudeColorsEnabled,
     is3DMode,
@@ -155,11 +157,14 @@ export function MapboxMap() {
 
   const mapRef = useRef<MapRef>(null);
   const [mapStyle, setMapStyle] = useState(MAPBOX_STYLES[0].style);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
 
   // Track which fixes array we've already fitted bounds to
   const lastFittedFixesRef = useRef<IGCFix[] | null>(null);
   // Track last selected event to avoid duplicate flyTo
   const lastSelectedEventIdRef = useRef<string | null>(null);
+  // Debounce timer for bounds updates
+  const boundsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track GeoJSON data
   const trackGeoJSON = useMemo(() => {
@@ -200,7 +205,6 @@ export function MapboxMap() {
     const optimizedPath = calculateOptimizedTaskLine(task);
     const segmentDistances = getOptimizedSegmentDistances(task);
 
-    // Task line
     const lineFeature = {
       type: 'Feature' as const,
       properties: {},
@@ -210,7 +214,6 @@ export function MapboxMap() {
       },
     };
 
-    // Segment labels
     const labelFeatures = optimizedPath.slice(0, -1).map((p1, i) => {
       const p2 = optimizedPath[i + 1];
       const midLon = (p1.lon + p2.lon) / 2;
@@ -225,7 +228,6 @@ export function MapboxMap() {
       };
     });
 
-    // Turnpoint markers
     const pointFeatures = task.turnpoints.map((tp, idx) => {
       const name = tp.waypoint.name || `TP${idx + 1}`;
       const radiusKm = (tp.radius / 1000).toFixed(tp.radius >= 1000 ? 0 : 1);
@@ -242,7 +244,6 @@ export function MapboxMap() {
       };
     });
 
-    // Cylinder polygons
     const cylinderFeatures = task.turnpoints.map((tp, idx) => ({
       type: 'Feature' as const,
       properties: { name: tp.waypoint.name || `TP${idx + 1}`, type: tp.type || '', radius: tp.radius },
@@ -286,9 +287,14 @@ export function MapboxMap() {
     return events.filter(e => keyEventTypes.has(e.type));
   }, [events]);
 
+  // Handle map load
+  const handleMapLoad = useCallback(() => {
+    setIsMapLoaded(true);
+  }, []);
+
   // Fit bounds when fixes change - only run once per new track
   useEffect(() => {
-    if (fixes.length > 0 && fixes !== lastFittedFixesRef.current && mapRef.current) {
+    if (isMapLoaded && fixes.length > 0 && fixes !== lastFittedFixesRef.current && mapRef.current) {
       lastFittedFixesRef.current = fixes;
       const bounds = getBoundingBox(fixes);
       mapRef.current.fitBounds(
@@ -296,11 +302,11 @@ export function MapboxMap() {
         { padding: 50, duration: 500 }
       );
     }
-  }, [fixes]);
+  }, [isMapLoaded, fixes]);
 
   // Pan to selected event - only when event ID changes
   useEffect(() => {
-    if (selectedEvent && selectedEvent.id !== lastSelectedEventIdRef.current && mapRef.current) {
+    if (isMapLoaded && selectedEvent && selectedEvent.id !== lastSelectedEventIdRef.current && mapRef.current) {
       lastSelectedEventIdRef.current = selectedEvent.id;
       mapRef.current.flyTo({
         center: [selectedEvent.longitude, selectedEvent.latitude],
@@ -309,22 +315,27 @@ export function MapboxMap() {
     } else if (!selectedEvent) {
       lastSelectedEventIdRef.current = null;
     }
-  }, [selectedEvent]);
+  }, [isMapLoaded, selectedEvent]);
 
-  // Handle bounds change - update app state for event filtering
+  // Handle bounds change - updates bounds store directly (not React state)
   const handleMoveEnd = useCallback(() => {
-    if (mapRef.current) {
-      const bounds = mapRef.current.getBounds();
-      if (bounds) {
-        setMapBounds({
-          north: bounds.getNorth(),
-          south: bounds.getSouth(),
-          east: bounds.getEast(),
-          west: bounds.getWest(),
-        });
-      }
+    if (boundsTimeoutRef.current) {
+      clearTimeout(boundsTimeoutRef.current);
     }
-  }, [setMapBounds]);
+    boundsTimeoutRef.current = setTimeout(() => {
+      if (mapRef.current) {
+        const bounds = mapRef.current.getBounds();
+        if (bounds) {
+          setBounds({
+            north: bounds.getNorth(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            west: bounds.getWest(),
+          });
+        }
+      }
+    }, 150);
+  }, []);
 
   // Build gradient expression
   const gradientExpression = useMemo(() => {
@@ -338,6 +349,11 @@ export function MapboxMap() {
     return expr;
   }, [altitudeGradient]);
 
+  // Handle event marker click
+  const handleEventClick = useCallback((event: FlightEvent) => {
+    selectEvent(event);
+  }, [selectEvent]);
+
   return (
     <Map
       ref={mapRef}
@@ -348,6 +364,7 @@ export function MapboxMap() {
         pitch: 45,
         bearing: 0,
       }}
+      onLoad={handleMapLoad}
       onMoveEnd={handleMoveEnd}
       mapStyle={mapStyle}
       mapboxAccessToken={MAPBOX_TOKEN}
@@ -555,9 +572,7 @@ export function MapboxMap() {
             key={event.id}
             longitude={event.longitude}
             latitude={event.latitude}
-            onClick={() => {
-              selectEvent(event);
-            }}
+            onClick={() => handleEventClick(event)}
           >
             <div
               style={{
@@ -575,4 +590,4 @@ export function MapboxMap() {
       })}
     </Map>
   );
-}
+});
