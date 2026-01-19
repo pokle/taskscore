@@ -5,7 +5,7 @@
  * Manages IGC file data, task data, events, and UI state.
  */
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { parseIGC, type IGCFile, type IGCFix } from '../igc-parser';
 import { fetchTaskByCode, calculateOptimizedTaskDistance, type XCTask } from '../xctsk-parser';
 import { detectFlightEvents, type FlightEvent } from '../event-detector';
@@ -268,7 +268,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, filterVisibleEvents: enabled }));
   }, []);
 
-  const value: AppContextType = {
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const value = useMemo<AppContextType>(() => ({
     ...state,
     loadIGCFile,
     loadTask,
@@ -280,7 +281,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     selectEvent,
     showStatus,
     setFilterVisibleEvents,
-  };
+  }), [
+    state,
+    loadIGCFile,
+    loadTask,
+    setViewMode,
+    setMapProvider,
+    setTheme,
+    setAltitudeColorsEnabled,
+    set3DMode,
+    selectEvent,
+    showStatus,
+    setFilterVisibleEvents,
+  ]);
 
   return (
     <AppContext.Provider value={value}>

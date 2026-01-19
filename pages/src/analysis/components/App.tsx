@@ -44,7 +44,15 @@ export function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Load from query params on mount
+  // Store refs to avoid re-running effect when functions change
+  const loadIGCFileRef = useRef(loadIGCFile);
+  const loadTaskRef = useRef(loadTask);
+  useEffect(() => {
+    loadIGCFileRef.current = loadIGCFile;
+    loadTaskRef.current = loadTask;
+  }, [loadIGCFile, loadTask]);
+
+  // Load from query params on mount (only once)
   useEffect(() => {
     const loadFromQueryParams = async () => {
       const params = new URLSearchParams(window.location.search);
@@ -53,7 +61,7 @@ export function App() {
 
       // Load task first if specified
       if (taskCode) {
-        await loadTask(taskCode);
+        await loadTaskRef.current(taskCode);
       }
 
       // Load track from samples folder if specified
@@ -73,7 +81,7 @@ export function App() {
 
           const content = await response.text();
           const file = new File([content], trackFile, { type: 'text/plain' });
-          await loadIGCFile(file);
+          await loadIGCFileRef.current(file);
         } catch (err) {
           console.error('Failed to load track from URL:', err);
         }
@@ -81,7 +89,7 @@ export function App() {
     };
 
     loadFromQueryParams();
-  }, [loadIGCFile, loadTask]);
+  }, []); // Empty deps - run only once on mount
 
   // Drag and drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {

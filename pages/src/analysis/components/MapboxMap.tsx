@@ -6,7 +6,7 @@
  * Receives all data as props - does NOT use context internally.
  */
 
-import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
+import { useEffect, useMemo, useCallback, useState, useRef, memo } from 'react';
 import Map, {
   Source,
   Layer,
@@ -150,8 +150,8 @@ function calculateAltitudeGradient(fixes: IGCFix[]): [number, string][] {
   return stops;
 }
 
-// Main exported component - receives all data as props
-export function MapboxMap({
+// Main exported component - receives all data as props, memoized to prevent unnecessary re-renders
+export const MapboxMap = memo(function MapboxMap({
   fixes,
   events,
   task,
@@ -583,4 +583,4 @@ export function MapboxMap({
       })}
     </Map>
   );
-}
+});
