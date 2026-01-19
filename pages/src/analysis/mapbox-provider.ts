@@ -13,6 +13,7 @@ import { XCTask } from './xctsk-parser';
 import { FlightEvent, getEventStyle } from './event-detector';
 import { calculateGlideMarkers } from './glide-speed';
 import type { MapProvider } from './map-provider';
+import { haversineDistance } from './geo';
 
 // Set MapBox access token
 mapboxgl.accessToken = 'pk.eyJ1IjoicG9rbGV0IiwiYSI6ImNta2NldzI2djAwM2szY3BudXYyd3Y2Ym4ifQ.cPKrPNe6ALnWnH03FlT6iA';
@@ -674,19 +675,8 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         return '#E3F2FD';                           // Pale Sky
       }
 
-      /**
-       * Calculate distance between two points (Haversine formula)
-       */
-      function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-        const R = 6371000; // Earth's radius in meters
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-          Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-      }
+      // Alias for backwards compatibility with local code
+      const calculateDistance = haversineDistance;
 
       /**
        * Calculate altitude gradient stops based on line progress

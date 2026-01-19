@@ -100,34 +100,19 @@ function findOptimalCirclePoint(prev, center, radius, next):
 
 ## Geometry Functions
 
-### Haversine Distance
-Calculates great circle distance between two points on a sphere:
+All geographic calculations use **Turf.js** via the centralized `geo.ts` module:
 
-```
-a = sin²(Δlat/2) + cos(lat₁) · cos(lat₂) · sin²(Δlon/2)
-c = 2 · atan2(√a, √(1-a))
-distance = R · c
+```typescript
+import { haversineDistance, calculateBearingRadians, destinationPoint } from './geo';
 ```
 
-Where R = 6,371,000 meters (Earth's mean radius).
+### Available Functions
 
-### Bearing Calculation
-Calculates the initial bearing from point 1 to point 2:
+- `haversineDistance(lat1, lon1, lat2, lon2)` - Great circle distance in meters
+- `calculateBearingRadians(lat1, lon1, lat2, lon2)` - Initial bearing in radians
+- `destinationPoint(lat, lon, distanceMeters, bearingRadians)` - Destination point calculation
 
-```
-y = sin(Δlon) · cos(lat₂)
-x = cos(lat₁) · sin(lat₂) - sin(lat₁) · cos(lat₂) · cos(Δlon)
-bearing = atan2(y, x)
-```
-
-### Destination Point
-Given a starting point, distance, and bearing, calculates the destination:
-
-```
-lat₂ = asin(sin(lat₁) · cos(d/R) + cos(lat₁) · sin(d/R) · cos(bearing))
-lon₂ = lon₁ + atan2(sin(bearing) · sin(d/R) · cos(lat₁),
-                     cos(d/R) - sin(lat₁) · sin(lat₂))
-```
+**Note**: Never implement inline geo math. Always use the `geo.ts` module which wraps Turf.js.
 
 ## Visual Representation
 

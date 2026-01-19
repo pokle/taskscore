@@ -102,3 +102,21 @@ npm run deploy       # Manual deploy to Cloudflare Pages
 - Decisions MUST be explainable - return explanations for scoring decisions, audit logs, and unit testing
 - Place experimental code in `/explorations/` - never use in production
 - Use Shoelace components for all UI elements - avoid custom CSS when Shoelace provides equivalent functionality
+
+## Geographic Calculations
+
+**Always use Turf.js via `geo.ts`** for any geographic/geometric calculations:
+
+```typescript
+import { haversineDistance, calculateBearing, destinationPoint, getBoundingBox, isInsideCylinder } from './geo';
+```
+
+**Available functions in `pages/src/analysis/geo.ts`:**
+- `haversineDistance(lat1, lon1, lat2, lon2)` - Distance between two points in meters
+- `calculateBearing(lat1, lon1, lat2, lon2)` - Bearing in degrees (-180 to 180)
+- `calculateBearingRadians(lat1, lon1, lat2, lon2)` - Bearing in radians
+- `destinationPoint(lat, lon, distanceMeters, bearingRadians)` - Point at distance/bearing from origin
+- `getBoundingBox(fixes)` - Bounding box for array of lat/lon points
+- `isInsideCylinder(lat, lon, centerLat, centerLon, radius)` - Point-in-cylinder test
+
+**NEVER** implement inline haversine, bearing, or other geo math - always use the centralized `geo.ts` module which wraps Turf.js.

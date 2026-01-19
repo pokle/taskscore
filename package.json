@@ -29,6 +29,11 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@turf/bbox": "^7.3.2",
+    "@turf/bearing": "^7.3.2",
+    "@turf/destination": "^7.3.2",
+    "@turf/distance": "^7.3.2",
+    "@turf/helpers": "^7.3.2",
     "mapbox-gl": "^3.17.0",
     "threebox-plugin": "^2.2.7"
   }

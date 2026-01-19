@@ -385,6 +385,12 @@ export function getIntermediateTurnpoints(task: XCTask): Turnpoint[] {
   return task.turnpoints.filter(tp => !tp.type);
 }
 
+import {
+  haversineDistance,
+  calculateBearingRadians as calculateBearing,
+  destinationPoint
+} from './geo';
+
 /**
  * Calculate total task distance (optimized route)
  */
@@ -395,66 +401,10 @@ export function calculateTaskDistance(task: XCTask): number {
   for (let i = 1; i < tps.length; i++) {
     const p1 = tps[i - 1].waypoint;
     const p2 = tps[i].waypoint;
-
-    // Haversine distance
-    const R = 6371000; // Earth's radius in meters
-    const dLat = (p2.lat - p1.lat) * Math.PI / 180;
-    const dLon = (p2.lon - p1.lon) * Math.PI / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(p1.lat * Math.PI / 180) *
-      Math.cos(p2.lat * Math.PI / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    distance += R * c;
+    distance += haversineDistance(p1.lat, p1.lon, p2.lat, p2.lon);
   }
 
   return distance;
-}
-
-/**
- * Calculate bearing from point 1 to point 2 (in radians)
- */
-function calculateBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const lat1Rad = lat1 * Math.PI / 180;
-  const lat2Rad = lat2 * Math.PI / 180;
-
-  const y = Math.sin(dLon) * Math.cos(lat2Rad);
-  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) -
-    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
-
-  return Math.atan2(y, x);
-}
-
-/**
- * Calculate a destination point given distance and bearing from start point
- * @param lat Starting latitude in degrees
- * @param lon Starting longitude in degrees
- * @param distance Distance in meters
- * @param bearing Bearing in radians
- * @returns Destination point {lat, lon} in degrees
- */
-function destinationPoint(lat: number, lon: number, distance: number, bearing: number): { lat: number; lon: number } {
-  const R = 6371000; // Earth's radius in meters
-  const latRad = lat * Math.PI / 180;
-  const lonRad = lon * Math.PI / 180;
-  const angularDistance = distance / R;
-
-  const lat2 = Math.asin(
-    Math.sin(latRad) * Math.cos(angularDistance) +
-    Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing)
-  );
-
-  const lon2 = lonRad + Math.atan2(
-    Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latRad),
-    Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(lat2)
-  );
-
-  return {
-    lat: lat2 * 180 / Math.PI,
-    lon: lon2 * 180 / Math.PI,
-  };
 }
 
 /**
@@ -635,22 +585,6 @@ export function calculateOptimizedTaskLine(task: XCTask): { lat: number; lon: nu
   }
 
   return path;
-}
-
-/**
- * Calculate distance between two points using Haversine formula
- */
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000; // Earth's radius in meters
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) *
-    Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
 }
 
 /**

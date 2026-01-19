@@ -11,6 +11,7 @@ import { XCTask } from './xctsk-parser';
 import { FlightEvent, getEventStyle } from './event-detector';
 import { StyleSelectorControl, MAP_STYLES, getStyleById } from './map-styles';
 import type { MapProvider } from './map-provider';
+import { haversineDistance, calculateBearing } from './geo';
 
 // Re-export MapProvider as MapRenderer for backwards compatibility
 export type MapRenderer = MapProvider & { map: maplibregl.Map };
@@ -592,18 +593,15 @@ export function createMapLibreProvider(container: HTMLElement): Promise<MapProvi
                   const prevFix = segmentFixes[i - 1];
                   const currFix = segmentFixes[i];
                   
-                  // Haversine distance
-                  const R = 6371000; // Earth radius in meters
-                  const dLat = (currFix.latitude - prevFix.latitude) * Math.PI / 180;
-                  const dLon = (currFix.longitude - prevFix.longitude) * Math.PI / 180;
-                  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(prevFix.latitude * Math.PI / 180) * Math.cos(currFix.latitude * Math.PI / 180) *
-                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                  const segmentDistance = R * c;
-                  
+                  const segmentDistance = haversineDistance(
+                    prevFix.latitude,
+                    prevFix.longitude,
+                    currFix.latitude,
+                    currFix.longitude
+                  );
+
                   cumulativeDistance += segmentDistance;
-                  
+
                   // Place chevrons at each 500m interval
                   while (cumulativeDistance >= nextChevronDistance) {
                     // Interpolate position along the segment
@@ -611,14 +609,14 @@ export function createMapLibreProvider(container: HTMLElement): Promise<MapProvi
                     const t = 1 - (overshoot / segmentDistance);
                     const chevronLat = prevFix.latitude + t * (currFix.latitude - prevFix.latitude);
                     const chevronLon = prevFix.longitude + t * (currFix.longitude - prevFix.longitude);
-                    
+
                     // Calculate local bearing at this point
-                    const bearingDLon = (currFix.longitude - prevFix.longitude) * Math.PI / 180;
-                    const lat1 = prevFix.latitude * Math.PI / 180;
-                    const lat2 = currFix.latitude * Math.PI / 180;
-                    const y = Math.sin(bearingDLon) * Math.cos(lat2);
-                    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(bearingDLon);
-                    const bearing = Math.atan2(y, x) * 180 / Math.PI;
+                    const bearing = calculateBearing(
+                      prevFix.latitude,
+                      prevFix.longitude,
+                      currFix.latitude,
+                      currFix.longitude
+                    );
                     
                     // Create chevron marker
                     const chevronEl = document.createElement('div');

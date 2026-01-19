@@ -9,7 +9,8 @@
  * - Max altitude, max climb rate, etc.
  */
 
-import { IGCFix, haversineDistance } from './igc-parser';
+import { IGCFix } from './igc-parser';
+import { haversineDistance, isInsideCylinder } from './geo';
 import { XCTask, Turnpoint } from './xctsk-parser';
 
 export type FlightEventType =
@@ -92,20 +93,6 @@ function calculateGroundSpeed(fix1: IGCFix, fix2: IGCFix): number {
   );
 
   return distance / timeDiff;
-}
-
-/**
- * Check if a point is inside a cylinder
- */
-function isInsideCylinder(
-  lat: number,
-  lon: number,
-  centerLat: number,
-  centerLon: number,
-  radius: number
-): boolean {
-  const distance = haversineDistance(lat, lon, centerLat, centerLon);
-  return distance <= radius;
 }
 
 /**
