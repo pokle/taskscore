@@ -24,7 +24,6 @@ import { useAppContext, type MapBounds } from '../context/AppContext';
 import { getEventStyle, type FlightEvent } from '../event-detector';
 import { type IGCFix } from '../igc-parser';
 import { calculateOptimizedTaskLine, getOptimizedSegmentDistances, type XCTask } from '../xctsk-parser';
-import { haversineDistance, calculateBearing } from '../geo';
 
 // Fix Leaflet default icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -34,10 +33,11 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Map bounds change handler
+// Map bounds change handler - only updates on moveend, doesn't control the map
 function MapEventHandler({ onBoundsChange }: { onBoundsChange: (bounds: MapBounds) => void }) {
-  const map = useMapEvents({
-    moveend: () => {
+  useMapEvents({
+    moveend: (e) => {
+      const map = e.target;
       const bounds = map.getBounds();
       onBoundsChange({
         north: bounds.getNorth(),
@@ -51,31 +51,36 @@ function MapEventHandler({ onBoundsChange }: { onBoundsChange: (bounds: MapBound
   return null;
 }
 
-// Fit bounds to track
+// Fit bounds to track - only when fixes array identity changes (new track loaded)
 function FitBounds({ fixes }: { fixes: IGCFix[] }) {
   const map = useMap();
+  const lastFixesRef = useRef<IGCFix[] | null>(null);
 
   useEffect(() => {
-    if (fixes.length > 0) {
+    // Only fit bounds if this is a new track (different array reference with content)
+    if (fixes.length > 0 && fixes !== lastFixesRef.current) {
+      lastFixesRef.current = fixes;
       const bounds = L.latLngBounds(fixes.map(fix => [fix.latitude, fix.longitude]));
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [50, 50], animate: false });
     }
   }, [fixes, map]);
 
   return null;
 }
 
-// Pan to event
-function PanToEvent({ event, fixes }: { event: FlightEvent | null; fixes: IGCFix[] }) {
+// Pan to event - only when selected event changes
+function PanToEvent({ event }: { event: FlightEvent | null }) {
   const map = useMap();
-  const prevEventRef = useRef<FlightEvent | null>(null);
+  const prevEventIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (event && event !== prevEventRef.current) {
+    if (event && event.id !== prevEventIdRef.current) {
+      prevEventIdRef.current = event.id;
       map.setView([event.latitude, event.longitude], map.getZoom(), { animate: true });
-      prevEventRef.current = event;
+    } else if (!event) {
+      prevEventIdRef.current = null;
     }
-  }, [event, fixes, map]);
+  }, [event, map]);
 
   return null;
 }
@@ -136,20 +141,16 @@ function TrackLine({ fixes, events }: { fixes: IGCFix[]; events: FlightEvent[] }
   );
 }
 
-// Task overlay
+// Task overlay - memoize path calculation
 function TaskOverlay({ task }: { task: XCTask | null }) {
-  const [optimizedPath, setOptimizedPath] = useState<{ lat: number; lon: number }[]>([]);
-  const [segmentDistances, setSegmentDistances] = useState<number[]>([]);
-
-  useEffect(() => {
-    if (task && task.turnpoints.length > 0) {
-      const path = calculateOptimizedTaskLine(task);
-      setOptimizedPath(path);
-      setSegmentDistances(getOptimizedSegmentDistances(task));
-    } else {
-      setOptimizedPath([]);
-      setSegmentDistances([]);
+  const { optimizedPath, segmentDistances } = useMemo(() => {
+    if (!task || task.turnpoints.length === 0) {
+      return { optimizedPath: [], segmentDistances: [] };
     }
+    return {
+      optimizedPath: calculateOptimizedTaskLine(task),
+      segmentDistances: getOptimizedSegmentDistances(task),
+    };
   }, [task]);
 
   if (!task || task.turnpoints.length === 0) return null;
@@ -373,7 +374,7 @@ export function LeafletMap() {
 
       <MapEventHandler onBoundsChange={setMapBounds} />
       <FitBounds fixes={fixes} />
-      <PanToEvent event={selectedEvent} fixes={fixes} />
+      <PanToEvent event={selectedEvent} />
 
       <TaskOverlay task={task} />
       <TrackLine fixes={fixes} events={events} />

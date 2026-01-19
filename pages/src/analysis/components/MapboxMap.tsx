@@ -3,6 +3,9 @@
  *
  * react-map-gl based map for displaying flight tracks, tasks, and events.
  * Supports 3D terrain and altitude coloring.
+ *
+ * Uses UNCONTROLLED mode - the map manages its own view state internally,
+ * and we only use the ref for programmatic operations (fitBounds, flyTo).
  */
 
 import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
@@ -14,7 +17,6 @@ import Map, {
   ScaleControl,
   FullscreenControl,
   type MapRef,
-  type ViewStateChangeEvent,
 } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -151,15 +153,13 @@ export function MapboxMap() {
     is3DMode,
   } = useAppContext();
 
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<MapRef>(null);
   const [mapStyle, setMapStyle] = useState(MAPBOX_STYLES[0].style);
-  const [viewState, setViewState] = useState({
-    longitude: 0,
-    latitude: 45,
-    zoom: 5,
-    pitch: 45,
-    bearing: 0,
-  });
+
+  // Track which fixes array we've already fitted bounds to
+  const lastFittedFixesRef = useRef<IGCFix[] | null>(null);
+  // Track last selected event to avoid duplicate flyTo
+  const lastSelectedEventIdRef = useRef<string | null>(null);
 
   // Track GeoJSON data
   const trackGeoJSON = useMemo(() => {
@@ -286,37 +286,43 @@ export function MapboxMap() {
     return events.filter(e => keyEventTypes.has(e.type));
   }, [events]);
 
-  // Fit bounds when fixes change
+  // Fit bounds when fixes change - only run once per new track
   useEffect(() => {
-    if (fixes.length > 0 && mapRef.current) {
+    if (fixes.length > 0 && fixes !== lastFittedFixesRef.current && mapRef.current) {
+      lastFittedFixesRef.current = fixes;
       const bounds = getBoundingBox(fixes);
       mapRef.current.fitBounds(
         [[bounds.minLon, bounds.minLat], [bounds.maxLon, bounds.maxLat]],
-        { padding: 50, duration: 1000 }
+        { padding: 50, duration: 500 }
       );
     }
   }, [fixes]);
 
-  // Pan to selected event
+  // Pan to selected event - only when event ID changes
   useEffect(() => {
-    if (selectedEvent && mapRef.current) {
+    if (selectedEvent && selectedEvent.id !== lastSelectedEventIdRef.current && mapRef.current) {
+      lastSelectedEventIdRef.current = selectedEvent.id;
       mapRef.current.flyTo({
         center: [selectedEvent.longitude, selectedEvent.latitude],
-        duration: 1000,
+        duration: 500,
       });
+    } else if (!selectedEvent) {
+      lastSelectedEventIdRef.current = null;
     }
   }, [selectedEvent]);
 
-  // Handle bounds change
+  // Handle bounds change - update app state for event filtering
   const handleMoveEnd = useCallback(() => {
     if (mapRef.current) {
       const bounds = mapRef.current.getBounds();
-      setMapBounds({
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest(),
-      });
+      if (bounds) {
+        setMapBounds({
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest(),
+        });
+      }
     }
   }, [setMapBounds]);
 
@@ -325,7 +331,7 @@ export function MapboxMap() {
     if (altitudeGradient.length < 2) {
       return ['interpolate', ['linear'], ['line-progress'], 0, '#3b82f6', 1, '#3b82f6'];
     }
-    const expr: any[] = ['interpolate', ['linear'], ['line-progress']];
+    const expr: (string | number | string[])[] = ['interpolate', ['linear'], ['line-progress']];
     for (const [progress, color] of altitudeGradient) {
       expr.push(progress, color);
     }
@@ -335,8 +341,13 @@ export function MapboxMap() {
   return (
     <Map
       ref={mapRef}
-      {...viewState}
-      onMove={(evt: ViewStateChangeEvent) => setViewState(evt.viewState)}
+      initialViewState={{
+        longitude: 0,
+        latitude: 45,
+        zoom: 5,
+        pitch: 45,
+        bearing: 0,
+      }}
       onMoveEnd={handleMoveEnd}
       mapStyle={mapStyle}
       mapboxAccessToken={MAPBOX_TOKEN}
@@ -491,7 +502,6 @@ export function MapboxMap() {
         <Layer
           id="track-line-outline"
           type="line"
-          layout={{ visibility: altitudeColorsEnabled ? 'visible' : 'visible' }}
           paint={{
             'line-color': '#000000',
             'line-width': ['interpolate', ['linear'], ['zoom'], 3, 4, 8, 6, 12, 5],
