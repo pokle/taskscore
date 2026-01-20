@@ -15,8 +15,8 @@ Single page app
 - **XContest Task Code**: Load competition tasks by entering the task code from xcontest.org
 
 ### Map Display
-- **3D Terrain**: MapLibre GL JS with hillshade and terrain elevation
-- **Track Visualization**: Flight track displayed with altitude-based coloring
+- **3D Terrain**: MapBox GL JS with terrain elevation and sky atmosphere
+- **Track Visualization**: Flight track displayed with altitude-based coloring (toggleable)
   - Brown: Low altitude (0-1000m) - earthy colors near the ground
   - Green: Medium altitude (1000-2000m) - transitional
   - Light Blue: High altitude (2000-3000m) - approaching sky
@@ -82,13 +82,19 @@ This visual system helps pilots quickly identify and understand the spatial exte
 ## Technical Architecture
 
 ```
-/pages/src/analysis/
-├── main.ts           # Application entry point and orchestration
-├── igc-parser.ts     # IGC file format parser
-├── xctsk-parser.ts   # XContest task format parser
-├── event-detector.ts # Flight event detection algorithms
-├── event-panel.ts    # Event list UI component
-└── map-renderer.ts   # MapLibre GL JS wrapper
+/pages/src/
+├── analysis.html       # Main HTML page with Tailwind/Basecoat layout
+├── styles.css          # Global styles (Tailwind, Basecoat, MapBox CSS)
+└── analysis/
+    ├── main.ts           # Application entry point and orchestration
+    ├── igc-parser.ts     # IGC file format parser
+    ├── xctsk-parser.ts   # XContest task format parser
+    ├── event-detector.ts # Flight event detection algorithms
+    ├── event-panel.ts    # Event list UI component (Tailwind classes)
+    ├── map-provider.ts   # Map provider interface
+    ├── mapbox-provider.ts # MapBox GL JS implementation
+    ├── geo.ts            # Geographic calculations (Turf.js wrapper)
+    └── glide-speed.ts    # Glide segment visualization
 ```
 
 ### IGC Parser
@@ -154,7 +160,11 @@ ext     - Optional extensions
 
 ## Dependencies
 
-- **maplibre-gl**: Map rendering with terrain and hillshade
+- **mapbox-gl**: Map rendering with 3D terrain and sky atmosphere
+- **threebox-plugin**: 3D track rendering on MapBox
+- **tailwindcss**: Utility-first CSS framework
+- **basecoat-css**: Lightweight UI component library
+- **@turf/***: Geographic calculations (distance, bearing, etc.)
 - **vite**: TypeScript bundling and dev server with HMR
 
 ## URL

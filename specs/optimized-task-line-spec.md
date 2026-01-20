@@ -173,7 +173,7 @@ export function getOptimizedSegmentDistances(
 
 ### Map Provider Integration
 
-Both Google Maps and MapLibre providers support rendering the optimized task line:
+The MapBox provider renders the optimized task line:
 
 ```typescript
 interface MapProvider {
@@ -263,8 +263,12 @@ The implementation should be tested with:
 
 ## Change Log
 
+### 2026-01-20: Simplified to MapBox Only
+- Removed Google Maps and MapLibre providers
+- MapBox GL JS is now the only supported map provider
+
 ### 2026-01-11: Initial Implementation
 - Implemented optimized task line calculation using golden section search
 - Added distance labels to task line segments
-- Integrated with both Google Maps and MapLibre providers
+- Integrated with map providers
 - Updated flight info display to show optimized distance

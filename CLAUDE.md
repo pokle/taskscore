@@ -79,29 +79,44 @@ npm run deploy       # Manual deploy to Cloudflare Pages
 
 ## Frontend UI
 
-**Shoelace Web Components:**
-- All UI components use [Shoelace](https://shoelace.style/) web components
-- Load via CDN in HTML files:
-  ```html
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css" />
-  <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
-  ```
-- Use dark theme: add `class="sl-theme-dark"` to `<html>` element
-- Override font to system stack: `--sl-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;`
-- Use Shoelace design tokens for styling (`--sl-color-*`, `--sl-spacing-*`, `--sl-font-*`)
-- Common components: `sl-button`, `sl-input`, `sl-dropdown`, `sl-menu`, `sl-switch`, `sl-alert`, `sl-drawer`
+**Tailwind CSS + Basecoat:**
+- Styling uses [Tailwind CSS](https://tailwindcss.com/) for utility-first CSS
+- UI components use [Basecoat](https://basecoatui.com/) - a lightweight component library built on Tailwind
+- Tailwind is configured via `@tailwindcss/vite` plugin in `vite.config.ts`
+- Main stylesheet at `pages/src/styles.css` imports Tailwind, Basecoat, and MapBox GL CSS
 
-**Design Pattern:**
-- VicEmergency-style layout for analysis page: central map + side panel for events
-- View mode toggle (List / Map / Both) controls layout
-- Responsive: desktop shows side panel, mobile uses drawer
+**Setup:**
+```css
+/* pages/src/styles.css */
+@import "tailwindcss";
+@import "basecoat-css";
+@import "mapbox-gl/dist/mapbox-gl.css";
+```
+
+**Common Basecoat components:**
+- `btn`, `btn-primary`, `btn-secondary`, `btn-ghost` - Buttons
+- `input` - Form inputs
+- `alert` - Status messages
+- `command`, `command-dialog` - Command menu (Cmd+K style)
+- `badge` - Status badges
+
+**Layout Pattern:**
+- Analysis page uses a responsive sidebar + map layout
+- Desktop: Fixed-width sidebar (320px) + full-width map
+- Mobile: Collapsible sidebar that slides in from left, overlays map
+- Header with hamburger menu (mobile) and command menu (gear icon)
+
+**Map Provider:**
+- MapBox GL JS exclusively (removed Leaflet, Google Maps, MapLibre)
+- Configured via `VITE_MAPBOX_TOKEN` environment variable
 
 ## Coding Preferences
 
 - MUST read library/tool documentation before use (Context7 tool, web docs)
 - Decisions MUST be explainable - return explanations for scoring decisions, audit logs, and unit testing
 - Place experimental code in `/explorations/` - never use in production
-- Use Shoelace components for all UI elements - avoid custom CSS when Shoelace provides equivalent functionality
+- Use Basecoat components for UI elements - prefer built-in components over custom implementations
+- Use Tailwind utility classes for styling - avoid custom CSS when Tailwind provides equivalent functionality
 
 ## Geographic Calculations
 
