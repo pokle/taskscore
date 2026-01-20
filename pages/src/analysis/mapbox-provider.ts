@@ -15,8 +15,8 @@ import { calculateGlideMarkers } from './glide-speed';
 import type { MapProvider } from './map-provider';
 import { haversineDistance } from './geo';
 
-// Set MapBox access token
-mapboxgl.accessToken = 'pk.eyJ1IjoicG9rbGV0IiwiYSI6ImNta2NldzI2djAwM2szY3BudXYyd3Y2Ym4ifQ.cPKrPNe6ALnWnH03FlT6iA';
+// Set MapBox access token from environment variable
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 // MapBox style options
 const MAPBOX_STYLES = [
