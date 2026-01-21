@@ -149,11 +149,11 @@ async function init(): Promise<void> {
 
       if (detail.action === 'close' || (detail.action === undefined && isOpen)) {
         sidebar.setAttribute('aria-hidden', 'true');
-        sidebar.classList.add('-translate-x-full');
+        sidebar.classList.add('translate-x-full');
         sidebarBackdrop.classList.add('hidden');
       } else {
         sidebar.setAttribute('aria-hidden', 'false');
-        sidebar.classList.remove('-translate-x-full');
+        sidebar.classList.remove('translate-x-full');
         sidebarBackdrop.classList.remove('hidden');
       }
     }) as EventListener);
