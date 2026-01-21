@@ -56,6 +56,9 @@ async function init(): Promise<void> {
   const menuImportTask = document.getElementById('menu-import-task');
   const menuAltitudeColors = document.getElementById('menu-altitude-colors');
   const menu3DTrack = document.getElementById('menu-3d-track');
+  const menuThemeLight = document.getElementById('menu-theme-light');
+  const menuThemeDark = document.getElementById('menu-theme-dark');
+  const menuThemeSystem = document.getElementById('menu-theme-system');
   const altitudeColorsStatus = document.getElementById('altitude-colors-status');
   const threeDTrackStatus = document.getElementById('3d-track-status');
 
@@ -136,6 +139,30 @@ async function init(): Promise<void> {
   } else if (menu3DTrack) {
     menu3DTrack.style.display = 'none';
   }
+
+  // Theme switching handlers
+  const setTheme = (mode: 'light' | 'dark' | 'system') => {
+    if (mode === 'system') {
+      localStorage.removeItem('themeMode');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.classList.toggle('dark', prefersDark);
+    } else {
+      localStorage.setItem('themeMode', mode);
+      document.documentElement.classList.toggle('dark', mode === 'dark');
+    }
+    commandDialog?.close();
+  };
+
+  menuThemeLight?.addEventListener('click', () => setTheme('light'));
+  menuThemeDark?.addEventListener('click', () => setTheme('dark'));
+  menuThemeSystem?.addEventListener('click', () => setTheme('system'));
+
+  // Listen for system theme changes when in system mode
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (!localStorage.getItem('themeMode')) {
+      document.documentElement.classList.toggle('dark', e.matches);
+    }
+  });
 
   // Set up sidebar toggle for mobile
   if (sidebar && sidebarBackdrop) {

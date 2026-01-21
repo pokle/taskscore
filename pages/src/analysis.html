@@ -9,6 +9,16 @@
     <!-- Styles -->
     <link rel="stylesheet" href="/styles.css">
 
+    <!-- Theme initialization - must run before render to prevent flash -->
+    <script>
+      (function() {
+        const stored = localStorage.getItem('themeMode');
+        if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+
     <!-- Basecoat JS for interactive components -->
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.10/dist/js/basecoat.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.10/dist/js/dropdown-menu.min.js" defer></script>
@@ -165,6 +175,34 @@
                 <!-- Display Options -->
                 <div role="group" aria-labelledby="display-options-heading">
                     <div role="heading" id="display-options-heading">Display Options</div>
+                    <div role="menuitem" id="menu-theme-light" data-keywords="light theme mode bright day">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="4"/>
+                            <path d="M12 2v2"/>
+                            <path d="M12 20v2"/>
+                            <path d="m4.93 4.93 1.41 1.41"/>
+                            <path d="m17.66 17.66 1.41 1.41"/>
+                            <path d="M2 12h2"/>
+                            <path d="M20 12h2"/>
+                            <path d="m6.34 17.66-1.41 1.41"/>
+                            <path d="m19.07 4.93-1.41 1.41"/>
+                        </svg>
+                        <span>Light Theme</span>
+                    </div>
+                    <div role="menuitem" id="menu-theme-dark" data-keywords="dark theme mode night">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                        </svg>
+                        <span>Dark Theme</span>
+                    </div>
+                    <div role="menuitem" id="menu-theme-system" data-keywords="system theme auto automatic">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect width="20" height="14" x="2" y="3" rx="2"/>
+                            <line x1="8" x2="16" y1="21" y2="21"/>
+                            <line x1="12" x2="12" y1="17" y2="21"/>
+                        </svg>
+                        <span>System Theme</span>
+                    </div>
                     <div role="menuitem" id="menu-altitude-colors" data-keywords="altitude colors gradient">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12 20V10"/>
