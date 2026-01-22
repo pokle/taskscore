@@ -107,8 +107,8 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
       <div class="flight-info-content text-muted-foreground">Load an IGC file to see flight info</div>
     </div>
     <div class="flex items-center gap-2 border-b border-border px-4 py-2">
-      <button id="filter-to-view-btn" class="btn btn-secondary btn-sm">Filter to View</button>
-      <button id="show-all-btn" class="btn btn-ghost btn-sm hidden">Show All</button>
+      <button id="show-all-btn" class="btn btn-ghost btn-sm">Show all</button>
+      <button id="filter-to-view-btn" class="btn btn-ghost btn-sm">Show visible</button>
     </div>
     <div class="border-b border-border px-4 py-1.5 text-sm text-muted-foreground">
       <span class="event-count">0 events</span>
@@ -137,26 +137,22 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
   let isFiltered = false;
   let frozenBounds: { north: number; south: number; east: number; west: number } | null = null;
 
-  // Filter to view button - captures current bounds and filters once
+  // Show all button - shows all events
+  showAllBtn?.addEventListener('click', () => {
+    isFiltered = false;
+    frozenBounds = null;
+    updateFilteredEvents();
+    renderEvents();
+  });
+
+  // Show visible button - filters to current view bounds
   filterToViewBtn?.addEventListener('click', () => {
     if (currentBounds) {
       isFiltered = true;
       frozenBounds = { ...currentBounds };
       updateFilteredEvents();
       renderEvents();
-      filterToViewBtn.classList.add('hidden');
-      showAllBtn.classList.remove('hidden');
     }
-  });
-
-  // Show all button - resets filter
-  showAllBtn?.addEventListener('click', () => {
-    isFiltered = false;
-    frozenBounds = null;
-    updateFilteredEvents();
-    renderEvents();
-    showAllBtn.classList.add('hidden');
-    filterToViewBtn.classList.remove('hidden');
   });
 
   /**
