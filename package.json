@@ -11,6 +11,10 @@
     "deployments": "wrangler pages deployment list --project-name=taskscore --json | jq .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
     "get-xcontest-task": "tsx scripts/get-xcontest-task.ts"
   },
   "workspaces": [
@@ -19,6 +23,7 @@
   ],
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260109.0",
+    "@playwright/test": "^1.57.0",
     "@types/node": "^25.0.5",
     "tsx": "^4.21.0",
     "typescript": "^5.7.3",
