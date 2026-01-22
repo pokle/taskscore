@@ -4,13 +4,13 @@ This is a high level overview of features. When implemented, they will be checke
 
 ## Features for pilots
 
+- [ ] Analyse a tracklog against a task
+  - Visualise task on the map
+  - Calculate task score, and explain the scores on the map
 - [ ] Submit tracklogs
   - email with IGC file attachment, and text containing pilot's thoughts
   - IGC files via drag-and-drop
 - [ ] View all previously submitted tracklogs
-- [ ] Analyse a tracklog against a task
-  - Visualise task on the map
-  - Calculate task score, and explain the scores on the map
 
 ## Features for scorers
 
