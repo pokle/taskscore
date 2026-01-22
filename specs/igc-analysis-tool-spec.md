@@ -2,9 +2,10 @@
 
 ## TODO
 - [ ] Add a 'Show all Events' command that's equivalent to clicking the Events button, and switching the filter to show all events. It should focus the keyboard on the event panel.
-- [ ] Implement 'Highest climbs' tab - show all climbs/thermals sorted by greatest altitude gain first
+- [x] Implement 'Highest climbs' tab - show all climbs/thermals sorted by greatest altitude gain first
 - [ ] Implement 'Deepest sinks' tab - show all descents sorted by greatest altitude drop first
 - [ ] Add box plots to the 'Longest glides' view showing vertically stacked box plots per detail (use uPlot for plotting, and simple-statistics for the descriptive statistics)
+- [ ] Review code and ensure that we're using appropriate libraries for statistics and geo calculations.
 
 ## Overview
 
@@ -73,7 +74,7 @@ Collapsible sidebar with tabbed interface for viewing flight data. Uses Basecoat
 **Tabs:**
 - **Events** - Chronological list of all detected events (takeoff, thermals, glides, landing, etc.)
 - **Glides** - Glides sorted by distance (longest first), combining start/end info into single entries
-- **Climbs** - *(Placeholder, disabled)* Will show thermals sorted by altitude gain
+- **Climbs** - Thermals sorted by altitude gain (highest first), combining entry/exit info into single entries
 - **Sinks** - *(Placeholder, disabled)* Will show descents sorted by altitude lost
 
 **Events Tab Features:**
@@ -90,9 +91,18 @@ Collapsible sidebar with tabbed interface for viewing flight data. Uses Basecoat
   - **Dur** - Duration (mm:ss)
 - Start/end altitudes displayed
 
+**Climbs Tab Features:**
+- Each climb shows: rank (#1, #2...), altitude gain (m), time range, and stats:
+  - **Avg** - Average climb rate (m/s)
+  - **Dur** - Duration (mm:ss)
+- Start/end altitudes displayed
+- Green accent color for climb items to distinguish from glides
+
 **Cross-Tab Selection Sync:**
 - Selecting a glide_start or glide_end event in Events tab → switching to Glides highlights the corresponding glide
+- Selecting a thermal_entry or thermal_exit event in Events tab → switching to Climbs highlights the corresponding climb
 - Selecting a glide in Glides tab → switching to Events highlights the corresponding glide_start event
+- Selecting a climb in Climbs tab → switching to Events highlights the corresponding thermal_entry event
 - Selected item automatically scrolls into view when switching tabs
 
 ### Event Selection Visualization

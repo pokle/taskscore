@@ -11,7 +11,7 @@ import { FlightEvent, FlightEventType, getEventStyle } from './event-detector';
 /**
  * View modes for the event panel
  */
-type ViewMode = 'all' | 'glides';
+type ViewMode = 'all' | 'glides' | 'climbs';
 
 /**
  * Combined glide data from start and end events
@@ -33,6 +33,27 @@ interface GlideData {
   endLon: number;
   segment: { startIndex: number; endIndex: number };
   /** Reference to the original glide_start event for click handling */
+  sourceEvent: FlightEvent;
+}
+
+/**
+ * Combined climb/thermal data from entry and exit events
+ */
+interface ClimbData {
+  id: string;
+  startTime: Date;
+  endTime: Date;
+  startAltitude: number;
+  endAltitude: number;
+  altitudeGain: number;
+  duration: number;
+  avgClimbRate: number;
+  startLat: number;
+  startLon: number;
+  endLat: number;
+  endLon: number;
+  segment: { startIndex: number; endIndex: number };
+  /** Reference to the original thermal_entry event for click handling */
   sourceEvent: FlightEvent;
 }
 
@@ -138,7 +159,7 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
       <nav role="tablist" class="w-full">
         <button type="button" role="tab" id="tab-events" aria-selected="true">Events</button>
         <button type="button" role="tab" id="tab-glides" aria-selected="false">Glides</button>
-        <button type="button" role="tab" id="tab-climbs" aria-selected="false" disabled>Climbs</button>
+        <button type="button" role="tab" id="tab-climbs" aria-selected="false">Climbs</button>
         <button type="button" role="tab" id="tab-sinks" aria-selected="false" disabled>Sinks</button>
       </nav>
     </div>
@@ -195,7 +216,15 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
       }
     }
 
-    const activeTab = mode === 'all' ? tabEvents : tabGlides;
+    // Select the active tab
+    let activeTab: HTMLButtonElement | null = null;
+    if (mode === 'all') {
+      activeTab = tabEvents;
+    } else if (mode === 'glides') {
+      activeTab = tabGlides;
+    } else if (mode === 'climbs') {
+      activeTab = tabClimbs;
+    }
     if (activeTab) {
       activeTab.setAttribute('aria-selected', 'true');
     }
@@ -216,6 +245,7 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
   // Tab click handlers
   tabEvents?.addEventListener('click', () => switchTab('all'));
   tabGlides?.addEventListener('click', () => switchTab('glides'));
+  tabClimbs?.addEventListener('click', () => switchTab('climbs'));
 
   // Show all button - shows all events (no spatial filter)
   showAllBtn?.addEventListener('click', () => {
@@ -308,6 +338,55 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
   }
 
   /**
+   * Extract combined climb/thermal data from thermal_entry events
+   * Each thermal_entry contains all the info we need
+   */
+  function extractClimbs(): ClimbData[] {
+    const climbs: ClimbData[] = [];
+
+    for (const event of allEvents) {
+      if (event.type === 'thermal_entry' && event.segment && event.details) {
+        const details = event.details as {
+          avgClimbRate?: number;
+          duration?: number;
+          altitudeGain?: number;
+        };
+
+        // Find matching thermal_exit event
+        const exitEvent = allEvents.find(
+          e => e.type === 'thermal_exit' &&
+               e.segment?.startIndex === event.segment?.startIndex &&
+               e.segment?.endIndex === event.segment?.endIndex
+        );
+
+        if (exitEvent) {
+          climbs.push({
+            id: event.id,
+            startTime: event.time,
+            endTime: exitEvent.time,
+            startAltitude: event.altitude,
+            endAltitude: exitEvent.altitude,
+            altitudeGain: details.altitudeGain || (exitEvent.altitude - event.altitude),
+            duration: details.duration || 0,
+            avgClimbRate: details.avgClimbRate || 0,
+            startLat: event.latitude,
+            startLon: event.longitude,
+            endLat: exitEvent.latitude,
+            endLon: exitEvent.longitude,
+            segment: event.segment,
+            sourceEvent: event,
+          });
+        }
+      }
+    }
+
+    // Sort by altitude gain (highest first)
+    climbs.sort((a, b) => b.altitudeGain - a.altitudeGain);
+
+    return climbs;
+  }
+
+  /**
    * Format duration in mm:ss
    */
   function formatDuration(seconds: number): string {
@@ -322,6 +401,8 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
   function render(): void {
     if (viewMode === 'glides') {
       renderGlides();
+    } else if (viewMode === 'climbs') {
+      renderClimbs();
     } else {
       renderEvents();
     }
@@ -503,6 +584,94 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
     }
   }
 
+  /**
+   * Render the climbs list (highest altitude gain first)
+   */
+  function renderClimbs(): void {
+    const climbs = extractClimbs();
+
+    if (climbs.length === 0) {
+      listContainer.innerHTML = `
+        <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
+          ${allEvents.length === 0 ? 'Load an IGC file to see climbs' : 'No thermals detected'}
+        </div>
+      `;
+      eventCountEl.textContent = '0 climbs';
+      return;
+    }
+
+    eventCountEl.textContent = `${climbs.length} climbs`;
+
+    // Render climbs with detailed stats
+    let html = '<div class="space-y-2">';
+
+    for (let i = 0; i < climbs.length; i++) {
+      const climb = climbs[i];
+
+      html += `
+        <button class="climb-item" data-climb-id="${climb.id}">
+          <div class="climb-rank">#${i + 1}</div>
+          <div class="climb-details">
+            <div class="climb-primary">
+              <span class="climb-gain">+${climb.altitudeGain.toFixed(0)}m</span>
+              <span class="climb-time">${formatTime(climb.startTime)} → ${formatTime(climb.endTime)}</span>
+            </div>
+            <div class="climb-stats">
+              <span class="climb-stat" title="Average Climb Rate">
+                <strong>Avg</strong> +${climb.avgClimbRate.toFixed(1)} m/s
+              </span>
+              <span class="climb-stat" title="Duration">
+                <strong>Dur</strong> ${formatDuration(climb.duration)}
+              </span>
+            </div>
+            <div class="climb-altitudes">
+              ${climb.startAltitude.toFixed(0)}m → ${climb.endAltitude.toFixed(0)}m
+            </div>
+          </div>
+        </button>
+      `;
+    }
+
+    html += '</div>';
+
+    listContainer.innerHTML = html;
+
+    // Add click handlers
+    listContainer.querySelectorAll('.climb-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const climbId = item.getAttribute('data-climb-id');
+        const climb = climbs.find(c => c.id === climbId);
+        if (climb) {
+          onEventClick(climb.sourceEvent);
+
+          // Store selected segment for cross-tab sync
+          selectedSegment = climb.segment;
+
+          // Highlight selected item
+          listContainer.querySelectorAll('.climb-item').forEach(el => {
+            el.classList.remove('selected');
+          });
+          item.classList.add('selected');
+        }
+      });
+    });
+
+    // Restore selection if there's a selected segment
+    if (selectedSegment) {
+      const matchingClimb = climbs.find(c =>
+        c.segment.startIndex === selectedSegment!.startIndex &&
+        c.segment.endIndex === selectedSegment!.endIndex
+      );
+      if (matchingClimb) {
+        const item = listContainer.querySelector(`[data-climb-id="${matchingClimb.id}"]`);
+        if (item) {
+          item.classList.add('selected');
+          item.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+        }
+      }
+    }
+  }
+
   return {
     setEvents(events: FlightEvent[]) {
       allEvents = events;
@@ -545,7 +714,7 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
 
     clearSelection() {
       selectedSegment = null;
-      listContainer.querySelectorAll('.event-item.selected, .glide-item.selected').forEach(el => {
+      listContainer.querySelectorAll('.event-item.selected, .glide-item.selected, .climb-item.selected').forEach(el => {
         el.classList.remove('selected');
       });
     },

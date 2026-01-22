@@ -118,6 +118,57 @@
     @apply text-xs text-muted-foreground;
   }
 
+  /* Climb item in the panel */
+  .climb-item {
+    @apply flex items-start gap-3 w-full p-3 bg-muted/30 border border-border;
+    @apply rounded-lg cursor-pointer text-left transition-colors duration-150;
+  }
+
+  .climb-item:hover {
+    @apply bg-muted;
+  }
+
+  .climb-item.selected {
+    @apply bg-primary/20 border-primary/50;
+  }
+
+  .climb-rank {
+    @apply flex items-center justify-center w-8 h-8 shrink-0;
+    @apply bg-green-500/20 text-green-600 dark:text-green-400 font-bold text-sm rounded-full;
+  }
+
+  .climb-details {
+    @apply flex flex-col gap-1 min-w-0 flex-1;
+  }
+
+  .climb-primary {
+    @apply flex items-baseline justify-between gap-2;
+  }
+
+  .climb-gain {
+    @apply text-base font-semibold text-green-600 dark:text-green-400;
+  }
+
+  .climb-time {
+    @apply text-xs text-muted-foreground;
+  }
+
+  .climb-stats {
+    @apply flex flex-wrap gap-x-3 gap-y-1 text-xs;
+  }
+
+  .climb-stat {
+    @apply text-muted-foreground;
+  }
+
+  .climb-stat strong {
+    @apply text-foreground font-medium;
+  }
+
+  .climb-altitudes {
+    @apply text-xs text-muted-foreground;
+  }
+
   /* MapBox map container - use !important to ensure it displays */
   #map {
     position: absolute !important;
