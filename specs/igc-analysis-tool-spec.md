@@ -1,5 +1,13 @@
 # IGC Analysis Tool Specification
 
+## TODO - add to spec
+- [ ] Add command to show/hide task
+- [ ] Add command to show/hide track
+- [ ] Convert the 'Show only visible events' toggle to a normal button - so that it only filters visible events on click of the button, and not every time the map moves.
+- [ ] Add a new events filter called 'Longest glides'. Show all glides sorted by longest to shortest. Single entry per glide combining start and end event information. Show standard segment details such as **L/D**, **Altitude**, **Duration**, **Distance**, **Speed**. Show these as vertically stacked box plots per detail (use uPlot for plotting, and simple-statistics for the descriptive statistics)
+- [ ] Add a new filter called 'Highest climbs'. Show all climbs/thermals sorted by the greatest altitude gain first.
+- [ ] Add a new filter called 'Deepest sinks'. Show all descents sorted by the one with the greatest altitude drop first.
+
 ## Overview
 
 The IGC Analysis Tool is a browser-based flight analysis application that allows pilots to visualize and analyze their paragliding/hanggliding flights. It parses IGC files, displays the track on an interactive 3D map, and detects flight events for analysis.
