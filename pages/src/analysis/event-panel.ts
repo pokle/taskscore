@@ -179,6 +179,8 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
   let isFiltered = false;
   let frozenBounds: { north: number; south: number; east: number; west: number } | null = null;
   let viewMode: ViewMode = 'all';
+  // Track selected segment for cross-tab synchronization
+  let selectedSegment: { startIndex: number; endIndex: number } | null = null;
 
   /**
    * Switch to a tab and update UI
@@ -205,8 +207,10 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
 
     render();
 
-    // Reset scroll position when switching tabs
-    listContainer.scrollTop = 0;
+    // Reset scroll position when switching tabs (unless we have a selection that will scroll into view)
+    if (!selectedSegment) {
+      listContainer.scrollTop = 0;
+    }
   }
 
   // Tab click handlers
@@ -374,6 +378,9 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
         if (event) {
           onEventClick(event);
 
+          // Store selected segment for cross-tab sync
+          selectedSegment = event.segment || null;
+
           // Highlight selected item
           listContainer.querySelectorAll('.event-item').forEach(el => {
             el.classList.remove('selected');
@@ -382,6 +389,21 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
         }
       });
     });
+
+    // Restore selection if there's a selected segment
+    if (selectedSegment) {
+      const matchingEvent = filteredEvents.find(e =>
+        e.segment?.startIndex === selectedSegment!.startIndex &&
+        e.segment?.endIndex === selectedSegment!.endIndex
+      );
+      if (matchingEvent) {
+        const item = listContainer.querySelector(`[data-event-id="${matchingEvent.id}"]`);
+        if (item) {
+          item.classList.add('selected');
+          item.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+        }
+      }
+    }
   }
 
   /**
@@ -453,6 +475,9 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
         if (glide) {
           onEventClick(glide.sourceEvent);
 
+          // Store selected segment for cross-tab sync
+          selectedSegment = glide.segment;
+
           // Highlight selected item
           listContainer.querySelectorAll('.glide-item').forEach(el => {
             el.classList.remove('selected');
@@ -461,6 +486,21 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
         }
       });
     });
+
+    // Restore selection if there's a selected segment
+    if (selectedSegment) {
+      const matchingGlide = glides.find(g =>
+        g.segment.startIndex === selectedSegment!.startIndex &&
+        g.segment.endIndex === selectedSegment!.endIndex
+      );
+      if (matchingGlide) {
+        const item = listContainer.querySelector(`[data-glide-id="${matchingGlide.id}"]`);
+        if (item) {
+          item.classList.add('selected');
+          item.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+        }
+      }
+    }
   }
 
   return {
@@ -504,7 +544,8 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
     },
 
     clearSelection() {
-      listContainer.querySelectorAll('.event-item.selected').forEach(el => {
+      selectedSegment = null;
+      listContainer.querySelectorAll('.event-item.selected, .glide-item.selected').forEach(el => {
         el.classList.remove('selected');
       });
     },

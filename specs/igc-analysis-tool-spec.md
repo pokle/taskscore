@@ -1,13 +1,9 @@
 # IGC Analysis Tool Specification
 
-## TODO - add to spec
-- [x] Add a command to show/hide task to the command palette
-- [x] Add command to show/hide track
-- [x] Convert the 'Show only visible events' toggle to a normal button - so that it only filters visible events on click of the button, and not every time the map moves.
-- [x] Add a new events filter called 'Longest glides'. Show all glides sorted by longest to shortest. Single entry per glide combining start and end event information. Show standard segment details such as **L/D**, **Altitude**, **Duration**, **Distance**, **Speed**.
+## TODO
 - [ ] Add a 'Show all Events' command that's equivalent to clicking the Events button, and switching the filter to show all events. It should focus the keyboard on the event panel.
-- [ ] Add a new filter called 'Highest climbs'. Show all climbs/thermals sorted by the greatest altitude gain first.
-- [ ] Add a new filter called 'Deepest sinks'. Show all descents sorted by the one with the greatest altitude drop first.
+- [ ] Implement 'Highest climbs' tab - show all climbs/thermals sorted by greatest altitude gain first
+- [ ] Implement 'Deepest sinks' tab - show all descents sorted by greatest altitude drop first
 - [ ] Add box plots to the 'Longest glides' view showing vertically stacked box plots per detail (use uPlot for plotting, and simple-statistics for the descriptive statistics)
 
 ## Overview
@@ -38,6 +34,23 @@ Single page app
     - Dotted
     - Label in the centre of line with distance and leg number (e.g. "Leg 1: 15.2km")
 
+### Command Palette (⌘K)
+Quick access menu for display options and actions.
+
+**Display Options:**
+- **Light/Dark/System Theme** - Switch color theme
+- **Toggle Altitude Colors** - Show/hide altitude-based track coloring (on/off indicator)
+- **Toggle 3D Track** - Show/hide 3D track rendering (on/off indicator)
+- **Toggle Task** - Show/hide task visualization (cylinders, route lines, labels) - persisted via `?task-visible=0` URL param
+- **Toggle Track** - Show/hide flight track and event markers - persisted via `?track-visible=0` URL param
+
+**File Operations:**
+- **Open IGC file** - File picker for IGC upload
+- **Import XContest task** - Enter task code to load from XContest
+
+**Sample Flights:**
+- Quick load sample IGC files for testing
+
 ### Event Detection
 The tool automatically detects and displays:
 
@@ -55,10 +68,32 @@ The tool automatically detects and displays:
 | Max Climb/Sink | Maximum vertical speeds |
 
 ### Event Panel
-- Collapsible sidebar listing all detected events (Take off, thermal, landing, etc...)
-- Filter toggle to show only events visible in current map view
-- Click on an event: Pan to event location
-- Double-click on an event: Pan and zoom in on the event location
+Collapsible sidebar with tabbed interface for viewing flight data. Uses Basecoat tabs component.
+
+**Tabs:**
+- **Events** - Chronological list of all detected events (takeoff, thermals, glides, landing, etc.)
+- **Glides** - Glides sorted by distance (longest first), combining start/end info into single entries
+- **Climbs** - *(Placeholder, disabled)* Will show thermals sorted by altitude gain
+- **Sinks** - *(Placeholder, disabled)* Will show descents sorted by altitude lost
+
+**Events Tab Features:**
+- Two filter buttons (always visible, not a toggle):
+  - **Show all** - Display all events
+  - **Show visible** - Filter to events within current map bounds (one-time snapshot, not continuous)
+- Click on an event: Pan to event location and highlight on map
+
+**Glides Tab Features:**
+- Each glide shows: rank (#1, #2...), distance (km), time range, and stats:
+  - **L/D** - Glide ratio
+  - **Spd** - Average speed (km/h)
+  - **Alt** - Altitude lost (m)
+  - **Dur** - Duration (mm:ss)
+- Start/end altitudes displayed
+
+**Cross-Tab Selection Sync:**
+- Selecting a glide_start or glide_end event in Events tab → switching to Glides highlights the corresponding glide
+- Selecting a glide in Glides tab → switching to Events highlights the corresponding glide_start event
+- Selected item automatically scrolls into view when switching tabs
 
 ### Event Selection Visualization
 When an event is selected from the panel:
