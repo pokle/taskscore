@@ -727,6 +727,9 @@ export function detectFlightEvents(
     const adjustedStartIndex = glide.startIndex + indexOffset;
     const adjustedEndIndex = glide.endIndex + indexOffset;
 
+    // Calculate average speed in m/s
+    const averageSpeed = glide.duration > 0 ? glide.distance / glide.duration : 0;
+
     allEvents.push({
       id: `glide-start-${adjustedStartIndex}`,
       type: 'glide_start',
@@ -739,6 +742,7 @@ export function detectFlightEvents(
         distance: glide.distance,
         glideRatio: glide.glideRatio,
         duration: glide.duration,
+        averageSpeed: averageSpeed,
       },
       segment: { startIndex: adjustedStartIndex, endIndex: adjustedEndIndex },
     });
@@ -755,6 +759,7 @@ export function detectFlightEvents(
         distance: glide.distance,
         glideRatio: glide.glideRatio,
         altitudeLost: glide.startAltitude - glide.endAltitude,
+        averageSpeed: averageSpeed,
       },
       segment: { startIndex: adjustedStartIndex, endIndex: adjustedEndIndex },
     });
