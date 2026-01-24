@@ -170,3 +170,30 @@ export function isInsideCylinder(
   const dist = haversineDistance(lat, lon, centerLat, centerLon);
   return dist <= radius;
 }
+
+/**
+ * Generate points forming a circle around a center point.
+ * Useful for rendering cylinders/circles on maps.
+ *
+ * @param centerLat - Latitude of circle center (degrees)
+ * @param centerLon - Longitude of circle center (degrees)
+ * @param radiusMeters - Circle radius in meters
+ * @param numPoints - Number of points to generate (default 64)
+ * @returns Array of {lat, lon} points forming the circle, closed (first point repeated at end)
+ */
+export function getCirclePoints(
+  centerLat: number,
+  centerLon: number,
+  radiusMeters: number,
+  numPoints = 64
+): Array<{ lat: number; lon: number }> {
+  const points: Array<{ lat: number; lon: number }> = [];
+
+  for (let i = 0; i <= numPoints; i++) {
+    const angle = (i / numPoints) * 2 * Math.PI;
+    const dest = destinationPoint(centerLat, centerLon, radiusMeters, angle);
+    points.push(dest);
+  }
+
+  return points;
+}

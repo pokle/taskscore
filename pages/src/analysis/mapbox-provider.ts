@@ -13,7 +13,7 @@ import { XCTask } from './xctsk-parser';
 import { FlightEvent, getEventStyle } from './event-detector';
 import { calculateGlideMarkers } from './glide-speed';
 import type { MapProvider } from './map-provider';
-import { haversineDistance } from './geo';
+import { haversineDistance, getCirclePoints } from './geo';
 
 // Set MapBox access token from environment variable
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -1380,7 +1380,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 }
 
 /**
- * Create a circle polygon (approximation) for cylinder rendering
+ * Create a circle polygon for cylinder rendering using geodesic calculations
  */
 function createCirclePolygon(
   centerLon: number,
@@ -1388,18 +1388,9 @@ function createCirclePolygon(
   radiusMeters: number,
   numPoints = 64
 ): GeoJSON.Polygon {
-  const coords: [number, number][] = [];
-
-  for (let i = 0; i <= numPoints; i++) {
-    const angle = (i / numPoints) * 2 * Math.PI;
-
-    const latOffset = (radiusMeters / 111320) * Math.cos(angle);
-    const lonOffset =
-      (radiusMeters / (111320 * Math.cos((centerLat * Math.PI) / 180))) *
-      Math.sin(angle);
-
-    coords.push([centerLon + lonOffset, centerLat + latOffset]);
-  }
+  const points = getCirclePoints(centerLat, centerLon, radiusMeters, numPoints);
+  // Convert to GeoJSON format [lon, lat]
+  const coords: [number, number][] = points.map(p => [p.lon, p.lat]);
 
   return {
     type: 'Polygon',
