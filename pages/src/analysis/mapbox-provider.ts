@@ -321,9 +321,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
               'interpolate',
               ['linear'],
               ['zoom'],
-              3, 4,    // At zoom 3, width 4
-              8, 6,    // At zoom 8, width 6
-              12, 5,   // At zoom 12, width 5
+              3, 8,    // At zoom 3, width 8
+              8, 12,   // At zoom 8, width 12
+              12, 10,  // At zoom 12, width 10
             ],
             'line-opacity': 0.4,
           },
@@ -345,9 +345,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
               'interpolate',
               ['linear'],
               ['zoom'],
-              3, 2,    // At zoom 3, width 2
-              8, 3,    // At zoom 8, width 3
-              12, 3,   // At zoom 12, width 3
+              3, 4,    // At zoom 3, width 4
+              8, 6,    // At zoom 8, width 6
+              12, 6,   // At zoom 12, width 6
             ],
             'line-opacity': 0.95,
           },
@@ -376,9 +376,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
               'interpolate',
               ['linear'],
               ['zoom'],
-              3, 2,
-              8, 3,
-              12, 3,
+              3, 4,
+              8, 6,
+              12, 6,
             ],
             'line-opacity': 0.95,
           },
@@ -666,12 +666,13 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         const t = Math.max(0, Math.min(1, normalizedAlt));
 
         // Color stops: brown (low) -> green -> light blue -> sky blue (high)
+        // More saturated colors for better distinction
         const colors = [
-          { pos: 0.0, r: 141, g: 110, b: 99 },   // Brown #8D6E63
-          { pos: 0.25, r: 102, g: 187, b: 106 }, // Green #66BB6A
-          { pos: 0.5, r: 41, g: 182, b: 246 },   // Light Blue #29B6F6
-          { pos: 0.75, r: 129, g: 212, b: 250 }, // Sky Blue #81D4FA
-          { pos: 1.0, r: 227, g: 242, b: 253 },  // Pale Sky #E3F2FD
+          { pos: 0.0, r: 139, g: 90, b: 43 },    // Saturated Brown #8B5A2B
+          { pos: 0.25, r: 67, g: 160, b: 71 },   // Saturated Green #43A047
+          { pos: 0.5, r: 3, g: 155, b: 229 },    // Saturated Cyan #039BE5
+          { pos: 0.75, r: 41, g: 182, b: 246 },  // Bright Sky Blue #29B6F6
+          { pos: 1.0, r: 79, g: 195, b: 247 },   // Sky Blue #4FC3F7
         ];
 
         // Find the two colors to interpolate between
