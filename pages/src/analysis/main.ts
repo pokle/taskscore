@@ -570,7 +570,7 @@ async function init(): Promise<void> {
 
   const loadSampleFile = async (filename: string) => {
     try {
-      const response = await fetch(`/samples/${filename}`);
+      const response = await fetch(`/data/tracks/${filename}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status}`);
       }
@@ -624,7 +624,7 @@ async function loadFromQueryParams(
     }
 
     try {
-      const response = await fetch(`/samples/${trackFile}`);
+      const response = await fetch(`/data/tracks/${trackFile}`);
       if (!response.ok) {
         console.error(`Failed to fetch track: ${response.status}`);
         return;

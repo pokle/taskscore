@@ -175,7 +175,7 @@ export function findWaypoint(
  * @returns Promise resolving to array of waypoints
  */
 export async function loadCorryongWaypoints(): Promise<WaypointRecord[]> {
-  const response = await fetch('/data/corryong-cup-waypoints.csv');
+  const response = await fetch('/data/waypoints/corryong-cup-waypoints.csv');
   if (!response.ok) {
     console.warn('Failed to load Corryong waypoints:', response.status);
     return [];

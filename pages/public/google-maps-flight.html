@@ -236,7 +236,7 @@
             updateStatus('Loading sample track...', '');
 
             try {
-                const response = await fetch('/samples/20260105-132715-GordonRigg.999.igc');
+                const response = await fetch('/data/tracks/20260105-132715-GordonRigg.999.igc');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const content = await response.text();
