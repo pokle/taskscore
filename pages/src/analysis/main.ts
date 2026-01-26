@@ -15,7 +15,7 @@ import { detectFlightEvents, FlightEvent } from './event-detector';
 import { createEventPanel, EventPanel, FlightInfo } from './event-panel';
 import { loadCorryongWaypoints, type WaypointRecord } from './waypoints';
 import { config, type UnitPreferences } from './config';
-import { formatDistance, onUnitsChanged } from './units';
+import { formatAltitude, formatDistance, onUnitsChanged } from './units';
 
 // Import styles
 import '../styles.css';
@@ -537,7 +537,7 @@ async function init(): Promise<void> {
         info.duration = `${hours}h ${mins}m`;
 
         const maxAlt = Math.max(...state.fixes.map(f => f.gnssAltitude));
-        info.maxAlt = `${maxAlt}m`;
+        info.maxAlt = formatAltitude(maxAlt).withUnit;
       }
     }
 
