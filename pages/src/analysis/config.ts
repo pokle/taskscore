@@ -18,7 +18,7 @@ export interface UnitPreferences {
 export type SpeedUnit = 'km/h' | 'mph' | 'knots';
 export type AltitudeUnit = 'm' | 'ft';
 export type DistanceUnit = 'km' | 'mi' | 'nmi';
-export type ClimbRateUnit = 'm/s' | 'ft/min' | '100ft/min' | 'knots';
+export type ClimbRateUnit = 'm/s' | 'ft/min' | 'knots';
 
 const STORAGE_KEY = 'taskscore:preferences';
 
@@ -111,7 +111,7 @@ class ConfigStore {
       speed: ['km/h', 'mph', 'knots'] as const,
       altitude: ['m', 'ft'] as const,
       distance: ['km', 'mi', 'nmi'] as const,
-      climbRate: ['m/s', 'ft/min', '100ft/min', 'knots'] as const,
+      climbRate: ['m/s', 'ft/min', 'knots'] as const,
     };
 
     const current = this.getUnits()[unitType];
