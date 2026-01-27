@@ -473,10 +473,10 @@ First time user:
 
 ### Future Enhancements
 
-When implementing "clear storage" features:
-1. Add `deleteTask(code)` and `deleteTrack(id)` methods
-2. Add `clearAllTasks()` and `clearAllTracks()` methods
-3. Add UI for storage management (Settings section of command menu)
+Storage management features to implement:
+1. Add `deleteTask(code)` and `deleteTrack(id)` methods for individual deletion
+2. Add UI for clearing all storage (methods already exist: `clearAllTasks()`, `clearAllTracks()`, `clearAll()`)
+3. Add storage quota indicator and management UI
 
 ## Testing
 
@@ -521,25 +521,25 @@ This covers effectively all browsers in current use.
 2. **Same-origin policy** - IndexedDB is origin-scoped
 3. **No cross-site access** - Data stays local to taskscore.shonky.info
 
-## Implementation Phases
+## Implementation Status
 
-### Phase 1: Core Storage
-1. Create `storage.ts` with StorageService
-2. Implement store/get/list for tasks and tracks
-3. Add content hashing for track deduplication
+All core features have been implemented:
 
-### Phase 2: Auto-Store Integration
-1. Modify `loadTask()` to store fetched tasks
-2. Modify `loadIGCFile()` to store opened tracks
-3. Check storage before network fetch for tasks
+### Completed
+- [x] `storage.ts` with StorageService class
+- [x] Store/get/list for tasks and tracks
+- [x] Content hashing (SHA-256) for track deduplication
+- [x] `loadTask()` checks storage first, stores fetched tasks
+- [x] `loadIGCFile()` stores opened tracks
+- [x] Dynamic "Stored Tasks" and "Stored Tracks" menu groups
+- [x] Menu item generation with search keywords
+- [x] Click handlers for loading stored items
+- [x] Menu refresh on storage changes
+- [x] `clearAllTasks()`, `clearAllTracks()`, `clearAll()` methods (for future UI)
 
-### Phase 3: Command Menu
-1. Add dynamic menu groups to HTML
-2. Implement menu item generation
-3. Wire up click handlers for stored items
-4. Refresh menu on storage changes
+### File Menu Commands
 
-### Phase 4: Polish
-1. Add loading states for async operations
-2. Handle edge cases (storage full, etc.)
-3. Add console logging for debugging
+The File section of the command menu includes:
+- **Load IGC file** - Opens file picker, stores track in browser storage
+- **Load XContest task** - Prompts for task code, stores task in browser storage
+- **Unload all (task & track)** - Clears current session (map/state), does NOT clear storage
