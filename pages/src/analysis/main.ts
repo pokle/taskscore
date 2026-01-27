@@ -36,7 +36,6 @@ const state: AppState = {
 
 let mapRenderer: MapProvider | null = null;
 let eventPanel: EventPanel | null = null;
-let isProgrammaticPan = false;
 let waypointDatabase: WaypointRecord[] = [];
 
 // Feature states
@@ -93,13 +92,6 @@ async function init(): Promise<void> {
   // Initialize map with MapBox provider
   try {
     mapRenderer = await createMapProvider(mapContainer);
-
-    // Update event panel when map moves (but not during programmatic pans from event clicks)
-    mapRenderer.onBoundsChange(() => {
-      if (!isProgrammaticPan) {
-        eventPanel?.filterByBounds(mapRenderer!.getBounds());
-      }
-    });
   } catch (err) {
     console.error('Failed to initialize map:', err);
     showStatus('Failed to initialize map', 'error');
@@ -320,15 +312,7 @@ async function init(): Promise<void> {
   // Handle event click
   const handleEventClick = (event: FlightEvent, options?: { skipPan?: boolean }) => {
     if (mapRenderer) {
-      if (!options?.skipPan) {
-        isProgrammaticPan = true;
-      }
       mapRenderer.panToEvent(event, options);
-      if (!options?.skipPan) {
-        setTimeout(() => {
-          isProgrammaticPan = false;
-        }, 1200);
-      }
     }
 
     // Close sidebar on mobile after selecting an event

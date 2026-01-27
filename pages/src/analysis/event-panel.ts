@@ -101,7 +101,6 @@ export interface FlightInfo {
 export interface EventPanel {
   setEvents(events: FlightEvent[]): void;
   setFlightInfo(info: FlightInfo): void;
-  filterByBounds(bounds: { north: number; south: number; east: number; west: number }): void;
   clearSelection(): void;
   toggle(): void;
   open(): void;
@@ -192,10 +191,6 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
         <button type="button" role="tab" id="tab-sinks" aria-selected="false">Sinks</button>
       </nav>
     </div>
-    <div class="flex items-center gap-2 border-b border-border px-4 py-2" id="events-filter-row">
-      <button id="show-all-btn" class="btn btn-ghost btn-sm filter-btn active">Show all</button>
-      <button id="filter-to-view-btn" class="btn btn-ghost btn-sm filter-btn">Show visible</button>
-    </div>
     <div class="border-b border-border px-4 py-1.5 text-sm text-muted-foreground">
       <span class="event-count">0 events</span>
     </div>
@@ -211,9 +206,6 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
   // Get references
   const listContainer = panel.querySelector('.event-panel-list') as HTMLElement;
   const eventCountEl = panel.querySelector('.event-count') as HTMLElement;
-  const filterToViewBtn = panel.querySelector('#filter-to-view-btn') as HTMLButtonElement;
-  const showAllBtn = panel.querySelector('#show-all-btn') as HTMLButtonElement;
-  const eventsFilterRow = panel.querySelector('#events-filter-row') as HTMLElement;
   const tabEvents = panel.querySelector('#tab-events') as HTMLButtonElement;
   const tabGlides = panel.querySelector('#tab-glides') as HTMLButtonElement;
   const tabClimbs = panel.querySelector('#tab-climbs') as HTMLButtonElement;
@@ -224,10 +216,7 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
   // State
   let allEvents: FlightEvent[] = [];
   let filteredEvents: FlightEvent[] = [];
-  let currentBounds: { north: number; south: number; east: number; west: number } | null = null;
   let isCollapsed = false;
-  let isFiltered = false;
-  let frozenBounds: { north: number; south: number; east: number; west: number } | null = null;
   let viewMode: ViewMode = 'all';
   // Track selected segment for cross-tab synchronization
   let selectedSegment: { startIndex: number; endIndex: number } | null = null;
@@ -260,11 +249,6 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
       activeTab.setAttribute('aria-selected', 'true');
     }
 
-    // Show/hide filter row (only for Events tab)
-    if (eventsFilterRow) {
-      eventsFilterRow.style.display = mode === 'all' ? '' : 'none';
-    }
-
     render();
 
     // Reset scroll position when switching tabs (unless we have a selection that will scroll into view)
@@ -279,42 +263,11 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
   tabClimbs?.addEventListener('click', () => switchTab('climbs'));
   tabSinks?.addEventListener('click', () => switchTab('sinks'));
 
-  // Show all button - shows all events (no spatial filter)
-  showAllBtn?.addEventListener('click', () => {
-    isFiltered = false;
-    frozenBounds = null;
-    showAllBtn.classList.add('active');
-    filterToViewBtn?.classList.remove('active');
-    updateFilteredEvents();
-    render();
-  });
-
-  // Show visible button - filters to current view bounds
-  filterToViewBtn?.addEventListener('click', () => {
-    if (currentBounds) {
-      isFiltered = true;
-      frozenBounds = { ...currentBounds };
-      filterToViewBtn.classList.add('active');
-      showAllBtn?.classList.remove('active');
-      updateFilteredEvents();
-      render();
-    }
-  });
-
   /**
-   * Update filtered events based on frozen bounds (if filtered)
+   * Update filtered events (currently shows all events)
    */
   function updateFilteredEvents(): void {
-    if (!isFiltered || !frozenBounds) {
-      filteredEvents = [...allEvents];
-    } else {
-      filteredEvents = allEvents.filter(event =>
-        event.latitude >= frozenBounds!.south &&
-        event.latitude <= frozenBounds!.north &&
-        event.longitude >= frozenBounds!.west &&
-        event.longitude <= frozenBounds!.east
-      );
-    }
+    filteredEvents = [...allEvents];
   }
 
   /**
@@ -917,12 +870,6 @@ export function createEventPanel(options: EventPanelOptions): EventPanel {
       flightInfoEl.innerHTML = parts.length > 0
         ? parts.join(' <span class="mx-1 text-border">|</span> ')
         : 'Load an IGC file to see flight info';
-    },
-
-    filterByBounds(bounds: { north: number; south: number; east: number; west: number }) {
-      // Just store current bounds - don't auto-filter
-      // User must click "Filter to View" button to filter
-      currentBounds = bounds;
     },
 
     clearSelection() {
