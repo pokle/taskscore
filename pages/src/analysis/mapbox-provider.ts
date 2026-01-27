@@ -14,6 +14,7 @@ import { FlightEvent, getEventStyle } from './event-detector';
 import { calculateGlideMarkers } from './glide-speed';
 import type { MapProvider } from './map-provider';
 import { haversineDistance, getCirclePoints } from './geo';
+import { formatDistance, formatRadius, formatAltitude, formatSpeed, formatAltitudeChange } from './units';
 
 // Set MapBox access token from environment variable
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -252,6 +253,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         }
 
         // Add layers in order from bottom to top
+        const width_mul = 0.7;
 
         // 1. Task line (dashed route)
         map.addLayer({
@@ -321,11 +323,11 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
               'interpolate',
               ['linear'],
               ['zoom'],
-              3, 8,    // At zoom 3, width 8
-              8, 12,   // At zoom 8, width 12
-              12, 10,  // At zoom 12, width 10
+              3, 8 * width_mul,    // At zoom 3, width 8
+              8, 12 * width_mul,   // At zoom 8, width 12
+              12, 10 * width_mul,  // At zoom 12, width 10
             ],
-            'line-opacity': 0.4,
+            'line-opacity': 0.6,
           },
         });
 
@@ -345,9 +347,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
               'interpolate',
               ['linear'],
               ['zoom'],
-              3, 4,    // At zoom 3, width 4
-              8, 6,    // At zoom 8, width 6
-              12, 6,   // At zoom 12, width 6
+              3, 4 * width_mul,    // At zoom 3, width 4
+              8, 6 * width_mul,    // At zoom 8, width 6
+              12, 6 * width_mul,   // At zoom 12, width 6
             ],
             'line-opacity': 0.95,
           },
@@ -376,9 +378,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
               'interpolate',
               ['linear'],
               ['zoom'],
-              3, 4,
-              8, 6,
-              12, 6,
+              3, 4 * width_mul,
+              8, 6 * width_mul,
+              12, 6 * width_mul,
             ],
             'line-opacity': 0.95,
           },
@@ -1039,12 +1041,12 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             const midLon = (p1.lon + p2.lon) / 2;
             const midLat = (p1.lat + p2.lat) / 2;
 
-            const distanceKm = (distance / 1000).toFixed(1);
+            const distanceStr = formatDistance(distance, { decimals: 1 }).withUnit;
             const legNumber = i + 1;
             segmentLabelFeatures.push({
               type: 'Feature' as const,
               properties: {
-                distance: `Leg ${legNumber}: ${distanceKm}km`,
+                distance: `Leg ${legNumber}: ${distanceStr}`,
               },
               geometry: {
                 type: 'Point' as const,
@@ -1061,12 +1063,12 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           // Create turnpoint markers
           const pointFeatures = task.turnpoints.map((tp, idx) => {
             const name = tp.waypoint.name || `TP${idx + 1}`;
-            const radiusKm = (tp.radius / 1000).toFixed(tp.radius >= 1000 ? 0 : 1);
-            const altitude = tp.waypoint.altSmoothed ? `A\u00A0${Math.round(tp.waypoint.altSmoothed)}m` : '';
+            const radiusStr = formatRadius(tp.radius).withUnit;
+            const altitude = tp.waypoint.altSmoothed ? `A\u00A0${formatAltitude(tp.waypoint.altSmoothed).withUnit}` : '';
             const role = tp.type || '';
 
             // Build label: "NAME, R Xkm, A Ym, ROLE" (with non-breaking spaces)
-            const labelParts = [name, `R\u00A0${radiusKm}km`];
+            const labelParts = [name, `R\u00A0${radiusStr}`];
             if (altitude) labelParts.push(altitude);
             if (role) labelParts.push(role);
             const label = labelParts.join(', ');
@@ -1221,13 +1223,13 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
                       line-height: 1.3;
                     `;
 
-                    // Format the label content
-                    const speed = `${Math.round(marker.speedKmh || 0)}km/h`;
+                    // Format the label content using units module
+                    const speed = formatSpeed(marker.speedMps || 0).withUnit;
                     const glideRatio = marker.glideRatio !== undefined
                       ? `${marker.glideRatio.toFixed(0)}:1`
                       : '∞:1'; // Infinite glide ratio if climbing or level
                     const altDiff = marker.altitudeDiff !== undefined
-                      ? `${marker.altitudeDiff > 0 ? '+' : ''}${marker.altitudeDiff}m`
+                      ? formatAltitudeChange(marker.altitudeDiff).withUnit
                       : '';
 
                     labelEl.innerHTML = `${speed}<br>${glideRatio} ${altDiff}`;

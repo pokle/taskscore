@@ -1,12 +1,19 @@
 # IGC Analysis Tool Specification
 
 ## TODO
+- [ ] Allow users to click on the track to show details on the events panel.
+  - Open the Event panel if closed
+  - If the point lies within a segment, select the segment (glide, thermal, or sink)
+  - Otherwise select the closest event on the event panel. 
+  - Accomodations:
+    - If possible, on hover, change the cursor to indicate that it's clickable.
+    - If possible, on hover over a segment, highlight the segment by increasing its width.
 - [ ] Add a 'Show all Events' command that's equivalent to clicking the Events button, and switching the filter to show all events. It should focus the keyboard on the event panel.
 - [x] Implement 'Highest climbs' tab - show all climbs/thermals sorted by greatest altitude gain first
 - [x] Implement 'Deepest sinks' tab - show all descents sorted by greatest altitude drop first
 - [ ] DEFER: Add box plots to the 'Longest glides' view showing vertically stacked box plots per detail (use uPlot for plotting, and simple-statistics for the descriptive statistics)
 - [x] Review code and ensure that we're using appropriate libraries for statistics and geo calculations.
-- [ ] Make units selectable
+- [x] Make units selectable (see `configurable-units-spec.md`)
 - [ ] Add altitude chart. X axis: Time, Y axis: Altitude
 - [x] Associate tasks with tracks. When we load a track, we should use the IGC file's declared task information if available. 
 - [x] If the IGC file doesn't contain task information, we should try to associate the track with any known tasks in the region on the date.
@@ -56,6 +63,26 @@ Quick access menu for display options and actions.
 
 **Sample Flights:**
 - Quick load sample IGC files for testing
+
+**Settings:**
+- **Configure units...** - Opens dialog to configure display units (see below)
+
+### Units Configuration
+
+Users can configure display units for measurements via the "Configure units..." option in the command palette. See `configurable-units-spec.md` for full details.
+
+**Configurable Units:**
+| Unit Type | Options | Default |
+|-----------|---------|---------|
+| Speed | km/h, mph, knots | km/h |
+| Altitude | m, ft | m |
+| Distance | km, mi, nmi | km |
+| Climb Rate | m/s, ft/min, knots | m/s |
+
+**Key Features:**
+- All values update immediately when units are changed (no page refresh required)
+- Preferences persist in localStorage
+- Accessed via command palette: Cmd+K → "Configure units..."
 
 ### Event Detection
 The tool automatically detects and displays:

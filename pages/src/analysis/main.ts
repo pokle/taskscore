@@ -14,6 +14,8 @@ import { createMapProvider, MapProvider } from './map-provider';
 import { detectFlightEvents, FlightEvent } from './event-detector';
 import { createEventPanel, EventPanel, FlightInfo } from './event-panel';
 import { loadCorryongWaypoints, type WaypointRecord } from './waypoints';
+import { config, type UnitPreferences } from './config';
+import { formatAltitude, formatDistance, onUnitsChanged } from './units';
 
 // Import styles
 import '../styles.css';
@@ -69,6 +71,15 @@ async function init(): Promise<void> {
   const threeDTrackStatus = document.getElementById('3d-track-status');
   const taskVisibilityStatus = document.getElementById('task-visibility-status');
   const trackVisibilityStatus = document.getElementById('track-visibility-status');
+
+  // Units dialog
+  const menuConfigureUnits = document.getElementById('menu-configure-units');
+  const unitsDialog = document.getElementById('units-dialog') as HTMLDialogElement | null;
+  const unitsForm = document.getElementById('units-form') as HTMLFormElement | null;
+  const unitSpeedSelect = document.getElementById('unit-speed-select') as HTMLSelectElement | null;
+  const unitAltitudeSelect = document.getElementById('unit-altitude-select') as HTMLSelectElement | null;
+  const unitDistanceSelect = document.getElementById('unit-distance-select') as HTMLSelectElement | null;
+  const unitClimbRateSelect = document.getElementById('unit-climbrate-select') as HTMLSelectElement | null;
 
   // Sidebar elements
   const sidebar = document.getElementById('waypoint-sidebar');
@@ -234,6 +245,53 @@ async function init(): Promise<void> {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
     if (!localStorage.getItem('themeMode')) {
       document.documentElement.classList.toggle('dark', e.matches);
+    }
+  });
+
+  // Units dialog handlers
+  const populateUnitsDialog = () => {
+    const units = config.getUnits();
+    if (unitSpeedSelect) unitSpeedSelect.value = units.speed;
+    if (unitAltitudeSelect) unitAltitudeSelect.value = units.altitude;
+    if (unitDistanceSelect) unitDistanceSelect.value = units.distance;
+    if (unitClimbRateSelect) unitClimbRateSelect.value = units.climbRate;
+  };
+
+  // Open units dialog
+  menuConfigureUnits?.addEventListener('click', () => {
+    commandDialog?.close();
+    populateUnitsDialog();
+    unitsDialog?.showModal();
+  });
+
+  // Handle units form submission
+  unitsForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const newUnits: Partial<UnitPreferences> = {};
+    if (unitSpeedSelect) newUnits.speed = unitSpeedSelect.value as UnitPreferences['speed'];
+    if (unitAltitudeSelect) newUnits.altitude = unitAltitudeSelect.value as UnitPreferences['altitude'];
+    if (unitDistanceSelect) newUnits.distance = unitDistanceSelect.value as UnitPreferences['distance'];
+    if (unitClimbRateSelect) newUnits.climbRate = unitClimbRateSelect.value as UnitPreferences['climbRate'];
+
+    config.setPreferences({ units: newUnits as UnitPreferences });
+    unitsDialog?.close();
+  });
+
+  // Subscribe to unit changes for reactive updates
+  onUnitsChanged(() => {
+    // Re-detect events to regenerate descriptions with new units
+    if (state.fixes.length > 0) {
+      state.events = detectFlightEvents(state.fixes, state.task || undefined);
+      eventPanel?.setEvents(state.events);
+      mapRenderer?.setEvents(state.events);
+    }
+
+    updateFlightInfo();
+
+    // Re-render map task labels with new units
+    if (state.task && mapRenderer) {
+      mapRenderer.setTask(state.task);
     }
   });
 
@@ -487,15 +545,15 @@ async function init(): Promise<void> {
         info.duration = `${hours}h ${mins}m`;
 
         const maxAlt = Math.max(...state.fixes.map(f => f.gnssAltitude));
-        info.maxAlt = `${maxAlt}m`;
+        info.maxAlt = formatAltitude(maxAlt).withUnit;
       }
     }
 
     if (state.task) {
       const numTurnpoints = state.task.turnpoints.length;
       const optimizedDistance = calculateOptimizedTaskDistance(state.task);
-      const distanceKm = (optimizedDistance / 1000).toFixed(2);
-      info.task = `${numTurnpoints} TPs, ${distanceKm} km`;
+      const distanceFormatted = formatDistance(optimizedDistance);
+      info.task = `${numTurnpoints} TPs, ${distanceFormatted.withUnit}`;
     }
 
     eventPanel?.setFlightInfo(info);
