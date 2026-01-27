@@ -26,12 +26,12 @@ const CONVERSIONS = {
   distance: {
     km: { factor: 0.001, decimals: 2, label: 'km' },
     mi: { factor: 0.000621371, decimals: 2, label: 'mi' },
-    nmi: { factor: 0.000539957, decimals: 2, label: 'nmi' },
+    nmi: { factor: 0.000539957, decimals: 2, label: 'NM' },
   } as Record<string, ConversionInfo>,
   climbRate: {
     'm/s': { factor: 1, decimals: 1, label: 'm/s' },
     'ft/min': { factor: 196.85, decimals: 0, label: 'fpm' },
-    '100ft/min': { factor: 1.9685, decimals: 1, label: '' }, // No label, just number
+    '100ft/min': { factor: 1.9685, decimals: 1, label: '100fpm' },
     knots: { factor: 1.944, decimals: 1, label: 'kts' },
   } as Record<string, ConversionInfo>,
 } as const;
@@ -78,8 +78,7 @@ export function formatUnit(
   const sign = options?.showSign && converted > 0 ? '+' : '';
   const displayValue = sign + formatted;
 
-  // For 100ft/min, just show the number (pilots know the context)
-  const withUnit = conv.label ? `${displayValue}${conv.label}` : displayValue;
+  const withUnit = conv.label ? `${displayValue}\u{00A0}${conv.label}` : displayValue;
 
   return {
     value: converted,
