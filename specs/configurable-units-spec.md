@@ -11,7 +11,7 @@ This feature allows users to configure display units for various measurements in
 | **Speed** | km/h | km/h, mph, knots | m/s |
 | **Altitude** | m | m, ft | m |
 | **Distance** | km | km, mi, nmi | m |
-| **Climb Rate** | m/s | m/s, ft/min, 100ft/min, knots | m/s |
+| **Climb Rate** | m/s | m/s, ft/min, knots | m/s |
 
 ### Unit Details
 
@@ -32,7 +32,6 @@ This feature allows users to configure display units for various measurements in
 #### Climb Rate
 - **m/s** - Meters per second
 - **ft/min** - Feet per minute (1 m/s = 196.85 ft/min)
-- **100ft/min** - Hundreds of feet per minute (1 m/s = 1.9685 units) - common vario display
 - **knots** - Nautical miles per hour (1 m/s = 1.944 knots) - convenient because 1 knot ≈ 100 ft/min ≈ 0.5 m/s
 
 ## User Interface
@@ -107,7 +106,7 @@ export interface UnitPreferences {
 export type SpeedUnit = 'km/h' | 'mph' | 'knots';
 export type AltitudeUnit = 'm' | 'ft';
 export type DistanceUnit = 'km' | 'mi' | 'nmi';
-export type ClimbRateUnit = 'm/s' | 'ft/min' | '100ft/min' | 'knots';
+export type ClimbRateUnit = 'm/s' | 'ft/min' | 'knots';
 
 const STORAGE_KEY = 'taskscore:preferences';
 
@@ -190,7 +189,7 @@ class ConfigStore {
       speed: ['km/h', 'mph', 'knots'],
       altitude: ['m', 'ft'],
       distance: ['km', 'mi', 'nmi'],
-      climbRate: ['m/s', 'ft/min', '100ft/min', 'knots'],
+      climbRate: ['m/s', 'ft/min', 'knots'],
     };
 
     const current = this.getUnits()[unitType];
@@ -235,7 +234,6 @@ const CONVERSIONS = {
   climbRate: {
     'm/s': { factor: 1, decimals: 1, label: 'm/s' },
     'ft/min': { factor: 196.85, decimals: 0, label: 'fpm' },
-    '100ft/min': { factor: 1.9685, decimals: 1, label: '' },  // No label, just number
     'knots': { factor: 1.944, decimals: 1, label: 'kts' },
   },
 } as const;
@@ -272,7 +270,6 @@ export function formatUnit(
   const sign = options?.showSign && converted > 0 ? '+' : '';
   const displayValue = sign + formatted;
 
-  // For 100ft/min, just show the number (pilots know the context)
   const withUnit = conv.label
     ? `${displayValue}${conv.label}`
     : displayValue;

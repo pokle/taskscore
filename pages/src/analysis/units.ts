@@ -31,7 +31,6 @@ const CONVERSIONS = {
   climbRate: {
     'm/s': { factor: 1, decimals: 1, label: 'm/s' },
     'ft/min': { factor: 196.85, decimals: 0, label: 'fpm' },
-    '100ft/min': { factor: 1.9685, decimals: 1, label: '' }, // No label, just number
     knots: { factor: 1.944, decimals: 1, label: 'kts' },
   } as Record<string, ConversionInfo>,
 } as const;
@@ -78,7 +77,6 @@ export function formatUnit(
   const sign = options?.showSign && converted > 0 ? '+' : '';
   const displayValue = sign + formatted;
 
-  // For 100ft/min, just show the number (pilots know the context)
   const withUnit = conv.label ? `${displayValue}${conv.label}` : displayValue;
 
   return {

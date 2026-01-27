@@ -280,11 +280,19 @@ async function init(): Promise<void> {
 
   // Subscribe to unit changes for reactive updates
   onUnitsChanged(() => {
-    // Re-render event panel with new units
-    if (state.events.length > 0) {
+    // Re-detect events to regenerate descriptions with new units
+    if (state.fixes.length > 0) {
+      state.events = detectFlightEvents(state.fixes, state.task || undefined);
       eventPanel?.setEvents(state.events);
+      mapRenderer?.setEvents(state.events);
     }
+
     updateFlightInfo();
+
+    // Re-render map task labels with new units
+    if (state.task && mapRenderer) {
+      mapRenderer.setTask(state.task);
+    }
   });
 
   // Set up sidebar toggle for mobile
