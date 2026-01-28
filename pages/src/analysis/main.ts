@@ -12,7 +12,7 @@ import { parseIGC, IGCFile, IGCFix } from './igc-parser';
 import { fetchTaskByCodeWithRaw, XCTask, calculateOptimizedTaskDistance, igcTaskToXCTask } from './xctsk-parser';
 import { createMapProvider, MapProvider } from './map-provider';
 import { detectFlightEvents, FlightEvent } from './event-detector';
-import { createAnalysisPanel, AnalysisPanel, FlightInfo } from './analysis-panel';
+import { createAnalysisPanel, AnalysisPanel, FlightInfo, PanelTabType } from './analysis-panel';
 import { loadCorryongWaypoints, type WaypointRecord } from './waypoints';
 import { config, type UnitPreferences } from './config';
 import { formatAltitude, formatDistance, onUnitsChanged } from './units';
@@ -401,11 +401,58 @@ async function init(): Promise<void> {
     },
   });
 
+  // Set up header tab controls for the analysis panel
+  const headerTabTrack = document.getElementById('header-tab-track');
+  const headerTabTask = document.getElementById('header-tab-task');
+  const headerTabTerrain = document.getElementById('header-tab-terrain');
+  const headerTabHide = document.getElementById('header-tab-hide');
+  const headerTabs = [headerTabTrack, headerTabTask, headerTabTerrain];
+
+  /**
+   * Update header tab visual states
+   */
+  function updateHeaderTabs(activeTab: PanelTabType | null): void {
+    for (const tab of headerTabs) {
+      if (tab) {
+        tab.setAttribute('aria-selected', 'false');
+      }
+    }
+    if (activeTab === 'track' && headerTabTrack) {
+      headerTabTrack.setAttribute('aria-selected', 'true');
+    } else if (activeTab === 'task' && headerTabTask) {
+      headerTabTask.setAttribute('aria-selected', 'true');
+    } else if (activeTab === 'terrain' && headerTabTerrain) {
+      headerTabTerrain.setAttribute('aria-selected', 'true');
+    }
+  }
+
+  /**
+   * Handle header tab click - show panel and switch to tab
+   */
+  function handleHeaderTabClick(tab: PanelTabType): void {
+    // Show panel if hidden
+    if (analysisPanel?.isHidden()) {
+      analysisPanel.show();
+    }
+    // Switch to the tab
+    analysisPanel?.switchTab(tab);
+    updateHeaderTabs(tab);
+  }
+
+  headerTabTrack?.addEventListener('click', () => handleHeaderTabClick('track'));
+  headerTabTask?.addEventListener('click', () => handleHeaderTabClick('task'));
+  headerTabTerrain?.addEventListener('click', () => handleHeaderTabClick('terrain'));
+  headerTabHide?.addEventListener('click', () => {
+    analysisPanel?.hide();
+    updateHeaderTabs(null);
+  });
+
   // Register track click handler to select events when clicking on the track
   mapRenderer.onTrackClick?.((fixIndex: number) => {
     // Open analysis panel if hidden
     if (analysisPanel?.isHidden()) {
       analysisPanel.show();
+      updateHeaderTabs(analysisPanel.getCurrentTab());
     }
 
     // Select the event for this fix (skip panning since user clicked directly on the track)

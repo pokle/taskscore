@@ -17,7 +17,8 @@ type TrackViewMode = 'all' | 'glides' | 'climbs' | 'sinks';
 /**
  * Main panel tabs
  */
-type PanelTab = 'track' | 'task' | 'terrain';
+export type PanelTabType = 'track' | 'task' | 'terrain';
+type PanelTab = PanelTabType;
 
 /**
  * Combined glide data from start and end events
@@ -111,6 +112,8 @@ export interface AnalysisPanel {
   hide(): void;
   show(): void;
   isHidden(): boolean;
+  switchTab(tab: PanelTabType): void;
+  getCurrentTab(): PanelTabType;
   selectByFixIndex(fixIndex: number, options?: { skipPan?: boolean }): void;
   destroy(): void;
 }
@@ -225,23 +228,10 @@ function getTurnpointTypeClass(type?: 'TAKEOFF' | 'SSS' | 'ESS'): string {
 export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPanel {
   const { container, onEventClick } = options;
 
-  // Create panel structure
+  // Create panel structure (tabs are now in the header, not here)
   const panel = document.createElement('div');
   panel.className = 'flex h-full flex-col overflow-hidden';
   panel.innerHTML = `
-    <div class="tabs w-full border-b border-border">
-      <nav role="tablist" class="w-full flex">
-        <button type="button" role="tab" id="main-tab-track" aria-selected="true" class="flex-1">Track</button>
-        <button type="button" role="tab" id="main-tab-task" aria-selected="false" class="flex-1">Task</button>
-        <button type="button" role="tab" id="main-tab-terrain" aria-selected="false" class="flex-1">Terrain</button>
-        <button type="button" role="tab" id="main-tab-hide" aria-selected="false" class="px-3" title="Hide panel">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m9 18 6-6-6-6"/>
-          </svg>
-        </button>
-      </nav>
-    </div>
-
     <!-- Track Panel Content -->
     <div id="track-panel-content" class="flex flex-1 flex-col overflow-hidden">
       <div class="border-b border-border bg-muted/50 px-4 py-2 text-sm">
@@ -302,12 +292,6 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   const taskPanelContent = panel.querySelector('#task-panel-content') as HTMLElement;
   const terrainPanelContent = panel.querySelector('#terrain-panel-content') as HTMLElement;
 
-  const mainTabTrack = panel.querySelector('#main-tab-track') as HTMLButtonElement;
-  const mainTabTask = panel.querySelector('#main-tab-task') as HTMLButtonElement;
-  const mainTabTerrain = panel.querySelector('#main-tab-terrain') as HTMLButtonElement;
-  const mainTabHide = panel.querySelector('#main-tab-hide') as HTMLButtonElement;
-  const mainTabs = [mainTabTrack, mainTabTask, mainTabTerrain];
-
   const listContainer = panel.querySelector('.track-list') as HTMLElement;
   const eventCountEl = panel.querySelector('.event-count') as HTMLElement;
   const taskListContainer = panel.querySelector('.task-list') as HTMLElement;
@@ -334,15 +318,10 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   terrainJokeEl.textContent = TERRAIN_JOKES[Math.floor(Math.random() * TERRAIN_JOKES.length)];
 
   /**
-   * Switch main panel tab
+   * Switch main panel tab (called externally from header tabs)
    */
   function switchMainTab(tab: PanelTab): void {
     currentTab = tab;
-
-    // Update main tab states
-    for (const t of mainTabs) {
-      t.setAttribute('aria-selected', 'false');
-    }
 
     // Hide all content panels
     trackPanelContent.classList.add('hidden');
@@ -351,14 +330,11 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
 
     // Show selected panel
     if (tab === 'track') {
-      mainTabTrack.setAttribute('aria-selected', 'true');
       trackPanelContent.classList.remove('hidden');
     } else if (tab === 'task') {
-      mainTabTask.setAttribute('aria-selected', 'true');
       taskPanelContent.classList.remove('hidden');
       renderTask();
     } else if (tab === 'terrain') {
-      mainTabTerrain.setAttribute('aria-selected', 'true');
       terrainPanelContent.classList.remove('hidden');
       // Pick a new random joke when switching to terrain tab
       terrainJokeEl.textContent = TERRAIN_JOKES[Math.floor(Math.random() * TERRAIN_JOKES.length)];
@@ -394,14 +370,6 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       listContainer.scrollTop = 0;
     }
   }
-
-  // Main tab click handlers
-  mainTabTrack?.addEventListener('click', () => switchMainTab('track'));
-  mainTabTask?.addEventListener('click', () => switchMainTab('task'));
-  mainTabTerrain?.addEventListener('click', () => switchMainTab('terrain'));
-  mainTabHide?.addEventListener('click', () => {
-    hidePanel();
-  });
 
   // Track sub-tab click handlers
   tabEvents?.addEventListener('click', () => switchTrackTab('all'));
@@ -1074,6 +1042,14 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
 
     isHidden() {
       return isPanelHidden;
+    },
+
+    switchTab(tab: PanelTabType) {
+      switchMainTab(tab);
+    },
+
+    getCurrentTab(): PanelTabType {
+      return currentTab;
     },
 
     selectByFixIndex(fixIndex: number, selectOptions?: { skipPan?: boolean }) {

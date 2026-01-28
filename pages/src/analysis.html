@@ -50,8 +50,21 @@
                 <span class="hidden text-sm text-muted-foreground sm:inline">IGC Analysis</span>
             </div>
 
-            <div class="flex items-center gap-2">
-                <!-- Panel is controlled by tabs, no toggle button needed -->
+            <div class="flex items-center gap-1">
+                <!-- Panel tabs in header - always visible -->
+                <div class="tabs">
+                    <nav role="tablist" class="flex">
+                        <button type="button" role="tab" id="header-tab-track" aria-selected="true" class="px-3 py-1.5 text-sm">Track</button>
+                        <button type="button" role="tab" id="header-tab-task" aria-selected="false" class="px-3 py-1.5 text-sm">Task</button>
+                        <button type="button" role="tab" id="header-tab-terrain" aria-selected="false" class="px-3 py-1.5 text-sm">Terrain</button>
+                        <button type="button" role="tab" id="header-tab-hide" aria-selected="false" class="px-2 py-1.5" title="Hide panel">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="13 17 18 12 13 7"/>
+                                <polyline points="6 17 11 12 6 7"/>
+                            </svg>
+                        </button>
+                    </nav>
+                </div>
             </div>
         </header>
 
