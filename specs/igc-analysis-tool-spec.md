@@ -2,6 +2,7 @@
 
 ## TODO
 - [ ] BUG: The `pages/public/data/tracks/2025-01-05-Tushar-Corryong.igc` IGC file has segments that aren't a glide or a thermal or sink. They're basically unclickable. These sections are near the end. I think there was so much lifty air that I was climbing on glide. Also there are sections that are identified as a thermal but are actually a climbing glide (flying straight).
+- [ ] Improve usability of the glide segment visualisation
 - [ ] **Browser Storage Management** (see `browser-storage-spec.md`):
   - [ ] Clear individual items from storage (delete a stored task or track)
   - [ ] Clear all storage (reset to empty state)
@@ -13,7 +14,6 @@
   - Accomodations:
     - [x] If possible, on hover, change the cursor to indicate that it's clickable.
     - [ ] DEFER: If possible, on hover over a segment, highlight the segment by increasing its width.
-- [ ] Add a 'Show all Events' command that's equivalent to clicking the Events button, and switching the filter to show all events. It should focus the keyboard on the event panel.
 - [x] Implement 'Highest climbs' tab - show all climbs/thermals sorted by greatest altitude gain first
 - [x] Implement 'Deepest sinks' tab - show all descents sorted by greatest altitude drop first
 - [ ] DEFER: Add box plots to the 'Longest glides' view showing vertically stacked box plots per detail (use uPlot for plotting, and simple-statistics for the descriptive statistics)
