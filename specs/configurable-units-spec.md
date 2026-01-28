@@ -27,7 +27,7 @@ This feature allows users to configure display units for various measurements in
 #### Distance
 - **km** - Kilometers (1 m = 0.001 km)
 - **mi** - Statute miles (1 m = 0.000621371 mi)
-- **nmi** - Nautical miles (1 m = 0.000539957 nmi)
+- **nmi** - Nautical miles (1 m = 0.000539957 nmi, label: "NM")
 
 #### Climb Rate
 - **m/s** - Meters per second
