@@ -60,7 +60,7 @@ npm run deploy       # Manual deploy to Cloudflare Pages
 /pages/           - Cloudflare Pages frontend
   /public/        - Static assets (HTML, CSS, etc.)
   /src/           - TypeScript source
-/workers/         - Cloudflare Workers (Email, API)
+/workers/         - Cloudflare Workers (Email, API) - not yet implemented
 /tests/           - Test files
 /specs/           - Feature and architecture specifications
 /explorations/    - Experimental code (NOT for production use)
@@ -103,7 +103,7 @@ npm run deploy       # Manual deploy to Cloudflare Pages
 **Layout Pattern:**
 - Analysis page uses a responsive sidebar + map layout
 - Desktop: Fixed-width sidebar (320px) + full-width map
-- Mobile: Collapsible sidebar that slides in from left, overlays map
+- Mobile: Collapsible sidebar that slides in from right, overlays map
 - Header with hamburger menu (mobile) and command menu (gear icon)
 
 **Map Provider:**
@@ -124,7 +124,7 @@ npm run deploy       # Manual deploy to Cloudflare Pages
 **Always use Turf.js via `geo.ts`** for any geographic/geometric calculations:
 
 ```typescript
-import { haversineDistance, calculateBearing, destinationPoint, getBoundingBox, isInsideCylinder } from './geo';
+import { haversineDistance, calculateBearing, destinationPoint, getBoundingBox, isInsideCylinder, getCirclePoints } from './geo';
 ```
 
 **Available functions in `pages/src/analysis/geo.ts`:**
@@ -134,5 +134,6 @@ import { haversineDistance, calculateBearing, destinationPoint, getBoundingBox, 
 - `destinationPoint(lat, lon, distanceMeters, bearingRadians)` - Point at distance/bearing from origin
 - `getBoundingBox(fixes)` - Bounding box for array of lat/lon points
 - `isInsideCylinder(lat, lon, centerLat, centerLon, radius)` - Point-in-cylinder test
+- `getCirclePoints(centerLat, centerLon, radiusMeters, numPoints?)` - Generate circle polygon points for map rendering
 
 **NEVER** implement inline haversine, bearing, or other geo math - always use the centralized `geo.ts` module which wraps Turf.js.

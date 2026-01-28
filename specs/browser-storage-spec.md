@@ -85,7 +85,6 @@ interface StoredTrack {
     pilot?: string;
     glider?: string;
     date?: string;
-    location?: string; // Could be derived from takeoff coordinates
   };
 
   /** When the track was stored */
