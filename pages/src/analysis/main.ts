@@ -300,8 +300,6 @@ async function init(): Promise<void> {
     analysisPanel?.setEvents([]);
     analysisPanel?.setFlightInfo({});
     analysisPanel?.setTask(null);
-
-    showStatus('Ready - drop an IGC file or use the file picker', 'info');
   });
 
   // Handle units form submission
@@ -869,8 +867,6 @@ async function init(): Promise<void> {
   Object.entries(sampleFiles).forEach(([id, filename]) => {
     document.getElementById(id)?.addEventListener('click', () => loadSampleFile(filename));
   });
-
-  showStatus('Ready - drop an IGC file or use the file picker', 'info');
 
   // Load from query params if present (e.g., ?task=buje&track=sample.igc)
   await loadFromQueryParams(loadTask, loadIGCFile);
