@@ -24,7 +24,7 @@
 
 - [ ] Manage scorer accounts
 
-# Low level TODOs
+# Analysis page TODOs
 
 - [ ] BUG: The `pages/public/data/tracks/2025-01-05-Tushar-Corryong.igc` IGC file has segments that aren't a glide or a thermal or sink. They're basically unclickable. These sections are near the end. I think there was so much lifty air that I was climbing on glide. Also there are sections that are identified as a thermal but are actually a climbing glide (flying straight).
 - [ ] Improve usability of the glide segment visualisation
@@ -48,3 +48,11 @@
 - [x] Associate tasks with tracks. When we load a track, we should use the IGC file's declared task information if available. 
 - [x] If the IGC file doesn't contain task information, we should try to associate the track with any known tasks in the region on the date.
 - [x] USABILITY: The altitude colours should be on by default.
+
+# AirScore TODOs
+
+These aren't items for taskscore, but ideas for feature requests in AirScore.
+
+- [ ] Dockerise AirScore so that I can run it locally and test it easily.
+- [ ] AirScore should load XContest tasks while creating tasks
+- [ ] Downloading IGC files from AirScore should include the task they were scored against.
