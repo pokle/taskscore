@@ -75,6 +75,12 @@ export interface MapProvider {
 
     /** Register callback for when user clicks on the track */
     onTrackClick?(callback: (fixIndex: number) => void): void;
+
+    /** Register callback for when user clicks on a task turnpoint */
+    onTurnpointClick?(callback: (turnpointIndex: number) => void): void;
+
+    /** Pan to a turnpoint center without changing zoom */
+    panToTurnpoint?(turnpointIndex: number): void;
 }
 
 /**

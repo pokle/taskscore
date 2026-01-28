@@ -375,10 +375,23 @@ async function init(): Promise<void> {
     }
   };
 
+  // Handle turnpoint click from panel - pan map to turnpoint center
+  const handleTurnpointClick = (turnpointIndex: number) => {
+    if (mapRenderer?.panToTurnpoint) {
+      mapRenderer.panToTurnpoint(turnpointIndex);
+    }
+
+    // Close sidebar on mobile after selecting a turnpoint
+    if (window.innerWidth < 768 && sidebar) {
+      document.dispatchEvent(new CustomEvent('basecoat:sidebar', { detail: { action: 'close', id: 'waypoint-sidebar' } }));
+    }
+  };
+
   // Initialize analysis panel with hide/show callbacks for sidebar visibility
   analysisPanel = createAnalysisPanel({
     container: eventPanelContainer,
     onEventClick: handleEventClick,
+    onTurnpointClick: handleTurnpointClick,
     onToggle: handlePanelToggle,
     onHide: () => {
       if (sidebar) {
@@ -455,6 +468,18 @@ async function init(): Promise<void> {
 
     // Select the event for this fix (skip panning since user clicked directly on the track)
     analysisPanel?.selectByFixIndex(fixIndex, { skipPan: true });
+  });
+
+  // Register turnpoint click handler to open Task tab when clicking on a turnpoint on the map
+  mapRenderer.onTurnpointClick?.((turnpointIndex: number) => {
+    // Open analysis panel if hidden
+    if (analysisPanel?.isHidden()) {
+      analysisPanel.show();
+    }
+
+    // Switch to task tab and select the turnpoint
+    analysisPanel?.selectTurnpoint(turnpointIndex);
+    updateHeaderTabs('task');
   });
 
   // Open IGC menu item triggers hidden file input

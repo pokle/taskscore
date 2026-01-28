@@ -88,6 +88,7 @@ interface SinkData {
 export interface AnalysisPanelOptions {
   container: HTMLElement;
   onEventClick: (event: FlightEvent, options?: { skipPan?: boolean }) => void;
+  onTurnpointClick?: (turnpointIndex: number) => void;
   onToggle?: () => void;
   onHide?: () => void;
   onShow?: () => void;
@@ -115,6 +116,7 @@ export interface AnalysisPanel {
   switchTab(tab: PanelTabType): void;
   getCurrentTab(): PanelTabType;
   selectByFixIndex(fixIndex: number, options?: { skipPan?: boolean }): void;
+  selectTurnpoint(turnpointIndex: number): void;
   destroy(): void;
 }
 
@@ -125,7 +127,7 @@ const TERRAIN_JOKES = [
   "Terrain data coming soon. For now, enjoy the view of nothing.",
   "It's so empty here, even the vultures left.",
   "This panel is flatter than Kansas on a no-fly day.",
-  "No terrain data. Just like my landing options after a bomb-out.",
+  "No terrain data. Just like my chances after a bomb-out.",
   "Coming soon: actual terrain info. For now, pretend you can see thermals.",
   "This area is as empty as cloudbase on a blue day.",
   "Terrain info? We're working on it. Unlike that thermal you're chasing.",
@@ -313,6 +315,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   let currentTab: PanelTab = 'track';
   let trackViewMode: TrackViewMode = 'all';
   let selectedSegment: { startIndex: number; endIndex: number } | null = null;
+  let selectedTurnpointIndex: number | null = null;
 
   // Set random terrain joke
   terrainJokeEl.textContent = TERRAIN_JOKES[Math.floor(Math.random() * TERRAIN_JOKES.length)];
@@ -921,8 +924,11 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       const legDistanceStr = i > 0 ? formatDistance(legDistance).withUnit : '—';
       const cumulativeDistStr = i > 0 ? formatDistance(distanceToHere).withUnit : 'Start';
 
+      const isSelected = selectedTurnpointIndex === i;
+      const selectedClass = isSelected ? 'ring-2 ring-primary' : '';
+
       html += `
-        <div class="turnpoint-item rounded-lg border border-border bg-muted/30 p-3">
+        <button class="turnpoint-item w-full text-left rounded-lg border border-border bg-muted/30 p-3 cursor-pointer hover:bg-muted/50 transition-colors ${selectedClass}" data-turnpoint-index="${i}">
           <div class="flex items-start gap-3">
             <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium ${typeClass}">
               ${i + 1}
@@ -960,12 +966,32 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
               </div>
             </div>
           </div>
-        </div>
+        </button>
       `;
     }
 
     html += '</div>';
     taskListContainer.innerHTML = html;
+
+    // Add click handlers for turnpoint items
+    taskListContainer.querySelectorAll('.turnpoint-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const indexStr = item.getAttribute('data-turnpoint-index');
+        if (indexStr !== null) {
+          const index = parseInt(indexStr, 10);
+          selectedTurnpointIndex = index;
+
+          // Update selection visual
+          taskListContainer.querySelectorAll('.turnpoint-item').forEach(el => {
+            el.classList.remove('ring-2', 'ring-primary');
+          });
+          item.classList.add('ring-2', 'ring-primary');
+
+          // Call the callback to pan the map
+          options.onTurnpointClick?.(index);
+        }
+      });
+    });
   }
 
   return {
@@ -1128,6 +1154,28 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
         }
 
         options.onEventClick(matchingEvent, selectOptions?.skipPan ? { skipPan: true } : undefined);
+      }
+    },
+
+    selectTurnpoint(turnpointIndex: number) {
+      if (!currentTask || turnpointIndex < 0 || turnpointIndex >= currentTask.turnpoints.length) {
+        return;
+      }
+
+      selectedTurnpointIndex = turnpointIndex;
+
+      // Switch to task tab if not already there
+      if (currentTab !== 'task') {
+        switchMainTab('task');
+      } else {
+        // Re-render to show selection
+        renderTask();
+      }
+
+      // Scroll the selected item into view
+      const selectedItem = taskListContainer.querySelector(`[data-turnpoint-index="${turnpointIndex}"]`);
+      if (selectedItem) {
+        selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
     },
 

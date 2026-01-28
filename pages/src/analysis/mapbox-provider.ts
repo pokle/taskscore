@@ -74,6 +74,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       // Track click callback
       let trackClickCallback: ((fixIndex: number) => void) | null = null;
 
+      // Turnpoint click callback
+      let turnpointClickCallback: ((turnpointIndex: number) => void) | null = null;
+
       /**
        * Show or hide the glide legend help button
        */
@@ -627,6 +630,38 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             map.getCanvas().style.cursor = '';
           });
         }
+
+        // Turnpoint click handler
+        map.on('click', 'task-points', (e) => {
+          if (!turnpointClickCallback || !currentTask || !isTaskVisible) return;
+          if (!e.features || e.features.length === 0) return;
+
+          // Find which turnpoint was clicked based on coordinates
+          const clickedCoords = e.features[0].geometry;
+          if (clickedCoords.type !== 'Point') return;
+
+          const [clickLon, clickLat] = clickedCoords.coordinates;
+
+          // Find the matching turnpoint index
+          for (let i = 0; i < currentTask.turnpoints.length; i++) {
+            const tp = currentTask.turnpoints[i];
+            if (Math.abs(tp.waypoint.lon - clickLon) < 0.0001 &&
+                Math.abs(tp.waypoint.lat - clickLat) < 0.0001) {
+              turnpointClickCallback(i);
+              break;
+            }
+          }
+        });
+
+        // Hover effects for turnpoints
+        map.on('mouseenter', 'task-points', () => {
+          if (!currentTask || !isTaskVisible) return;
+          map.getCanvas().style.cursor = 'pointer';
+        });
+
+        map.on('mouseleave', 'task-points', () => {
+          map.getCanvas().style.cursor = '';
+        });
 
         resolve(renderer);
       });
@@ -1479,6 +1514,23 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
         onTrackClick(callback: (fixIndex: number) => void) {
           trackClickCallback = callback;
+        },
+
+        onTurnpointClick(callback: (turnpointIndex: number) => void) {
+          turnpointClickCallback = callback;
+        },
+
+        panToTurnpoint(turnpointIndex: number) {
+          if (!currentTask || turnpointIndex < 0 || turnpointIndex >= currentTask.turnpoints.length) {
+            return;
+          }
+
+          const tp = currentTask.turnpoints[turnpointIndex];
+          map.flyTo({
+            center: [tp.waypoint.lon, tp.waypoint.lat],
+            zoom: map.getZoom(), // Keep current zoom level
+            duration: 1000,
+          });
         },
       };
 
