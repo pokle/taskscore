@@ -1,0 +1,12 @@
+name = "airscore-worker"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# KV namespace for caching API responses (1 hour TTL)
+[[kv_namespaces]]
+binding = "AIRSCORE_CACHE"
+id = "placeholder-id"
+
+# Routes - update these for production
+# [routes]
+# pattern = "api.taskscore.shonky.info/airscore/*"
