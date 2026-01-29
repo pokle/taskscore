@@ -21,11 +21,12 @@ export async function getCachedOrFetch<T>(
   // Fetch fresh data
   const data = await fetcher();
 
-  // Store in cache (fire and forget - don't block on this)
-  // Using waitUntil would be better but we don't have ctx here
-  kv.put(key, JSON.stringify(data), { expirationTtl: ttlSeconds }).catch((err) => {
+  // Store in cache - must await to ensure write completes before next read
+  try {
+    await kv.put(key, JSON.stringify(data), { expirationTtl: ttlSeconds });
+  } catch (err) {
     console.error('Failed to cache data:', err);
-  });
+  }
 
   return { data, cached: false };
 }
