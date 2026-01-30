@@ -18,6 +18,7 @@ import { config, type UnitPreferences } from './config';
 import { formatAltitude, formatDistance, onUnitsChanged } from './units';
 import { storage } from './storage';
 import { StorageMenu } from './storage-menu';
+import { fetchAirScoreTask, fetchAirScoreTrack } from './airscore-client';
 
 // Import styles
 import '../styles.css';
@@ -58,10 +59,13 @@ async function init(): Promise<void> {
   const commandDialog = document.getElementById('command-dialog') as HTMLDialogElement | null;
   const importTaskDialog = document.getElementById('import-task-dialog') as HTMLDialogElement | null;
   const importTaskInput = document.getElementById('import-task-input') as HTMLInputElement | null;
+  const importAirscoreDialog = document.getElementById('import-airscore-dialog') as HTMLDialogElement | null;
+  const importAirscoreInput = document.getElementById('import-airscore-input') as HTMLInputElement | null;
 
   // Menu items
   const menuOpenIgc = document.getElementById('menu-open-igc');
   const menuImportTask = document.getElementById('menu-import-task');
+  const menuImportAirscore = document.getElementById('menu-import-airscore');
   const menuAltitudeColors = document.getElementById('menu-altitude-colors');
   const menu3DTrack = document.getElementById('menu-3d-track');
   const menuToggleTask = document.getElementById('menu-toggle-task');
@@ -553,6 +557,32 @@ async function init(): Promise<void> {
     }
   });
 
+  // Import AirScore menu item -> opens AirScore dialog
+  menuImportAirscore?.addEventListener('click', () => {
+    commandDialog?.close();
+    if (importAirscoreInput) {
+      importAirscoreInput.value = '';
+    }
+    importAirscoreDialog?.showModal();
+    importAirscoreInput?.focus();
+  });
+
+  // Import AirScore dialog input handler
+  importAirscoreInput?.addEventListener('keydown', async (e: Event) => {
+    const keyEvent = e as KeyboardEvent;
+    if (keyEvent.key === 'Enter') {
+      keyEvent.preventDefault();
+      keyEvent.stopPropagation();
+      const url = importAirscoreInput.value.trim();
+      if (url) {
+        importAirscoreDialog?.close();
+        await loadAirScoreFromUrl(url);
+      }
+    } else if (keyEvent.key === 'Escape') {
+      importAirscoreDialog?.close();
+    }
+  });
+
   // Keyboard shortcut for command menu (Cmd/Ctrl + K)
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -758,6 +788,98 @@ async function init(): Promise<void> {
     } catch (err) {
       console.error('Failed to load stored task:', err);
       showStatus(`Failed to load stored task: ${err}`, 'error');
+    }
+  }
+
+  /**
+   * Parse AirScore URL and extract parameters
+   * Supports URLs like: https://xc.highcloud.net/tracklog_map.html?trackid=43826&comPk=466&tasPk=2030
+   */
+  function parseAirScoreUrl(url: string): { trackId: string; comPk: number; tasPk: number } | null {
+    try {
+      const parsed = new URL(url);
+      const params = parsed.searchParams;
+
+      const trackId = params.get('trackid') || params.get('trackId');
+      const comPk = params.get('comPk') || params.get('compk');
+      const tasPk = params.get('tasPk') || params.get('taspk');
+
+      if (!trackId || !comPk || !tasPk) {
+        return null;
+      }
+
+      return {
+        trackId,
+        comPk: parseInt(comPk, 10),
+        tasPk: parseInt(tasPk, 10),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Load task and track from AirScore URL
+   */
+  async function loadAirScoreFromUrl(url: string): Promise<void> {
+    const params = parseAirScoreUrl(url);
+
+    if (!params) {
+      showStatus('Invalid AirScore URL. Expected format: https://xc.highcloud.net/tracklog_map.html?trackid=...&comPk=...&tasPk=...', 'error');
+      return;
+    }
+
+    showStatus('Loading from AirScore...', 'info');
+
+    try {
+      // Fetch task data first
+      const taskData = await fetchAirScoreTask(params.comPk, params.tasPk);
+
+      // Set the task
+      state.task = taskData.task;
+
+      if (mapRenderer) {
+        mapRenderer.setTask(taskData.task);
+      }
+
+      analysisPanel?.setTask(taskData.task);
+
+      // Now fetch the track
+      const igcContent = await fetchAirScoreTrack(params.trackId, params.comPk, params.tasPk);
+
+      // Parse and load the IGC content
+      const igcFile = parseIGC(igcContent);
+
+      state.igcFile = igcFile;
+      state.fixes = igcFile.fixes;
+
+      // Update map with track
+      if (mapRenderer) {
+        mapRenderer.setTrack(igcFile.fixes);
+      }
+
+      // Detect events with the loaded task
+      state.events = detectFlightEvents(igcFile.fixes, state.task);
+
+      // Update analysis panel
+      analysisPanel?.setEvents(state.events);
+
+      // Update map events
+      if (mapRenderer) {
+        mapRenderer.setEvents(state.events);
+      }
+
+      // Update flight info
+      updateFlightInfo();
+
+      // Build a descriptive filename
+      const pilotName = taskData.pilots.find(p => p.trackId === params.trackId)?.name || 'Unknown';
+      const taskName = taskData.competition.taskName || `Task ${params.tasPk}`;
+
+      showStatus(`Loaded ${pilotName} - ${taskData.competition.name} ${taskName}`, 'success');
+    } catch (err) {
+      console.error('Failed to load from AirScore:', err);
+      showStatus(`Failed to load from AirScore: ${err}`, 'error');
     }
   }
 

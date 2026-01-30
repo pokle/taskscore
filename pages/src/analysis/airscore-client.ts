@@ -77,7 +77,7 @@ export interface AirScoreError {
 function getAirScoreApiBase(): string {
   // Check if running on localhost (dev) or production
   if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-    return 'http://localhost:8787';
+    return 'http://localhost:8787/api/airscore';
   }
   return '/api/airscore';
 }

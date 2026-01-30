@@ -10,11 +10,11 @@ const tasPk = 2030;
 const trackId = '43826';
 
 // Use production API (or localhost:8787 if worker is running locally)
-const API_BASE = process.env.LOCAL ? 'http://localhost:8787' : 'https://taskscore.shonky.info';
+const API_BASE = process.env.LOCAL ? 'http://localhost:8787/api/airscore' : 'https://taskscore.shonky.info/api/airscore';
 
 async function testHealthCheck() {
   console.log('\n=== Testing Health Check ===');
-  const url = `${API_BASE}/api/airscore`;
+  const url = `${API_BASE}`;
   console.log(`URL: ${url}`);
   try {
     const response = await fetch(url);
@@ -30,7 +30,7 @@ async function testHealthCheck() {
 
 async function testFetchTask() {
   console.log('\n=== Testing fetchAirScoreTask ===');
-  const url = `${API_BASE}/api/airscore/task?comPk=${comPk}&tasPk=${tasPk}`;
+  const url = `${API_BASE}/task?comPk=${comPk}&tasPk=${tasPk}`;
   console.log(`URL: ${url}`);
 
   try {
@@ -95,7 +95,7 @@ async function testFetchTask() {
 
 async function testFetchTrack() {
   console.log('\n=== Testing fetchAirScoreTrack ===');
-  const url = `${API_BASE}/api/airscore/track?trackId=${trackId}&comPk=${comPk}&tasPk=${tasPk}`;
+  const url = `${API_BASE}/track?trackId=${trackId}&comPk=${comPk}&tasPk=${tasPk}`;
   console.log(`URL: ${url}`);
 
   try {

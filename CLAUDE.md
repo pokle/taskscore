@@ -131,6 +131,14 @@ npm run dev
 
 The frontend's AirScore client (`pages/src/analysis/airscore-client.ts`) automatically connects to `localhost:8787` in development mode.
 
+**Loading AirScore Tasks in the UI:**
+
+Users can load task and track data from AirScore directly in the analysis tool:
+1. Open command menu (Cmd+K or hamburger icon)
+2. Select "Load AirScore task"
+3. Paste an AirScore tracklog URL (e.g., `https://xc.highcloud.net/tracklog_map.html?trackid=43826&comPk=466&tasPk=2030`)
+4. Both the competition task and pilot's track are loaded together
+
 ## Project Structure
 
 ```
@@ -143,6 +151,7 @@ The frontend's AirScore client (`pages/src/analysis/airscore-client.ts`) automat
   /airscore-api/           - AirScore caching proxy (implemented)
     /src/                  - Worker source code
     wrangler.toml          - Worker configuration
+/scripts/                  - Utility scripts for testing and development
 /tests/                    - Test files
 /specs/                    - Feature and architecture specifications
 /explorations/             - Experimental code (NOT for production use)
