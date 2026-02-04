@@ -27,6 +27,8 @@ const MAPBOX_STYLES = [
   { id: 'light', name: 'Light', style: 'mapbox://styles/mapbox/light-v11' },
   { id: 'dark', name: 'Dark', style: 'mapbox://styles/mapbox/dark-v11' },
 ];
+const GLIDE_LABEL_SPEED_MIN_ZOOM = 11;
+const GLIDE_LABEL_DETAILS_MIN_ZOOM = 13;
 
 /**
  * Create a MapBox map provider
@@ -76,6 +78,35 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
       // Turnpoint click callback
       let turnpointClickCallback: ((turnpointIndex: number) => void) | null = null;
+
+      /**
+       * Hide glide speed labels when zoomed out to prevent overlap clutter.
+       */
+      function updateGlideLabelVisibility(): void {
+        const zoom = map.getZoom();
+        for (const marker of activeMarkers) {
+          const el = marker.getElement();
+          if (el.dataset.glideLabel === 'true') {
+            const speed = el.dataset.speedLabel || '';
+            const details = el.dataset.detailLabel || '';
+
+            // Far zoom: hide labels (chevrons remain visible)
+            if (zoom < GLIDE_LABEL_SPEED_MIN_ZOOM) {
+              el.style.display = 'none';
+              continue;
+            }
+
+            el.style.display = '';
+
+            // Mid zoom: show speed only. Close zoom: show full details.
+            if (zoom < GLIDE_LABEL_DETAILS_MIN_ZOOM) {
+              el.innerHTML = speed;
+            } else {
+              el.innerHTML = details ? `${speed}<br>${details}` : speed;
+            }
+          }
+        }
+      }
 
       /**
        * Show or hide the glide legend help button
@@ -555,6 +586,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           restoreData();
         }
       });
+
+      // Keep glide labels hidden while zoomed out.
+      map.on('zoom', updateGlideLabelVisibility);
 
       /**
        * Find the index of the fix closest to the given coordinates
@@ -1379,7 +1413,11 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
                       ? formatAltitudeChange(marker.altitudeDiff).withUnit
                       : '';
 
-                    labelEl.innerHTML = `${speed}<br>${glideRatio} ${altDiff}`;
+                    const detailText = `${glideRatio} ${altDiff}`.trim();
+                    labelEl.innerHTML = `${speed}<br>${detailText}`;
+                    labelEl.dataset.glideLabel = 'true';
+                    labelEl.dataset.speedLabel = speed;
+                    labelEl.dataset.detailLabel = detailText;
 
                     const labelMarker = new mapboxgl.Marker({ element: labelEl })
                       .setLngLat([marker.lon, marker.lat])
@@ -1401,6 +1439,8 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
                     activeMarkers.push(chevronMarker);
                   }
                 }
+
+                updateGlideLabelVisibility();
               }
             }
           } else {
