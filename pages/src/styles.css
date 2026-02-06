@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "basecoat-css";
 
+/* Atkinson Hyperlegible Next - self-hosted via fontsource for fast loading */
+@import "@fontsource/atkinson-hyperlegible-next/latin-400.css";
+@import "@fontsource/atkinson-hyperlegible-next/latin-500.css";
+@import "@fontsource/atkinson-hyperlegible-next/latin-600.css";
+@import "@fontsource/atkinson-hyperlegible-next/latin-700.css";
+
 /* MapBox GL CSS */
 @import "mapbox-gl/dist/mapbox-gl.css";
 
