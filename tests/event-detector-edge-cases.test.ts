@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { detectFlightEvents } from '../pages/src/analysis/event-detector';
 import { IGCFix } from '../pages/src/analysis/igc-parser';
 

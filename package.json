@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:worker": "bun run --filter airscore-api typecheck",
     "typecheck:all": "bun run typecheck && bun run typecheck:worker",
-    "test": "vitest run",
+    "test": "bun test",
     "get-xcontest-task": "tsx scripts/get-xcontest-task.ts"
   },
   "workspaces": [
@@ -23,10 +23,10 @@
   ],
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260109.0",
+    "@types/bun": "^1.2.13",
     "@types/node": "^25.0.5",
     "tsx": "^4.21.0",
     "typescript": "^5.7.3",
-    "vitest": "^4.0.18",
     "wrangler": "^4.61.0"
   },
   "engines": {

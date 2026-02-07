@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { parseXCTask, getSSSIndex, getESSIndex, calculateTaskDistance, igcTaskToXCTask } from '../pages/src/analysis/xctsk-parser';
 import type { IGCTask } from '../pages/src/analysis/igc-parser';
 
