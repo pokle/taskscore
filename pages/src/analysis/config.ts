@@ -14,6 +14,7 @@ export interface UserPreferences {
   units: UnitPreferences;
   theme?: 'light' | 'dark' | 'system';
   mapLocation?: MapLocation;
+  mapStyle?: string;
 }
 
 export interface UnitPreferences {

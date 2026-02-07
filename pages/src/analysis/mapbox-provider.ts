@@ -40,13 +40,15 @@ const GLIDE_LABEL_DETAILS_MIN_ZOOM = 13;
 export function createMapBoxProvider(container: HTMLElement): Promise<MapProvider> {
   return new Promise((resolve, reject) => {
     try {
-      // Get default style
-      const defaultStyle = MAPBOX_STYLES[0].style;
+      // Get saved or default style
+      const savedStyleId = config.getPreferences().mapStyle;
+      const savedStyle = savedStyleId ? MAPBOX_STYLES.find(s => s.id === savedStyleId) : null;
+      const initialStyle = savedStyle ?? MAPBOX_STYLES[0];
 
       const savedLocation = config.getMapLocation();
       const map = new mapboxgl.Map({
         container,
-        style: defaultStyle,
+        style: initialStyle.style,
         center: savedLocation?.center,
         zoom: savedLocation?.zoom ?? 2,
         pitch: savedLocation?.pitch ?? 45,
@@ -542,10 +544,13 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             select.appendChild(option);
           }
 
+          select.value = initialStyle.id;
+
           select.addEventListener('change', () => {
             const selectedStyle = MAPBOX_STYLES.find(s => s.id === select.value);
             if (selectedStyle) {
               map.setStyle(selectedStyle.style);
+              config.setPreferences({ mapStyle: selectedStyle.id });
             }
           });
 
