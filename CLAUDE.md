@@ -37,7 +37,7 @@ bun install          # Install dependencies
 bun run dev          # Local development server (Pages)
 bun run typecheck    # TypeScript type checking (root project)
 bun run typecheck:all # Type check everything (Pages + Workers)
-bun run test         # Run tests with vitest
+bun run test         # Run tests with bun's built-in test runner
 bun run deploy       # Manual deploy to Cloudflare Pages
 bun run deploy:worker # Manual deploy AirScore API Worker
 bun run deploy:all   # Deploy Pages + all Workers

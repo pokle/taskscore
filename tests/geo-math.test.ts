@@ -6,7 +6,7 @@
  * maintain the same behavior.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 
 // Import from igc-parser (the canonical export location)
 import {
