@@ -277,6 +277,39 @@ function detectGlides(fixes: IGCFix[], thermals: ThermalSegment[]): GlideSegment
     prevEnd = thermal.endIndex;
   }
 
+  // Trailing glide: from last thermal end (or start of flight) to end of track
+  const lastIdx = fixes.length - 1;
+  if (lastIdx > prevEnd + 10) {
+    const startIdx = prevEnd;
+    const endIdx = lastIdx;
+    const duration = (fixes[endIdx].time.getTime() - fixes[startIdx].time.getTime()) / 1000;
+
+    if (duration > 30) {
+      let totalDist = 0;
+      for (let i = startIdx; i < endIdx; i++) {
+        totalDist += haversineDistance(
+          fixes[i].latitude,
+          fixes[i].longitude,
+          fixes[i + 1].latitude,
+          fixes[i + 1].longitude
+        );
+      }
+
+      const altLoss = fixes[startIdx].gnssAltitude - fixes[endIdx].gnssAltitude;
+      const glideRatio = altLoss > 0 ? totalDist / altLoss : Infinity;
+
+      glides.push({
+        startIndex: startIdx,
+        endIndex: endIdx,
+        startAltitude: fixes[startIdx].gnssAltitude,
+        endAltitude: fixes[endIdx].gnssAltitude,
+        distance: totalDist,
+        glideRatio,
+        duration,
+      });
+    }
+  }
+
   return glides;
 }
 
