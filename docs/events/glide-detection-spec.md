@@ -115,18 +115,17 @@ The glide starts at `thermal.endIndex` (the previous thermal's end) and ends at 
 
 The first glide starts at index 0 of the flight fixes array (the takeoff point). If the pilot enters a thermal immediately after takeoff (within 10 fixes), no initial glide is created.
 
-### Trailing Glide (Missing)
+### Trailing Glide
 
-The algorithm does **not** detect a glide after the last thermal. After the loop processes all thermals, `prevEnd` holds the last thermal's `endIndex`, but no code creates a glide from there to the end of the flight.
+After the loop processes all thermals, the algorithm creates a final glide from the last thermal's `endIndex` to the end of the flight track (the last fix). The same minimum gap (10 fixes) and minimum duration (30 seconds) filters apply.
 
-This means:
-- The final glide to landing is not shown in the Glides or Sinks tabs.
-- The track segment after the last thermal is not selectable as a glide on the map.
-- Clicking on that portion of the track falls through to the closest-event logic instead.
+This ensures:
+- The final glide to landing is shown in the Glides and Sinks tabs.
+- The track segment after the last thermal is selectable as a glide on the map.
 
 ### No-Thermal Flights
 
-If no thermals are detected (e.g., a sled ride), no glides are created either, since glides are defined as gaps between thermals. The entire flight appears as a single unclassified segment.
+If no thermals are detected (e.g., a sled ride), `prevEnd` remains at 0 and the trailing glide logic creates a single glide spanning the entire flight from the first to the last fix. The flight appears as one glide segment with full statistics (distance, L/D, duration).
 
 ## Edge Cases
 
@@ -150,8 +149,6 @@ Since glide boundaries depend entirely on thermal boundaries:
 
 ## Known Limitations
 
-1. **No trailing glide** — the final glide after the last thermal is not detected.
-2. **No no-thermal glides** — flights without thermals produce zero glides.
-3. **Path distance vs. straight-line distance** — glide distance is the sum of fix-to-fix haversine distances (the path walked), not the straight-line distance. For straight glides these are nearly equal, but for glides with course changes the path distance will be longer.
-4. **L/D uses path distance** — the glide ratio uses path distance in the numerator. This slightly overstates L/D compared to the straight-line convention, especially for glides with significant course changes.
-5. **No wind correction** — glide performance is over the ground, not through the air. A glide into headwind will show a worse L/D than the same glide with a tailwind, even though the glider's aerodynamic performance is identical.
+1. **Path distance vs. straight-line distance** — glide distance is the sum of fix-to-fix haversine distances (the path walked), not the straight-line distance. For straight glides these are nearly equal, but for glides with course changes the path distance will be longer.
+2. **L/D uses path distance** — the glide ratio uses path distance in the numerator. This slightly overstates L/D compared to the straight-line convention, especially for glides with significant course changes.
+3. **No wind correction** — glide performance is over the ground, not through the air. A glide into headwind will show a worse L/D than the same glide with a tailwind, even though the glider's aerodynamic performance is identical.
