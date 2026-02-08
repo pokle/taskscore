@@ -554,6 +554,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         if (currentEvents.length > 0) {
           renderer.setEvents(currentEvents);
         }
+        updateTrackRendering();
       }
 
       // Add navigation controls
@@ -1489,8 +1490,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
                     chevronEl.style.alignItems = 'center';
                     chevronEl.style.justifyContent = 'center';
                     chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12" style="transform: rotate(${marker.bearing}deg);">
-                      <path d="M2 10 L10 2 L18 10" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
-                      <path d="M2 10 L10 2 L18 10" fill="none" stroke="#00ffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>`;
 
                     const chevronMarker = new mapboxgl.Marker({ element: chevronEl })
