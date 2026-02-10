@@ -26,6 +26,11 @@ struct FlightInfoView: View {
                     .font(.caption)
             }
 
+            if let taskDistance = summary.taskDistance {
+                Label("Task: \(taskDistance)", systemImage: "map")
+                    .font(.caption)
+            }
+
             Label("\(summary.eventCount) events", systemImage: "list.bullet")
                 .font(.caption)
         }

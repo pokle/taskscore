@@ -74,8 +74,9 @@ public struct GlideSegment: Sendable {
     public let duration: Double
 }
 
-/// XCTask types needed by event detector
-public struct XCTaskWaypoint: Sendable {
+/// XCTask types needed by event detector and task parsing
+
+public struct XCTaskWaypoint: Codable, Sendable {
     public let name: String
     public let description: String?
     public let lat: Double
@@ -92,7 +93,7 @@ public struct XCTaskWaypoint: Sendable {
     }
 }
 
-public struct XCTaskTurnpoint: Sendable {
+public struct XCTaskTurnpoint: Codable, Sendable {
     public let type: String? // "TAKEOFF", "SSS", "ESS"
     public let radius: Double
     public let waypoint: XCTaskWaypoint
@@ -104,19 +105,116 @@ public struct XCTaskTurnpoint: Sendable {
     }
 }
 
-public struct XCTask: Sendable {
+public struct SSSConfig: Codable, Sendable {
+    public let type: String       // "RACE" or "ELAPSED-TIME"
+    public let direction: String  // "ENTER" or "EXIT"
+    public let timeGates: [String]?
+
+    public init(type: String = "RACE", direction: String = "ENTER", timeGates: [String]? = nil) {
+        self.type = type
+        self.direction = direction
+        self.timeGates = timeGates
+    }
+}
+
+public struct GoalConfig: Codable, Sendable {
+    public let type: String       // "CYLINDER" or "LINE"
+    public let deadline: String?
+
+    public init(type: String = "CYLINDER", deadline: String? = nil) {
+        self.type = type
+        self.deadline = deadline
+    }
+}
+
+public struct TakeoffConfig: Codable, Sendable {
+    public let timeOpen: String?
+    public let timeClose: String?
+
+    public init(timeOpen: String? = nil, timeClose: String? = nil) {
+        self.timeOpen = timeOpen
+        self.timeClose = timeClose
+    }
+}
+
+public struct XCTask: Codable, Sendable {
     public let taskType: String
     public let version: Int
     public let earthModel: String?
     public let turnpoints: [XCTaskTurnpoint]
+    public let takeoff: TakeoffConfig?
+    public let sss: SSSConfig?
+    public let goal: GoalConfig?
 
     public init(taskType: String, version: Int, earthModel: String? = nil,
-                turnpoints: [XCTaskTurnpoint]) {
+                turnpoints: [XCTaskTurnpoint], takeoff: TakeoffConfig? = nil,
+                sss: SSSConfig? = nil, goal: GoalConfig? = nil) {
         self.taskType = taskType
         self.version = version
         self.earthModel = earthModel
         self.turnpoints = turnpoints
+        self.takeoff = takeoff
+        self.sss = sss
+        self.goal = goal
     }
+}
+
+// MARK: - AirScore Response Types
+
+public struct CompetitionInfo: Codable, Sendable {
+    public let name: String
+    public let compClass: String
+    public let taskName: String
+    public let date: String
+    public let taskType: String
+    public let taskDistance: Double
+    public let waypointDistance: Double
+    public let comment: String?
+    public let quality: Double
+    public let stopped: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case compClass = "class"
+        case taskName, date, taskType, taskDistance, waypointDistance
+        case comment, quality, stopped
+    }
+}
+
+public struct PilotResult: Codable, Sendable, Identifiable {
+    public let rank: Int
+    public let pilotId: String
+    public let name: String
+    public let nationality: String
+    public let glider: String
+    public let gliderClass: String
+    public let startTime: String?
+    public let finishTime: String?
+    public let duration: String?
+    public let distance: Double
+    public let speed: Double
+    public let score: Double
+    public let trackId: String?
+
+    public var id: String { pilotId }
+}
+
+public struct FormulaInfo: Codable, Sendable {
+    public let name: String
+    public let goalPenalty: Double
+    public let nominalGoal: String
+    public let minimumDistance: String
+    public let nominalDistance: String
+    public let nominalTime: String
+    public let arrivalScoring: String
+    public let heightBonus: String
+}
+
+public struct AirScoreTaskResponse: Codable, Sendable {
+    public let task: XCTask
+    public let competition: CompetitionInfo
+    public let pilots: [PilotResult]
+    public let formula: FormulaInfo
 }
 
 /// Style information for event display
