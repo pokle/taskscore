@@ -217,6 +217,53 @@ public struct AirScoreTaskResponse: Codable, Sendable {
     public let formula: FormulaInfo
 }
 
+/// Combined glide segment for the Glides tab
+public struct GlideData: Identifiable, Hashable {
+    public let id: String
+    public let startTime: Date
+    public let endTime: Date
+    public let startAltitude: Double
+    public let endAltitude: Double
+    public let distance: Double
+    public let duration: Double
+    public let averageSpeed: Double
+    public let glideRatio: Double
+    public let altitudeLost: Double
+    public let segment: TrackSegment
+    public let sourceEvent: FlightEvent
+}
+
+/// Combined thermal/climb segment for the Climbs tab
+public struct ClimbData: Identifiable, Hashable {
+    public let id: String
+    public let startTime: Date
+    public let endTime: Date
+    public let startAltitude: Double
+    public let endAltitude: Double
+    public let altitudeGain: Double
+    public let duration: Double
+    public let avgClimbRate: Double
+    public let segment: TrackSegment
+    public let sourceEvent: FlightEvent
+}
+
+/// Sink segment for the Sinks tab (glides with L/D ≤ 5:1)
+public struct SinkData: Identifiable, Hashable {
+    public let id: String
+    public let startTime: Date
+    public let endTime: Date
+    public let startAltitude: Double
+    public let endAltitude: Double
+    public let altitudeLost: Double
+    public let distance: Double
+    public let duration: Double
+    public let averageSpeed: Double
+    public let avgSinkRate: Double
+    public let glideRatio: Double
+    public let segment: TrackSegment
+    public let sourceEvent: FlightEvent
+}
+
 /// Style information for event display
 public struct EventStyle {
     public let icon: String

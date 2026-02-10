@@ -4,6 +4,14 @@ import SwiftUI
 struct FlightInfoView: View {
     let summary: FlightSummary
 
+    @AppStorage("altitudeUnit") private var altitudeUnit: String = AltitudeUnit.meters.rawValue
+    @AppStorage("distanceUnit") private var distanceUnit: String = DistanceUnit.km.rawValue
+
+    private var prefs: UnitPreferences {
+        UnitPreferences(speed: SpeedUnit.kmh.rawValue, altitude: altitudeUnit,
+                        distance: distanceUnit, climbRate: ClimbRateUnit.mps.rawValue)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if let pilot = summary.pilot {
@@ -21,13 +29,13 @@ struct FlightInfoView: View {
                     .font(.caption)
             }
 
-            if let maxAlt = summary.maxAltitude {
-                Label("Max: \(maxAlt)m", systemImage: "arrow.up")
+            if let maxAlt = summary.maxAltitudeMeters {
+                Label("Max: \(Units.formatAltitude(maxAlt, prefs: prefs).withUnit)", systemImage: "arrow.up")
                     .font(.caption)
             }
 
-            if let taskDistance = summary.taskDistance {
-                Label("Task: \(taskDistance)", systemImage: "map")
+            if let taskDist = summary.taskDistanceMeters {
+                Label("Task: \(Units.formatDistance(taskDist, prefs: prefs).withUnit)", systemImage: "map")
                     .font(.caption)
             }
 
