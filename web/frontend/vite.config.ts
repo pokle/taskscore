@@ -27,7 +27,7 @@ function airscoreWorkerCheck(): Plugin {
 
 export default defineConfig({
   root: 'src',
-  envDir: resolve(__dirname, '..'),
+  envDir: resolve(__dirname, '../..'),
   publicDir: '../public',
   plugins: [
     tailwindcss(),

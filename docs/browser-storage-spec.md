@@ -130,7 +130,7 @@ taskscore (database)
 
 ## Storage Service API
 
-### Location: `pages/src/analysis/storage.ts`
+### Location: `web/frontend/src/analysis/storage.ts`
 
 ```typescript
 /**
@@ -459,7 +459,7 @@ All list operations return empty arrays, get operations return null, store opera
 ## File Structure
 
 ```
-pages/src/analysis/
+web/frontend/src/analysis/
 ├── storage.ts          # StorageService class and exports
 ├── storage-menu.ts     # Command menu integration helpers
 └── main.ts             # Modified to use storage
@@ -496,7 +496,7 @@ Storage management features to implement:
 ### Automated Tests
 
 ```typescript
-// tests/storage.test.ts
+// web/analysis/tests/storage.test.ts
 describe('StorageService', () => {
   // Use fake-indexeddb for Node.js testing
 

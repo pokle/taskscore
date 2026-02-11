@@ -30,7 +30,7 @@ The publishable package is in `packages/css/` (not the monorepo root). Make sure
 
 ## Switching back to upstream
 
-When the fix is merged upstream, update `pages/package.json`:
+When the fix is merged upstream, update `web/frontend/package.json`:
 
 ```diff
 - "@pokle/basecoat-css": "0.3.10-beta.fork",
@@ -38,5 +38,5 @@ When the fix is merged upstream, update `pages/package.json`:
 ```
 
 And update the import paths in:
-- `pages/src/styles.css` — `@import "@pokle/basecoat-css"` → `@import "basecoat-css"`
-- `pages/src/analysis/main.ts` — `@pokle/basecoat-css/...` → `basecoat-css/...`
+- `web/frontend/src/styles.css` — `@import "@pokle/basecoat-css"` → `@import "basecoat-css"`
+- `web/frontend/src/analysis/main.ts` — `@pokle/basecoat-css/...` → `basecoat-css/...`

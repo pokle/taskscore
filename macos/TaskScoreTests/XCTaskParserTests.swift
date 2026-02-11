@@ -481,7 +481,7 @@ struct AirScoreURLParsingTests {
     @Test("should parse standard AirScore tracklog URL")
     func standardURL() {
         let url = "https://xc.highcloud.net/tracklog_map.html?trackid=43826&comPk=466&tasPk=2030"
-        let parsed = AirScoreClient.parseAirScoreURL(url)
+        let parsed = AirScoreURLParser.parse(url)
 
         #expect(parsed != nil)
         #expect(parsed!.comPk == 466)
@@ -492,7 +492,7 @@ struct AirScoreURLParsingTests {
     @Test("should handle URL without trackId")
     func noTrackId() {
         let url = "https://xc.highcloud.net/task_result.html?comPk=466&tasPk=2030"
-        let parsed = AirScoreClient.parseAirScoreURL(url)
+        let parsed = AirScoreURLParser.parse(url)
 
         #expect(parsed != nil)
         #expect(parsed!.comPk == 466)
@@ -502,14 +502,14 @@ struct AirScoreURLParsingTests {
 
     @Test("should return nil for invalid URL")
     func invalidURL() {
-        let parsed = AirScoreClient.parseAirScoreURL("not a url")
+        let parsed = AirScoreURLParser.parse("not a url")
         #expect(parsed == nil)
     }
 
     @Test("should return nil for URL missing comPk")
     func missingComPk() {
         let url = "https://xc.highcloud.net/tracklog_map.html?tasPk=2030"
-        let parsed = AirScoreClient.parseAirScoreURL(url)
+        let parsed = AirScoreURLParser.parse(url)
         #expect(parsed == nil)
     }
 }

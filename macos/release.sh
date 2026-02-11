@@ -45,7 +45,20 @@ ditto -c -k --keepParent TaskScore.app "$ZIP"
 echo "Creating GitHub release $TAG..."
 gh release create "$TAG" "$ZIP" \
     --title "TaskScore macOS $VERSION" \
-    --notes "TaskScore macOS app v${VERSION} (Apple Silicon)"
+    --notes "$(cat <<EOF
+TaskScore macOS app v${VERSION} (Apple Silicon)
+
+## Installation
+
+After downloading, you need to remove the quarantine attribute before opening:
+
+\`\`\`
+xattr -cr ~/Downloads/TaskScore.app
+\`\`\`
+
+The app is not signed with an Apple Developer certificate, so macOS Gatekeeper will block it. The usual right-click → Open workaround does not work for unsigned apps downloaded from the internet.
+EOF
+)"
 
 # Clean up zip
 rm "$ZIP"

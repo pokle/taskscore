@@ -76,7 +76,7 @@ When units are changed:
 ### File Structure
 
 ```
-/pages/src/analysis/
+/web/frontend/src/analysis/
 ├── config.ts           # Configuration storage abstraction
 ├── units.ts            # Unit conversion and formatting module
 ├── main.ts             # Wire up unit preferences and reactive updates
