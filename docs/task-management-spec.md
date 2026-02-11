@@ -16,7 +16,7 @@ When loading a track (IGC file), we need to find matching task files (.xctask). 
 
 ## Current State
 
-- **Frontend only** - No backend workers or D1 database yet (workers/ directory is empty)
+- **Frontend only** - No backend workers or D1 database yet (web/workers/ directory is empty)
 - **Command menu exists** - Uses native `<dialog>` with Basecoat styling
 - **No authentication** - Needs to be implemented first
 - **Task files** - Currently loaded from static `/data/tasks/` or fetched from xcontest.org
@@ -72,7 +72,7 @@ CREATE INDEX idx_tasks_date ON tasks(task_date);
 
 ### API Worker Endpoints
 
-**File: `/workers/api/src/index.ts`**
+**File: `/web/workers/api/src/index.ts`**
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
@@ -111,7 +111,7 @@ CREATE INDEX idx_tasks_date ON tasks(task_date);
 
 ### Command Menu Addition
 
-**File: `/pages/src/analysis.html`**
+**File: `/web/frontend/src/analysis.html`**
 
 Add menu item in the command menu:
 ```html
@@ -169,7 +169,7 @@ Add menu item in the command menu:
 
 ### Form Handler
 
-**File: `/pages/src/analysis/main.ts`**
+**File: `/web/frontend/src/analysis/main.ts`**
 
 ```typescript
 const createTaskDialog = document.getElementById('create-task-dialog') as HTMLDialogElement;
@@ -229,7 +229,7 @@ createTaskForm?.addEventListener('submit', async (e) => {
 
 ### Matching Algorithm
 
-**File: `/pages/src/analysis/task-matcher.ts`**
+**File: `/web/frontend/src/analysis/task-matcher.ts`**
 
 ```typescript
 import { haversineDistance } from './geo';
@@ -357,16 +357,16 @@ When multiple tasks match, show a selection dialog:
 ### New Files
 | File | Purpose |
 |------|---------|
-| `/workers/api/src/index.ts` | API Worker with task endpoints |
-| `/workers/api/wrangler.toml` | Worker configuration |
+| `/web/workers/api/src/index.ts` | API Worker with task endpoints |
+| `/web/workers/api/wrangler.toml` | Worker configuration |
 | `/schema.sql` | D1 database schema |
-| `/pages/src/analysis/task-matcher.ts` | Task matching logic |
+| `/web/frontend/src/analysis/task-matcher.ts` | Task matching logic |
 
 ### Modified Files
 | File | Changes |
 |------|---------|
-| `/pages/src/analysis.html` | Add "Create Task" menu item, dialogs |
-| `/pages/src/analysis/main.ts` | Add dialog handlers, task matching flow |
+| `/web/frontend/src/analysis.html` | Add "Create Task" menu item, dialogs |
+| `/web/frontend/src/analysis/main.ts` | Add dialog handlers, task matching flow |
 | `/wrangler.toml` | Add D1 binding configuration |
 
 ---
@@ -374,7 +374,7 @@ When multiple tasks match, show a selection dialog:
 ## Verification Steps
 
 1. **Database setup**: Run `wrangler d1 execute taskscore --file=schema.sql`
-2. **Worker deployment**: Run `wrangler deploy` in workers/api
+2. **Worker deployment**: Run `wrangler deploy` in web/workers/api
 3. **Create task**: Use command menu → Create Task → fill form
 4. **Verify storage**: Check D1 database has the task
 5. **Load track**: Load an IGC file and verify matching tasks appear

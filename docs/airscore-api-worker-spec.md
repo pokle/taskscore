@@ -4,7 +4,7 @@
 
 A Cloudflare Worker that acts as a caching proxy for the AirScore API, fetching task and track information and transforming it into a format compatible with the TaskScore analysis tool.
 
-**Implementation:** `workers/airscore-api/`
+**Implementation:** `web/workers/airscore-api/`
 
 ## Problem Statement
 
@@ -153,7 +153,7 @@ All errors return JSON:
 
 ## Frontend Integration
 
-The frontend client (`pages/src/analysis/airscore-client.ts`) automatically detects environment:
+The frontend client (`web/frontend/src/analysis/airscore-client.ts`) automatically detects environment:
 - **localhost** → `http://localhost:8787` (local worker)
 - **production** → `/api/airscore` (proxied through Pages)
 
@@ -172,7 +172,7 @@ The frontend client (`pages/src/analysis/airscore-client.ts`) automatically dete
 ### Deploy Command
 
 ```bash
-cd workers/airscore-api
+cd web/workers/airscore-api
 bun run deploy
 ```
 
@@ -208,11 +208,11 @@ Options for routing `taskscore.shonky.info/api/airscore/*` to the worker:
 
 | File | Purpose |
 |------|---------|
-| `workers/airscore-api/src/index.ts` | Entry point, routing, CORS |
-| `workers/airscore-api/src/types.ts` | TypeScript interfaces |
-| `workers/airscore-api/src/cache.ts` | KV caching utilities |
-| `workers/airscore-api/src/handlers/task.ts` | Task endpoint handler |
-| `workers/airscore-api/src/handlers/track.ts` | Track endpoint handler |
-| `workers/airscore-api/src/transforms/task.ts` | AirScore → XCTask transformation |
-| `workers/airscore-api/src/transforms/pilots.ts` | HTML parsing for pilot data |
-| `pages/src/analysis/airscore-client.ts` | Frontend API client |
+| `web/workers/airscore-api/src/index.ts` | Entry point, routing, CORS |
+| `web/workers/airscore-api/src/types.ts` | TypeScript interfaces |
+| `web/workers/airscore-api/src/cache.ts` | KV caching utilities |
+| `web/workers/airscore-api/src/handlers/task.ts` | Task endpoint handler |
+| `web/workers/airscore-api/src/handlers/track.ts` | Track endpoint handler |
+| `web/workers/airscore-api/src/transforms/task.ts` | AirScore → XCTask transformation |
+| `web/workers/airscore-api/src/transforms/pilots.ts` | HTML parsing for pilot data |
+| `web/frontend/src/analysis/airscore-client.ts` | Frontend API client |

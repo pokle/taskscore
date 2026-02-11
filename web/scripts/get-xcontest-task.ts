@@ -14,7 +14,7 @@
  */
 
 import { readFileSync } from 'fs';
-import { parseXCTask, isValidTask, type XCTask } from '../packages/analysis/src/xctsk-parser';
+import { parseXCTask, isValidTask, type XCTask } from '../analysis/src/xctsk-parser';
 
 async function fetchTaskByCode(code: string): Promise<XCTask> {
   const cleanCode = code.trim();

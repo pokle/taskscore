@@ -5,23 +5,23 @@
   "description": "Hanggliding/paragliding competition track log analysis",
   "type": "module",
   "scripts": {
-    "dev": "bun run --filter '@taskscore/pages' dev",
-    "build": "bun run --filter '@taskscore/pages' build",
-    "deploy": "bun run --filter '@taskscore/pages' deploy",
+    "dev": "bun run --filter '@taskscore/frontend' dev",
+    "build": "bun run --filter '@taskscore/frontend' build",
+    "deploy": "bun run --filter '@taskscore/frontend' deploy",
     "deploy:worker": "bun run --filter airscore-api deploy",
     "deploy:all": "bun run deploy && bun run deploy:worker",
     "deployments": "wrangler pages deployment list --project-name=taskscore --json | jq .",
     "typecheck": "tsc --noEmit",
-    "typecheck:analysis": "tsc --noEmit -p packages/analysis/tsconfig.json",
+    "typecheck:analysis": "tsc --noEmit -p web/analysis/tsconfig.json",
     "typecheck:worker": "bun run --filter airscore-api typecheck",
     "typecheck:all": "bun run typecheck && bun run typecheck:analysis && bun run typecheck:worker",
     "test": "bun test",
-    "get-xcontest-task": "tsx scripts/get-xcontest-task.ts"
+    "get-xcontest-task": "tsx web/scripts/get-xcontest-task.ts"
   },
   "workspaces": [
-    "packages/*",
-    "pages",
-    "workers/*"
+    "web/analysis",
+    "web/frontend",
+    "web/workers/*"
   ],
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260109.0",

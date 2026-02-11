@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'bun:test';
-import { detectFlightEvents, filterEventsByBounds, getEventStyle, FlightEvent } from '../packages/analysis/src/event-detector';
-import { IGCFix } from '../packages/analysis/src/igc-parser';
-import { XCTask } from '../packages/analysis/src/xctsk-parser';
+import { detectFlightEvents, filterEventsByBounds, getEventStyle, FlightEvent } from '../src/event-detector';
+import { IGCFix } from '../src/igc-parser';
+import { XCTask } from '../src/xctsk-parser';
 
 /**
  * Helper to create a mock fix

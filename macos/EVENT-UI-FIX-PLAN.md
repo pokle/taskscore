@@ -1,6 +1,6 @@
 # macOS Event UI Fix Plan
 
-The macOS event sidebar (EventListView) does not match the glide-detection-spec or the web reference implementation (`pages/src/analysis/event-panel.ts`). The three specialized tabs (Glides, Climbs, Sinks) use a generic event row instead of combined segment cards with detailed statistics, and the Sinks filter is fundamentally broken.
+The macOS event sidebar (EventListView) does not match the glide-detection-spec or the web reference implementation (`web/frontend/src/analysis/event-panel.ts`). The three specialized tabs (Glides, Climbs, Sinks) use a generic event row instead of combined segment cards with detailed statistics, and the Sinks filter is fundamentally broken.
 
 ## Files to change
 

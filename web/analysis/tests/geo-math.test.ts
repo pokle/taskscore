@@ -13,8 +13,8 @@ import {
   haversineDistance as oldHaversineDistance,
   getBoundingBox as oldGetBoundingBox,
   calculateBearing as oldCalculateBearing,
-} from '../packages/analysis/src/geo';
-import type { IGCFix } from '../packages/analysis/src/igc-parser';
+} from '../src/geo';
+import type { IGCFix } from '../src/igc-parser';
 
 // Import new Turf.js implementations
 import {
@@ -25,7 +25,7 @@ import {
   calculateBearingRadians as turfCalculateBearingRadians,
   isInsideCylinder as turfIsInsideCylinder,
   getCirclePoints
-} from '../packages/analysis/src/geo';
+} from '../src/geo';
 
 // Use the old implementations by default for backwards compatibility tests
 const haversineDistance = oldHaversineDistance;

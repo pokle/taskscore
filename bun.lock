@@ -18,7 +18,7 @@
         "wrangler": "^4.61.0",
       },
     },
-    "packages/analysis": {
+    "web/analysis": {
       "name": "@taskscore/analysis",
       "version": "0.1.0",
       "dependencies": {
@@ -29,8 +29,8 @@
         "@turf/helpers": "^7.3.2",
       },
     },
-    "pages": {
-      "name": "@taskscore/pages",
+    "web/frontend": {
+      "name": "@taskscore/frontend",
       "version": "0.1.0",
       "dependencies": {
         "@taskscore/analysis": "workspace:*",
@@ -47,7 +47,7 @@
         "wrangler": "^4.63.0",
       },
     },
-    "workers/airscore-api": {
+    "web/workers/airscore-api": {
       "name": "airscore-api",
       "version": "1.0.0",
       "devDependencies": {
@@ -298,9 +298,9 @@
 
     "@tailwindcss/vite": ["@tailwindcss/vite@4.1.18", "", { "dependencies": { "@tailwindcss/node": "4.1.18", "@tailwindcss/oxide": "4.1.18", "tailwindcss": "4.1.18" }, "peerDependencies": { "vite": "^5.2.0 || ^6 || ^7" } }, "sha512-jVA+/UpKL1vRLg6Hkao5jldawNmRo7mQYrZtNHMIVpLfLhDml5nMRUo/8MwoX2vNXvnaXNNMedrMfMugAVX1nA=="],
 
-    "@taskscore/analysis": ["@taskscore/analysis@workspace:packages/analysis"],
+    "@taskscore/analysis": ["@taskscore/analysis@workspace:web/analysis"],
 
-    "@taskscore/pages": ["@taskscore/pages@workspace:pages"],
+    "@taskscore/frontend": ["@taskscore/frontend@workspace:web/frontend"],
 
     "@turf/bbox": ["@turf/bbox@7.3.3", "", { "dependencies": { "@turf/helpers": "7.3.3", "@turf/meta": "7.3.3", "@types/geojson": "^7946.0.10", "tslib": "^2.8.1" } }, "sha512-1zNO/JUgDp0N+3EG5fG7+8EolE95OW1LD8ur0hRP0JK+lRyN0gAvJT7n1I9pu/NIqTa8x/zXxGRc1dcOdohYkg=="],
 
@@ -332,7 +332,7 @@
 
     "@types/supercluster": ["@types/supercluster@7.1.3", "", { "dependencies": { "@types/geojson": "*" } }, "sha512-Z0pOY34GDFl3Q6hUFYf3HkTwKEE02e7QgtJppBt+beEAxnyOpJua+voGFvxINBHa06GwLFFym7gRPY2SiKIfIA=="],
 
-    "airscore-api": ["airscore-api@workspace:workers/airscore-api"],
+    "airscore-api": ["airscore-api@workspace:web/workers/airscore-api"],
 
     "blake3-wasm": ["blake3-wasm@2.1.5", "", {}, "sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g=="],
 
