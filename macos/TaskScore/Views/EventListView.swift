@@ -209,7 +209,7 @@ struct GlideRowView: View {
             HStack(spacing: 8) {
                 Text("L/D \(formatGlideRatio(glide.glideRatio))")
                 Text(Units.formatSpeed(glide.averageSpeed, prefs: prefs).withUnit)
-                Text("-\(Units.formatAltitude(glide.altitudeLost, prefs: prefs).withUnit)")
+                Text(Units.formatAltitude(abs(glide.altitudeLost), prefs: prefs).withUnit)
                 Text(formatDuration(glide.duration))
             }
             .font(.caption)
@@ -344,7 +344,7 @@ struct SinkRowView: View {
                 Text("#\(rank)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                Text("-\(Units.formatAltitude(sink.altitudeLost, prefs: prefs).withUnit)")
+                Text(Units.formatAltitude(sink.altitudeLost, prefs: prefs).withUnit)
                     .font(.body.bold())
                 Spacer()
                 Text(formatTimeRange(sink.startTime, sink.endTime))
