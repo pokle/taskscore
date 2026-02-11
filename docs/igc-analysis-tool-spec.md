@@ -5,7 +5,7 @@
 The IGC Analysis Tool is a browser-based flight analysis application that allows pilots to visualize and analyze their paragliding/hanggliding flights. It parses IGC files, displays the track on an interactive 3D map, and detects flight events for analysis.
 
 Single page app
-- source `pages/src/analysis.html`
+- source `web/frontend/src/analysis.html`
 - Deployed to https://taskscore.shonky.info/analysis
 
 ## Features
@@ -200,7 +200,7 @@ This visual system helps pilots quickly identify and understand the spatial exte
 ## Technical Architecture
 
 ```
-/pages/src/
+/web/frontend/src/
 ├── analysis.html       # Main HTML page with Tailwind/Basecoat layout
 ├── styles.css          # Global styles (Tailwind, Basecoat, MapBox CSS)
 └── analysis/

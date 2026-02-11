@@ -16,22 +16,22 @@ The macOS app lives alongside the existing web project in a single repository. T
 
 ```
 taskscore/
-├── pages/                      # (existing) Web frontend
-├── packages/analysis/          # (existing) TS analysis engine
-├── workers/                    # (existing) Cloudflare Workers
+├── web/frontend/               # (existing) Web frontend
+├── web/analysis/               # (existing) TS analysis engine
+├── web/workers/                # (existing) Cloudflare Workers
 ├── macos/                      # NEW — Xcode project
 │   ├── TaskScore.xcodeproj
 │   ├── TaskScore/
 │   │   ├── TaskScoreApp.swift
-│   │   ├── Analysis/           # Swift port of packages/analysis
+│   │   ├── Analysis/           # Swift port of web/analysis
 │   │   ├── Models/
 │   │   ├── Views/
 │   │   └── Services/
 │   └── TaskScoreTests/
-├── tests/
+├── web/analysis/tests/
 │   └── fixtures/               # Shared test IGC files + expected outputs
 ├── docs/                       # (existing) Shared specs
-├── scripts/                    # (existing)
+├── web/scripts/                # (existing)
 └── .github/workflows/
     ├── web.yml                 # (existing, add path filter)
     └── macos.yml               # NEW — Xcode build + test
@@ -43,12 +43,12 @@ taskscore/
 # .github/workflows/web.yml
 on:
   push:
-    paths: ['pages/**', 'workers/**', 'packages/**']
+    paths: ['web/frontend/**', 'web/workers/**', 'web/analysis/**']
 
 # .github/workflows/macos.yml
 on:
   push:
-    paths: ['macos/**', 'tests/fixtures/**']
+    paths: ['macos/**', 'web/analysis/tests/fixtures/**']
 ```
 
 Changes to shared test fixtures trigger both pipelines — which is exactly the desired behavior, since both parsers must agree on the same inputs.

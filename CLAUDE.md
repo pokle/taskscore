@@ -60,15 +60,15 @@ bun run deploy:all   # Deploy Pages + all Workers
 
 ## Workers Development
 
-Workers are located in `/workers/` with each worker in its own subdirectory.
+Workers are located in `/web/workers/` with each worker in its own subdirectory.
 
-### AirScore API Worker (`workers/airscore-api`)
+### AirScore API Worker (`web/workers/airscore-api`)
 
 Caching proxy for the AirScore API that transforms task/track data for the analysis tool.
 
 **Local Development:**
 ```bash
-cd workers/airscore-api
+cd web/workers/airscore-api
 bun install                    # Install worker dependencies
 bun run dev                    # Start local worker at http://localhost:8787
 ```
@@ -87,7 +87,7 @@ curl "http://localhost:8787/"
 
 **Deploy to Cloudflare:**
 ```bash
-cd workers/airscore-api
+cd web/workers/airscore-api
 
 # First time: Create KV namespace for caching
 wrangler kv:namespace create AIRSCORE_CACHE
@@ -107,13 +107,13 @@ curl "https://airscore-api.{account}.workers.dev/api/airscore/task?comPk=466&tas
 
 **Type Checking:**
 ```bash
-cd workers/airscore-api
+cd web/workers/airscore-api
 bun run typecheck
 ```
 
 **Clear Local Cache:**
 ```bash
-cd workers/airscore-api
+cd web/workers/airscore-api
 bun run clear-cache  # Removes .wrangler/state (local KV data)
 ```
 
@@ -123,13 +123,13 @@ For full local development with both Pages and Workers:
 
 ```bash
 # Terminal 1: Start the worker
-cd workers/airscore-api && bun run dev
+cd web/workers/airscore-api && bun run dev
 
 # Terminal 2: Start the Pages dev server
 bun run dev
 ```
 
-The frontend's AirScore client (`pages/src/analysis/airscore-client.ts`) automatically connects to `localhost:8787` in development mode.
+The frontend's AirScore client (`web/frontend/src/analysis/airscore-client.ts`) automatically connects to `localhost:8787` in development mode.
 
 **Loading AirScore Tasks in the UI:**
 
@@ -142,17 +142,21 @@ Users can load task and track data from AirScore directly in the analysis tool:
 ## Project Structure
 
 ```
-/pages/                    - Cloudflare Pages frontend
-  /public/                 - Static assets (HTML, CSS, etc.)
-  /src/                    - TypeScript source
-    /analysis/             - IGC analysis tool modules
-      airscore-client.ts   - Client for AirScore API worker
-/workers/                  - Cloudflare Workers
-  /airscore-api/           - AirScore caching proxy (implemented)
-    /src/                  - Worker source code
-    wrangler.toml          - Worker configuration
-/scripts/                  - Utility scripts for testing and development
-/tests/                    - Test files
+/web/                      - All web application code
+  /frontend/               - Cloudflare Pages frontend (was pages/)
+    /public/               - Static assets (HTML, CSS, etc.)
+    /src/                  - TypeScript source
+      /analysis/           - IGC analysis tool modules
+        airscore-client.ts - Client for AirScore API worker
+  /analysis/               - Shared analysis library (was packages/analysis/)
+    /src/                  - Library source code
+    /tests/                - Test files (was root tests/)
+  /workers/                - Cloudflare Workers (was workers/)
+    /airscore-api/         - AirScore caching proxy
+      /src/                - Worker source code
+      wrangler.toml        - Worker configuration
+  /scripts/                - Utility scripts (was scripts/)
+/macos/                    - macOS native app
 /docs/                     - Feature and architecture specifications
   /events/                 - Event detection algorithm specs
 /explorations/             - Experimental code (NOT for production use)
@@ -175,11 +179,11 @@ Users can load task and track data from AirScore directly in the analysis tool:
 - Styling uses [Tailwind CSS](https://tailwindcss.com/) for utility-first CSS
 - UI components use [Basecoat](https://basecoatui.com/) - a lightweight component library built on Tailwind (using forked `@pokle/basecoat-css`, see `docs/basecoat-fork.md`)
 - Tailwind is configured via `@tailwindcss/vite` plugin in `vite.config.ts`
-- Main stylesheet at `pages/src/styles.css` imports Tailwind, Basecoat, and MapBox GL CSS
+- Main stylesheet at `web/frontend/src/styles.css` imports Tailwind, Basecoat, and MapBox GL CSS
 
 **Setup:**
 ```css
-/* pages/src/styles.css */
+/* web/frontend/src/styles.css */
 @import "tailwindcss";
 @import "@pokle/basecoat-css";
 @import "mapbox-gl/dist/mapbox-gl.css";
@@ -219,7 +223,7 @@ Users can load task and track data from AirScore directly in the analysis tool:
 import { haversineDistance, calculateBearing, destinationPoint, getBoundingBox, isInsideCylinder, getCirclePoints } from './geo';
 ```
 
-**Available functions in `pages/src/analysis/geo.ts`:**
+**Available functions in `web/frontend/src/analysis/geo.ts`:**
 - `haversineDistance(lat1, lon1, lat2, lon2)` - Distance between two points in meters
 - `calculateBearing(lat1, lon1, lat2, lon2)` - Bearing in degrees (-180 to 180)
 - `calculateBearingRadians(lat1, lon1, lat2, lon2)` - Bearing in radians

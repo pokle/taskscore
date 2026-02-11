@@ -13,11 +13,11 @@
     "types": ["@cloudflare/workers-types", "@types/node", "bun"]
   },
   "include": [
-    "packages/*/src/**/*",
-    "pages/src/**/*",
-    "workers/**/*",
-    "tests/**/*",
-    "scripts/**/*"
+    "web/analysis/src/**/*",
+    "web/frontend/src/**/*",
+    "web/workers/**/*",
+    "web/analysis/tests/**/*",
+    "web/scripts/**/*"
   ],
   "exclude": [
     "node_modules",
