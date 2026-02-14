@@ -12,13 +12,13 @@ enum SampleFlights {
 
         let trackDest = FileStore.tracksURL.appending(path: sampleTrackFilename)
         if !fm.fileExists(atPath: trackDest.path),
-           let src = Bundle.module.url(forResource: "durand_45515_050126", withExtension: "igc") {
+           let src = Bundle.main.url(forResource: "durand_45515_050126", withExtension: "igc") {
             try? fm.copyItem(at: src, to: trackDest)
         }
 
         let taskDest = FileStore.tasksURL.appending(path: sampleTaskFilename)
         if !fm.fileExists(atPath: taskDest.path),
-           let src = Bundle.module.url(forResource: "buje", withExtension: "xctask") {
+           let src = Bundle.main.url(forResource: "buje", withExtension: "xctask") {
             try? fm.copyItem(at: src, to: taskDest)
         }
     }
@@ -27,12 +27,12 @@ enum SampleFlights {
     static var trackURL: URL? {
         let docURL = FileStore.tracksURL.appending(path: sampleTrackFilename)
         if FileManager.default.fileExists(atPath: docURL.path) { return docURL }
-        return Bundle.module.url(forResource: "durand_45515_050126", withExtension: "igc")
+        return Bundle.main.url(forResource: "durand_45515_050126", withExtension: "igc")
     }
 
     static var taskURL: URL? {
         let docURL = FileStore.tasksURL.appending(path: sampleTaskFilename)
         if FileManager.default.fileExists(atPath: docURL.path) { return docURL }
-        return Bundle.module.url(forResource: "buje", withExtension: "xctask")
+        return Bundle.main.url(forResource: "buje", withExtension: "xctask")
     }
 }

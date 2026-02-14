@@ -9,8 +9,30 @@ struct ContentView: View {
     @State private var selectedEvent: FlightEvent?
     @State private var eventFilter: EventFilter = .all
     @State private var showAirScoreSheet = false
+    @State private var showIGCImporter = false
+    @State private var showXCTaskImporter = false
+    #if os(iOS)
+    @State private var showSettings = false
+    @State private var showEventList = true
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
 
     var body: some View {
+        #if os(iOS)
+        if horizontalSizeClass == .compact {
+            iPhoneLayout
+        } else {
+            iPadLayout
+        }
+        #else
+        macOSLayout
+        #endif
+    }
+
+    // MARK: - macOS Layout
+
+    #if os(macOS)
+    private var macOSLayout: some View {
         NavigationSplitView {
             EventListView(
                 events: viewModel.events,
@@ -22,36 +44,7 @@ struct ContentView: View {
             )
             .navigationTitle("Events")
         } detail: {
-            MapView(
-                fixes: viewModel.fixes,
-                events: viewModel.events,
-                task: viewModel.task,
-                selectedEvent: $selectedEvent
-            )
-            .overlay(alignment: .topTrailing) {
-                if let summary = viewModel.summary {
-                    FlightInfoView(summary: summary)
-                        .padding()
-                }
-            }
-            .overlay(alignment: .center) {
-                if viewModel.isLoading {
-                    ProgressView("Loading...")
-                        .padding()
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .padding(8)
-                        .background(.red.opacity(0.8), in: RoundedRectangle(cornerRadius: 6))
-                        .padding()
-                        .onTapGesture { viewModel.errorMessage = nil }
-                }
-            }
+            mapDetailView
         }
         .sheet(isPresented: $showAirScoreSheet) {
             AirScoreLoadView(isLoading: $viewModel.isLoading) { comPk, tasPk, trackId in
@@ -59,10 +52,10 @@ struct ContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openIGCFile)) { _ in
-            openIGCFile()
+            showIGCImporter = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .openXCTaskFile)) { _ in
-            openXCTaskFile()
+            showXCTaskImporter = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .loadAirScoreTask)) { _ in
             showAirScoreSheet = true
@@ -71,29 +64,225 @@ struct ContentView: View {
             openSampleFlight()
         }
         .focusedSceneValue(\.eventFilter, $eventFilter)
+        .fileImporter(isPresented: $showIGCImporter, allowedContentTypes: igcContentTypes) { result in
+            handleFileImport(result) { url in viewModel.loadIGCFile(from: url) }
+        }
+        .fileImporter(isPresented: $showXCTaskImporter, allowedContentTypes: taskContentTypes) { result in
+            handleFileImport(result) { url in viewModel.loadXCTaskFile(from: url) }
+        }
     }
+    #endif
 
-    private func openIGCFile() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.plainText, UTType(filenameExtension: "igc") ?? .plainText]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Select an IGC flight log file"
+    // MARK: - iPad Layout
 
-        if panel.runModal() == .OK, let url = panel.url {
-            viewModel.loadIGCFile(from: url)
+    #if os(iOS)
+    private var iPadLayout: some View {
+        NavigationSplitView {
+            EventListView(
+                events: viewModel.events,
+                glides: viewModel.extractGlides(),
+                climbs: viewModel.extractClimbs(),
+                sinks: viewModel.extractSinks(),
+                selectedEvent: $selectedEvent,
+                filter: $eventFilter
+            )
+            .navigationTitle("Events")
+            .toolbar { iOSToolbar }
+        } detail: {
+            mapDetailView
+        }
+        .sheet(isPresented: $showAirScoreSheet) {
+            AirScoreLoadView(isLoading: $viewModel.isLoading) { comPk, tasPk, trackId in
+                viewModel.loadFromAirScore(comPk: comPk, tasPk: tasPk, trackId: trackId)
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            NavigationStack {
+                SettingsView()
+                    .navigationTitle("Settings")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showSettings = false }
+                        }
+                    }
+            }
+        }
+        .fileImporter(isPresented: $showIGCImporter, allowedContentTypes: igcContentTypes) { result in
+            handleFileImport(result) { url in viewModel.loadIGCFile(from: url) }
+        }
+        .fileImporter(isPresented: $showXCTaskImporter, allowedContentTypes: taskContentTypes) { result in
+            handleFileImport(result) { url in viewModel.loadXCTaskFile(from: url) }
         }
     }
 
-    private func openXCTaskFile() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json, UTType(filenameExtension: "xctsk") ?? .json]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Select an XCTask file"
+    // MARK: - iPhone Layout
 
-        if panel.runModal() == .OK, let url = panel.url {
-            viewModel.loadXCTaskFile(from: url)
+    private var iPhoneLayout: some View {
+        mapDetailView
+            .overlay(alignment: .topTrailing) {
+                iPhoneMenuButtons
+            }
+            .sheet(isPresented: $showEventList) {
+                NavigationStack {
+                    EventListView(
+                        events: viewModel.events,
+                        glides: viewModel.extractGlides(),
+                        climbs: viewModel.extractClimbs(),
+                        sinks: viewModel.extractSinks(),
+                        selectedEvent: $selectedEvent,
+                        filter: $eventFilter
+                    )
+                    .navigationTitle("Events")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+                .presentationDetents([.fraction(0.15), .medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                .interactiveDismissDisabled()
+            }
+            .sheet(isPresented: $showAirScoreSheet) {
+                AirScoreLoadView(isLoading: $viewModel.isLoading) { comPk, tasPk, trackId in
+                    viewModel.loadFromAirScore(comPk: comPk, tasPk: tasPk, trackId: trackId)
+                }
+            }
+            .sheet(isPresented: $showSettings) {
+                NavigationStack {
+                    SettingsView()
+                        .navigationTitle("Settings")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { showSettings = false }
+                            }
+                        }
+                }
+            }
+            .fileImporter(isPresented: $showIGCImporter, allowedContentTypes: igcContentTypes) { result in
+                handleFileImport(result) { url in viewModel.loadIGCFile(from: url) }
+            }
+            .fileImporter(isPresented: $showXCTaskImporter, allowedContentTypes: taskContentTypes) { result in
+                handleFileImport(result) { url in viewModel.loadXCTaskFile(from: url) }
+            }
+    }
+
+    private var iPhoneMenuButtons: some View {
+        HStack(spacing: 8) {
+            Menu {
+                Button { showIGCImporter = true } label: {
+                    Label("Open IGC File", systemImage: "doc")
+                }
+                Button { showXCTaskImporter = true } label: {
+                    Label("Open Task File", systemImage: "map")
+                }
+                Button { showAirScoreSheet = true } label: {
+                    Label("Load AirScore Task", systemImage: "cloud.fill")
+                }
+                Divider()
+                Button { openSampleFlight() } label: {
+                    Label("Sample Flight", systemImage: "paperplane")
+                }
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title2)
+                    .symbolRenderingMode(.hierarchical)
+            }
+
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.title2)
+                    .symbolRenderingMode(.hierarchical)
+            }
+        }
+        .padding(12)
+    }
+
+    @ToolbarContentBuilder
+    private var iOSToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
+            Menu {
+                Button { showIGCImporter = true } label: {
+                    Label("Open IGC File", systemImage: "doc")
+                }
+                Button { showXCTaskImporter = true } label: {
+                    Label("Open Task File", systemImage: "map")
+                }
+                Button { showAirScoreSheet = true } label: {
+                    Label("Load AirScore Task", systemImage: "cloud.fill")
+                }
+                Divider()
+                Button { openSampleFlight() } label: {
+                    Label("Sample Flight", systemImage: "paperplane")
+                }
+            } label: {
+                Image(systemName: "plus.circle")
+            }
+
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape")
+            }
+        }
+    }
+    #endif
+
+    // MARK: - Shared Views
+
+    private var mapDetailView: some View {
+        MapView(
+            fixes: viewModel.fixes,
+            events: viewModel.events,
+            task: viewModel.task,
+            selectedEvent: $selectedEvent
+        )
+        .overlay(alignment: .topTrailing) {
+            if let summary = viewModel.summary {
+                FlightInfoView(summary: summary)
+                    .padding()
+                    #if os(iOS)
+                    .padding(.top, 32) // avoid iPhone menu buttons
+                    #endif
+            }
+        }
+        .overlay(alignment: .center) {
+            if viewModel.isLoading {
+                ProgressView("Loading...")
+                    .padding()
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let error = viewModel.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.white)
+                    .padding(8)
+                    .background(.red.opacity(0.8), in: RoundedRectangle(cornerRadius: 6))
+                    .padding()
+                    .onTapGesture { viewModel.errorMessage = nil }
+            }
+        }
+    }
+
+    // MARK: - File Import
+
+    private var igcContentTypes: [UTType] {
+        [UTType(filenameExtension: "igc") ?? .plainText, .plainText]
+    }
+
+    private var taskContentTypes: [UTType] {
+        [UTType(filenameExtension: "xctsk") ?? .json, .json]
+    }
+
+    private func handleFileImport(_ result: Result<URL, Error>, load: (URL) -> Void) {
+        switch result {
+        case .success(let url):
+            let gotAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if gotAccess { url.stopAccessingSecurityScopedResource() }
+            }
+            load(url)
+        case .failure(let error):
+            viewModel.errorMessage = error.localizedDescription
         }
     }
 
@@ -120,6 +309,7 @@ enum EventFilter: String, CaseIterable {
 
 // MARK: - FocusedValue for event filter binding
 
+#if os(macOS)
 struct EventFilterKey: FocusedValueKey {
     typealias Value = Binding<EventFilter>
 }
@@ -130,6 +320,7 @@ extension FocusedValues {
         set { self[EventFilterKey.self] = newValue }
     }
 }
+#endif
 
 /// View model managing flight data and analysis
 @Observable
