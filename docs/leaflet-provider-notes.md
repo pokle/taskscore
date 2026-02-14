@@ -71,6 +71,31 @@ Tailwind's preflight styles affect Leaflet elements:
 
 Dark mode overrides for Leaflet controls need to be placed outside `@layer` blocks in `styles.css` to override Leaflet's own CSS. We use CSS custom properties (`var(--background)`, `var(--foreground)`, etc.) for theming consistency.
 
+## Turnpoint Labels: DivIcon vs Tooltip
+
+**Symptom:** Turnpoint name labels rendered inside a white rectangular box (Leaflet's default tooltip styling), obscuring the map underneath.
+
+**Root cause:** `bindTooltip()` wraps content in Leaflet's `.leaflet-tooltip` container which has background, border, box-shadow, and a `::before` pseudo-element arrow. Overriding all of this via CSS requires multiple `!important` rules and still leaves artifacts (the tooltip container div with padding/layout).
+
+**Fix:** Replaced `bindTooltip()` with a `DivIcon` marker using inline text-shadow for readability — the same approach used for leg distance labels:
+
+```typescript
+const labelIcon = new DivIcon({
+  html: `<div style="
+    font-size: 12px; font-weight: 600; color: #1e293b;
+    white-space: nowrap;
+    text-shadow: -1px -1px 2px white, 1px -1px 2px white,
+                 -1px 1px 2px white, 1px 1px 2px white, 0 0 4px white;
+  ">${label}</div>`,
+  className: '',   // prevents Leaflet's default marker styling
+  iconSize: [0, 0],
+  iconAnchor: [0, 12],  // offset above the turnpoint dot
+});
+taskGroup.addLayer(new Marker(latlng, { icon: labelIcon, interactive: false }));
+```
+
+**Key takeaway:** For text-only labels on a Leaflet map, prefer `DivIcon` with `className: ''` over `bindTooltip({ permanent: true })`. DivIcon gives full control over styling with no Leaflet CSS to fight against. Use multi-directional text-shadow as a lightweight halo for readability over varied map backgrounds.
+
 ## Leaflet 2.0 ESM API
 
 Leaflet 2.0 uses ESM imports with `new` constructors instead of the `L.marker()` factory pattern:

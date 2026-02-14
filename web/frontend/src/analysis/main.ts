@@ -99,7 +99,7 @@ async function init(): Promise<void> {
 
   // Map provider switch menu
   const menuSwitchMap = document.getElementById('menu-switch-map');
-  const mapProviderStatus = document.getElementById('map-provider-status');
+  const mapProviderLabel = document.getElementById('map-provider-label');
 
   if (!mapContainer || !eventPanelContainer) {
     console.error('Required containers not found');
@@ -123,9 +123,10 @@ async function init(): Promise<void> {
     return;
   }
 
-  // Update provider status in command menu
-  if (mapProviderStatus) {
-    mapProviderStatus.textContent = providerType === 'leaflet' ? '(Leaflet)' : '(MapBox)';
+  // Update provider label in command menu to show the target provider
+  if (mapProviderLabel) {
+    const targetProvider = providerType === 'leaflet' ? 'MapBox' : 'Leaflet';
+    mapProviderLabel.textContent = `Switch Map Provider to ${targetProvider}`;
   }
 
   // Load waypoint database for enriching IGC tasks

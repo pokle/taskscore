@@ -79,20 +79,37 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
       });
 
     // Tile layers
-    const outdoors = new TileLayer(TILE_LAYERS.outdoors.url, TILE_LAYERS.outdoors.options);
-    const streets = new TileLayer(TILE_LAYERS.streets.url, TILE_LAYERS.streets.options);
-    const satellite = new TileLayer(TILE_LAYERS.satellite.url, TILE_LAYERS.satellite.options);
+    const tileLayerEntries = {
+      outdoors: new TileLayer(TILE_LAYERS.outdoors.url, TILE_LAYERS.outdoors.options),
+      streets: new TileLayer(TILE_LAYERS.streets.url, TILE_LAYERS.streets.options),
+      satellite: new TileLayer(TILE_LAYERS.satellite.url, TILE_LAYERS.satellite.options),
+    };
 
-    // Default layer
-    outdoors.addTo(map);
+    // Restore saved tile layer or default to outdoors
+    const savedStyle = config.getPreferences().mapStyle;
+    const initialKey = savedStyle && savedStyle in tileLayerEntries
+      ? savedStyle as keyof typeof tileLayerEntries
+      : 'outdoors';
+    tileLayerEntries[initialKey].addTo(map);
 
     // Layer control
     const baseLayers: Record<string, TileLayer> = {
-      [TILE_LAYERS.outdoors.name]: outdoors,
-      [TILE_LAYERS.streets.name]: streets,
-      [TILE_LAYERS.satellite.name]: satellite,
+      [TILE_LAYERS.outdoors.name]: tileLayerEntries.outdoors,
+      [TILE_LAYERS.streets.name]: tileLayerEntries.streets,
+      [TILE_LAYERS.satellite.name]: tileLayerEntries.satellite,
     };
     new Control.Layers(baseLayers, null, { position: 'topleft' }).addTo(map);
+
+    // Save tile layer preference on change
+    const nameToKey: Record<string, string> = {
+      [TILE_LAYERS.outdoors.name]: 'outdoors',
+      [TILE_LAYERS.streets.name]: 'streets',
+      [TILE_LAYERS.satellite.name]: 'satellite',
+    };
+    map.on('baselayerchange', (e: { name: string }) => {
+      const key = nameToKey[e.name];
+      if (key) config.setPreferences({ mapStyle: key });
+    });
 
     // Scale control
     new Control.Scale({ maxWidth: 200 }).addTo(map);
@@ -449,12 +466,21 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
           if (role) labelParts.push(role);
           const label = labelParts.join(', ');
 
-          dot.bindTooltip(label, {
-            permanent: true,
-            direction: 'top',
-            offset: [0, -12],
-            className: 'leaflet-tp-label',
+          const labelIcon = new DivIcon({
+            html: `<div style="
+              font-family: ${MAP_FONT_FAMILY};
+              font-size: 12px;
+              font-weight: 600;
+              color: #1e293b;
+              white-space: nowrap;
+              text-shadow: -1px -1px 2px white, 1px -1px 2px white, -1px 1px 2px white, 1px 1px 2px white, 0 0 4px white;
+              text-align: center;
+            ">${label}</div>`,
+            className: '',
+            iconSize: [0, 0],
+            iconAnchor: [0, 12],
           });
+          taskGroup.addLayer(new Marker(latlng, { icon: labelIcon, interactive: false }));
 
           // Click handler
           const tpIndex = idx;
