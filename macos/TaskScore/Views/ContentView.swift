@@ -347,7 +347,7 @@ struct ContentView: View {
             openURL(url) { accepted in
                 if !accepted {
                     UIPasteboard.general.string = email
-                    viewModel.errorMessage = "No email app found. Email address copied to clipboard: \(email)"
+                    viewModel.errorMessage = "Email Tushar at \(email) (copied to your clipboard)"
                 }
             }
         }
