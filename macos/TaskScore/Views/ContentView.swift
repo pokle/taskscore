@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var activeSheet: iOSSheet?
     @State private var panelDetent: PanelDetent = .collapsed
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.openURL) private var openURL
     #endif
 
     var body: some View {
@@ -26,7 +27,7 @@ struct ContentView: View {
                 iPadLayout
             }
         }
-        .alert("Error", isPresented: showErrorAlert, actions: {
+        .alert("", isPresented: showErrorAlert, actions: {
             Button("OK") { viewModel.errorMessage = nil }
         }, message: {
             Text(viewModel.errorMessage ?? "")
@@ -232,6 +233,12 @@ struct ContentView: View {
                     .font(.title2)
                     .symbolRenderingMode(.hierarchical)
             }
+
+            Button { sendFeedback() } label: {
+                Image(systemName: "envelope.fill")
+                    .font(.title2)
+                    .symbolRenderingMode(.hierarchical)
+            }
         }
         .padding(12)
     }
@@ -261,6 +268,10 @@ struct ContentView: View {
 
             Button { activeSheet = .settings } label: {
                 Image(systemName: "gearshape")
+            }
+
+            Button { sendFeedback() } label: {
+                Image(systemName: "envelope")
             }
         }
     }
@@ -328,6 +339,20 @@ struct ContentView: View {
             viewModel.errorMessage = error.localizedDescription
         }
     }
+
+    #if os(iOS)
+    private func sendFeedback() {
+        let email = "tushar.pokle@gmail.com"
+        if let url = URL(string: "mailto:\(email)?subject=TaskScore%20Feedback%20for%20you") {
+            openURL(url) { accepted in
+                if !accepted {
+                    UIPasteboard.general.string = email
+                    viewModel.errorMessage = "Email Tushar at \(email) (copied to your clipboard)"
+                }
+            }
+        }
+    }
+    #endif
 
     private func openSampleFlight() {
         // Load task first, then track

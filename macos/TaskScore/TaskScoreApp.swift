@@ -81,6 +81,15 @@ struct TaskScoreApp: App {
                 }
             }
 
+            // Help menu
+            CommandGroup(replacing: .help) {
+                Button("Email Feedback") {
+                    if let url = URL(string: "mailto:tushar.pokle@gmail.com?subject=TaskScore%20Feedback%20for%20you") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
+
             // Flight menu
             CommandMenu("Flight") {
                 Button("All Events") {
