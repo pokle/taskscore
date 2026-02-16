@@ -1,8 +1,17 @@
 {
-  "enabledPlugins": {},
   "permissions": {
     "allow": [
-      "Bash(npm:*)"
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
     ]
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true
   }
 }

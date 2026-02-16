@@ -24,7 +24,7 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 // MapBox style options
 const MAPBOX_STYLES = [
-  { id: 'outdoors', name: 'Outdoors', style: 'mapbox://styles/mapbox/outdoors-v12' },
+  { id: 'outdoors', name: 'Outdoors', style: 'mapbox://styles/poklet/cmkceyuoc00ha01svg6lb767k' },
   { id: 'satellite', name: 'Satellite', style: 'mapbox://styles/mapbox/satellite-streets-v12' },
   { id: 'streets', name: 'Streets', style: 'mapbox://styles/mapbox/streets-v12' },
   { id: 'light', name: 'Light', style: 'mapbox://styles/mapbox/light-v11' },

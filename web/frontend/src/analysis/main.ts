@@ -8,7 +8,7 @@
  * - Event detection and display
  */
 
-import { parseIGC, detectFlightEvents, calculateOptimizedTaskDistance, igcTaskToXCTask, type IGCFile, type IGCFix, type XCTask, type FlightEvent, type WaypointRecord } from '@taskscore/analysis';
+import { parseIGC, parseXCTask, detectFlightEvents, calculateOptimizedTaskDistance, igcTaskToXCTask, type IGCFile, type IGCFix, type XCTask, type FlightEvent, type WaypointRecord } from '@taskscore/analysis';
 import { fetchTaskByCodeWithRaw } from './xctsk-fetch';
 import { createMapProvider, type MapProvider, type MapProviderType } from './map-provider';
 import { createAnalysisPanel, AnalysisPanel, FlightInfo, PanelTabType } from './analysis-panel';
@@ -1039,8 +1039,55 @@ async function init(): Promise<void> {
     'sample-tushar': '2025-01-05-Tushar-Corryong.igc'
   };
 
+  // Map sample track filenames to local task files (by competition date)
+  const sampleTaskMap: Record<string, string> = {
+    '2026-01-05-RohanHolt-XFH-000-01.IGC': 'buje',
+    '2026-01-05-shane-dunc-XCT-SDU-02.igc': 'doza',
+    '20260105-132715-GordonRigg.999.igc': 'buje',
+    'burkitt_18393_050126.igc': 'buje',
+    'durand_45515_050126.igc': 'buje',
+    'holtkamp_33915_050126.igc': 'buje',
+  };
+
+  async function loadLocalTask(taskFile: string): Promise<void> {
+    try {
+      const response = await fetch(`/data/tasks/${taskFile}.xctask`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch task: ${response.status}`);
+      }
+      const rawJson = await response.text();
+      const task = parseXCTask(rawJson);
+
+      state.task = task;
+
+      if (mapRenderer) {
+        mapRenderer.setTask(task);
+      }
+
+      analysisPanel?.setTask(task);
+
+      if (state.fixes.length > 0) {
+        state.events = detectFlightEvents(state.fixes, task);
+        analysisPanel?.setEvents(state.events);
+        if (mapRenderer) {
+          mapRenderer.setEvents(state.events);
+        }
+      }
+
+      updateFlightInfo();
+    } catch (err) {
+      console.warn('Failed to load sample task:', err);
+    }
+  }
+
   const loadSampleFile = async (filename: string) => {
     try {
+      // Load associated task first if one exists
+      const taskFile = sampleTaskMap[filename];
+      if (taskFile) {
+        await loadLocalTask(taskFile);
+      }
+
       const response = await fetch(`/data/tracks/${filename}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status}`);
