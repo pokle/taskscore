@@ -27,6 +27,7 @@ const MAPBOX_STYLES = [
   { id: 'outdoors', name: 'Outdoors', style: 'mapbox://styles/poklet/cmkceyuoc00ha01svg6lb767k' },
   { id: 'satellite', name: 'Satellite', style: 'mapbox://styles/mapbox/satellite-streets-v12' },
   { id: 'streets', name: 'Streets', style: 'mapbox://styles/mapbox/streets-v12' },
+  { id: 'topo', name: 'Topo (ArcGIS)', style: `https://basemapstyles-api.arcgis.com/arcgis/rest/services/styles/v2/styles/arcgis/topographic?token=${import.meta.env.VITE_ARCGIS_API_KEY}` },
   { id: 'light', name: 'Light', style: 'mapbox://styles/mapbox/light-v11' },
   { id: 'dark', name: 'Dark', style: 'mapbox://styles/mapbox/dark-v11' },
 ];
