@@ -9,15 +9,9 @@ import { getEventStyle, getOptimizedSegmentDistances, type FlightEvent, type Fli
 import { formatAltitude, formatSpeed, formatDistance, formatClimbRate } from './units-browser';
 
 /**
- * View modes for the Track sub-tabs
+ * Unified panel tabs
  */
-type TrackViewMode = 'all' | 'glides' | 'climbs' | 'sinks';
-
-/**
- * Main panel tabs
- */
-export type PanelTabType = 'track' | 'task' | 'terrain';
-type PanelTab = PanelTabType;
+export type PanelTabType = 'task' | 'events' | 'glides' | 'climbs' | 'sinks';
 
 /**
  * Combined glide data from start and end events
@@ -119,20 +113,6 @@ export interface AnalysisPanel {
   destroy(): void;
 }
 
-// Terrain jokes about emptiness
-const TERRAIN_JOKES = [
-  "This space is emptier than a thermal at sunset.",
-  "Nothing here yet... like a glider without wind.",
-  "Terrain data coming soon. For now, enjoy the view of nothing.",
-  "It's so empty here, even the vultures left.",
-  "This panel is flatter than Kansas on a no-fly day.",
-  "No terrain data. Just like my chances after a bomb-out.",
-  "Coming soon: actual terrain info. For now, pretend you can see thermals.",
-  "This area is as empty as cloudbase on a blue day.",
-  "Terrain info? We're working on it. Unlike that thermal you're chasing.",
-  "Nothing to see here. Much like your vario in sink.",
-];
-
 /**
  * Format time as HH:MM:SS
  */
@@ -229,59 +209,42 @@ function getTurnpointTypeClass(type?: 'TAKEOFF' | 'SSS' | 'ESS'): string {
 export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPanel {
   const { container, onEventClick } = options;
 
-  // Create panel structure (tabs are now in the header, not here)
+  // Create panel structure with unified tab row
   const panel = document.createElement('div');
   panel.className = 'flex h-full flex-col overflow-hidden';
   panel.innerHTML = `
-    <!-- Track Panel Content -->
-    <div id="track-panel-content" class="flex flex-1 flex-col overflow-hidden">
-      <div class="border-b border-border bg-muted/50 px-4 py-2 text-sm">
-        <div class="flight-info-content text-muted-foreground">Load an IGC file to see flight info</div>
-      </div>
-      <div class="tabs w-full border-b border-border">
-        <nav role="tablist" class="w-full">
-          <button type="button" role="tab" id="tab-events" aria-selected="true">Events</button>
-          <button type="button" role="tab" id="tab-glides" aria-selected="false">Glides</button>
-          <button type="button" role="tab" id="tab-climbs" aria-selected="false">Climbs</button>
-          <button type="button" role="tab" id="tab-sinks" aria-selected="false">Sinks</button>
-        </nav>
-      </div>
-      <div class="border-b border-border px-4 py-1.5 text-sm text-muted-foreground">
-        <span class="event-count">0 events</span>
-      </div>
-      <div class="track-list flex-1 overflow-y-auto p-2 scrollbar">
-        <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
-          Load an IGC file to see events
-        </div>
+    <!-- Flight info banner -->
+    <div class="border-b border-border bg-muted/50 px-4 py-2 text-sm">
+      <div class="flight-info-content text-muted-foreground">Load an IGC file to see flight info</div>
+    </div>
+
+    <!-- Unified tab row -->
+    <div class="tabs w-full border-b border-border">
+      <nav role="tablist" class="w-full">
+        <button type="button" role="tab" id="tab-task" aria-selected="false">Task</button>
+        <button type="button" role="tab" id="tab-events" aria-selected="true">Events</button>
+        <button type="button" role="tab" id="tab-glides" aria-selected="false">Glides</button>
+        <button type="button" role="tab" id="tab-climbs" aria-selected="false">Climbs</button>
+        <button type="button" role="tab" id="tab-sinks" aria-selected="false">Sinks</button>
+      </nav>
+    </div>
+
+    <!-- Count bar -->
+    <div class="border-b border-border px-4 py-1.5 text-sm text-muted-foreground">
+      <span class="event-count">0 events</span>
+    </div>
+
+    <!-- Track content (Events, Glides, Climbs, Sinks) -->
+    <div id="track-panel-content" class="track-list flex-1 overflow-y-auto p-2 scrollbar">
+      <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
+        Load an IGC file to see events
       </div>
     </div>
 
-    <!-- Task Panel Content -->
-    <div id="task-panel-content" class="hidden flex flex-1 flex-col overflow-hidden">
-      <div class="border-b border-border px-4 py-3">
-        <h2 class="text-base font-semibold">Task Turnpoints</h2>
-      </div>
-      <div class="task-list flex-1 overflow-y-auto p-2 scrollbar">
-        <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
-          No task loaded
-        </div>
-      </div>
-    </div>
-
-    <!-- Terrain Panel Content -->
-    <div id="terrain-panel-content" class="hidden flex flex-1 flex-col overflow-hidden">
-      <div class="border-b border-border px-4 py-3">
-        <h2 class="text-base font-semibold">Terrain</h2>
-      </div>
-      <div class="terrain-content flex-1 overflow-y-auto p-4">
-        <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
-          <div class="space-y-4">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto opacity-50">
-              <path d="M14 6l-3.75 5 2.85 3.8-1.6 1.2C9.81 13.75 7 10 7 10l-6 8h22L14 6z"/>
-            </svg>
-            <p class="terrain-joke italic"></p>
-          </div>
-        </div>
+    <!-- Task content (turnpoints list) -->
+    <div id="task-panel-content" class="hidden task-list flex-1 overflow-y-auto p-2 scrollbar">
+      <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
+        No task loaded
       </div>
     </div>
   `;
@@ -291,18 +254,17 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   // Get references
   const trackPanelContent = panel.querySelector('#track-panel-content') as HTMLElement;
   const taskPanelContent = panel.querySelector('#task-panel-content') as HTMLElement;
-  const terrainPanelContent = panel.querySelector('#terrain-panel-content') as HTMLElement;
 
-  const listContainer = panel.querySelector('.track-list') as HTMLElement;
+  const listContainer = trackPanelContent;
   const eventCountEl = panel.querySelector('.event-count') as HTMLElement;
-  const taskListContainer = panel.querySelector('.task-list') as HTMLElement;
-  const terrainJokeEl = panel.querySelector('.terrain-joke') as HTMLElement;
+  const taskListContainer = panel.querySelector('#task-panel-content') as HTMLElement;
 
+  const tabTask = panel.querySelector('#tab-task') as HTMLButtonElement;
   const tabEvents = panel.querySelector('#tab-events') as HTMLButtonElement;
   const tabGlides = panel.querySelector('#tab-glides') as HTMLButtonElement;
   const tabClimbs = panel.querySelector('#tab-climbs') as HTMLButtonElement;
   const tabSinks = panel.querySelector('#tab-sinks') as HTMLButtonElement;
-  const trackSubTabs = [tabEvents, tabGlides, tabClimbs, tabSinks];
+  const allTabs = [tabTask, tabEvents, tabGlides, tabClimbs, tabSinks];
 
   const flightInfoEl = panel.querySelector('.flight-info-content') as HTMLElement;
 
@@ -311,73 +273,50 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   let filteredEvents: FlightEvent[] = [];
   let currentTask: XCTask | null = null;
   let isPanelHidden = true;
-  let currentTab: PanelTab = 'track';
-  let trackViewMode: TrackViewMode = 'all';
+  let currentTab: PanelTabType = 'events';
   let selectedSegment: { startIndex: number; endIndex: number } | null = null;
   let selectedTurnpointIndex: number | null = null;
 
-  // Set random terrain joke
-  terrainJokeEl.textContent = TERRAIN_JOKES[Math.floor(Math.random() * TERRAIN_JOKES.length)];
-
   /**
-   * Switch main panel tab (called externally from header tabs)
+   * Switch to a tab (unified tab system)
    */
-  function switchMainTab(tab: PanelTab): void {
+  function switchTabInternal(tab: PanelTabType): void {
     currentTab = tab;
 
-    // Hide all content panels
-    trackPanelContent.classList.add('hidden');
-    taskPanelContent.classList.add('hidden');
-    terrainPanelContent.classList.add('hidden');
+    // Update tab visual states
+    for (const t of allTabs) {
+      if (t) t.setAttribute('aria-selected', 'false');
+    }
+    const tabMap: Record<PanelTabType, HTMLButtonElement | null> = {
+      task: tabTask,
+      events: tabEvents,
+      glides: tabGlides,
+      climbs: tabClimbs,
+      sinks: tabSinks,
+    };
+    tabMap[tab]?.setAttribute('aria-selected', 'true');
 
-    // Show selected panel
-    if (tab === 'track') {
-      trackPanelContent.classList.remove('hidden');
-    } else if (tab === 'task') {
+    // Show appropriate content panel
+    if (tab === 'task') {
+      trackPanelContent.classList.add('hidden');
       taskPanelContent.classList.remove('hidden');
       renderTask();
-    } else if (tab === 'terrain') {
-      terrainPanelContent.classList.remove('hidden');
-      // Pick a new random joke when switching to terrain tab
-      terrainJokeEl.textContent = TERRAIN_JOKES[Math.floor(Math.random() * TERRAIN_JOKES.length)];
-    }
-  }
-
-  /**
-   * Switch track sub-tab
-   */
-  function switchTrackTab(mode: TrackViewMode): void {
-    trackViewMode = mode;
-
-    // Update tab states
-    for (const tab of trackSubTabs) {
-      if (tab) {
-        tab.setAttribute('aria-selected', 'false');
+    } else {
+      taskPanelContent.classList.add('hidden');
+      trackPanelContent.classList.remove('hidden');
+      renderTrack();
+      if (!selectedSegment) {
+        listContainer.scrollTop = 0;
       }
     }
-
-    let activeTab: HTMLButtonElement | null = null;
-    if (mode === 'all') activeTab = tabEvents;
-    else if (mode === 'glides') activeTab = tabGlides;
-    else if (mode === 'climbs') activeTab = tabClimbs;
-    else if (mode === 'sinks') activeTab = tabSinks;
-
-    if (activeTab) {
-      activeTab.setAttribute('aria-selected', 'true');
-    }
-
-    renderTrack();
-
-    if (!selectedSegment) {
-      listContainer.scrollTop = 0;
-    }
   }
 
-  // Track sub-tab click handlers
-  tabEvents?.addEventListener('click', () => switchTrackTab('all'));
-  tabGlides?.addEventListener('click', () => switchTrackTab('glides'));
-  tabClimbs?.addEventListener('click', () => switchTrackTab('climbs'));
-  tabSinks?.addEventListener('click', () => switchTrackTab('sinks'));
+  // Tab click handlers
+  tabTask?.addEventListener('click', () => switchTabInternal('task'));
+  tabEvents?.addEventListener('click', () => switchTabInternal('events'));
+  tabGlides?.addEventListener('click', () => switchTabInternal('glides'));
+  tabClimbs?.addEventListener('click', () => switchTabInternal('climbs'));
+  tabSinks?.addEventListener('click', () => switchTabInternal('sinks'));
 
   /**
    * Hide the panel
@@ -559,11 +498,11 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
    * Main render function for track panel
    */
   function renderTrack(): void {
-    if (trackViewMode === 'glides') {
+    if (currentTab === 'glides') {
       renderGlides();
-    } else if (trackViewMode === 'climbs') {
+    } else if (currentTab === 'climbs') {
       renderClimbs();
-    } else if (trackViewMode === 'sinks') {
+    } else if (currentTab === 'sinks') {
       renderSinks();
     } else {
       renderEvents();
@@ -893,6 +832,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
    */
   function renderTask(): void {
     if (!currentTask || currentTask.turnpoints.length === 0) {
+      eventCountEl.textContent = 'No task loaded';
       taskListContainer.innerHTML = `
         <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
           No task loaded
@@ -900,6 +840,8 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       `;
       return;
     }
+
+    eventCountEl.textContent = `${currentTask.turnpoints.length} turnpoints`;
 
     const segmentDistances = getOptimizedSegmentDistances(currentTask);
 
@@ -997,7 +939,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     setEvents(events: FlightEvent[]) {
       allEvents = events;
       updateFilteredEvents();
-      if (currentTab === 'track') {
+      if (currentTab !== 'task') {
         renderTrack();
       }
     },
@@ -1070,7 +1012,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     },
 
     switchTab(tab: PanelTabType) {
-      switchMainTab(tab);
+      switchTabInternal(tab);
     },
 
     getCurrentTab(): PanelTabType {
@@ -1137,19 +1079,15 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       if (matchingEvent) {
         selectedSegment = matchingEvent.segment || null;
 
-        // Switch to track tab and appropriate sub-tab
-        if (currentTab !== 'track') {
-          switchMainTab('track');
-        }
-
+        // Switch to the appropriate tab
         if (eventType === 'glide') {
-          switchTrackTab('glides');
+          switchTabInternal('glides');
         } else if (eventType === 'climb') {
-          switchTrackTab('climbs');
+          switchTabInternal('climbs');
         } else if (eventType === 'sink') {
-          switchTrackTab('sinks');
+          switchTabInternal('sinks');
         } else {
-          switchTrackTab('all');
+          switchTabInternal('events');
         }
 
         options.onEventClick(matchingEvent, selectOptions?.skipPan ? { skipPan: true } : undefined);
@@ -1165,7 +1103,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
 
       // Switch to task tab if not already there
       if (currentTab !== 'task') {
-        switchMainTab('task');
+        switchTabInternal('task');
       } else {
         // Re-render to show selection
         renderTask();
