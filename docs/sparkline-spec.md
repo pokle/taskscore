@@ -20,7 +20,7 @@ The altitude sparkline is an interactive miniature altitude profile displayed in
 ├─────────────────────────┤
 │ Count bar               │
 ├─────────────────────────┤
-│ Altitude sparkline      │  ← 72px fixed height, does not scroll
+│ Altitude sparkline      │  ← 88px fixed height, does not scroll
 ├─────────────────────────┤
 │                         │
 │ Scrollable event list   │  ← flex-1, overflow-y-auto
@@ -33,8 +33,8 @@ The altitude sparkline is an interactive miniature altitude profile displayed in
 ### Fixed position (not scrolling)
 The sparkline is placed in the flex column outside the scrollable list container. This means it remains visible at all times regardless of scroll position, giving the user a persistent overview of the flight profile.
 
-### Height: 72px
-Approximately 1.5x the height of a single event-item (~48px). Large enough to show the altitude profile clearly, small enough to not steal too much space from the event list.
+### Height: 88px
+Includes 72px for the chart area plus 16px for X-axis labels. The 32px left padding accommodates Y-axis labels. Large enough to show the altitude profile clearly with axis context, small enough to not steal too much space from the event list.
 
 ### Standalone element (not a background)
 Originally the sparkline was rendered as a CSS `background-image` on the scrollable list container, displayed behind the event items at 0.15 opacity. It was moved to a dedicated container so it could be:
@@ -44,8 +44,8 @@ Originally the sparkline was rendered as a CSS `background-image` on the scrolla
 
 ## Data Flow
 
-### Altitude data
-The sparkline receives altitude data via `setAltitudes(altitudes: number[])`, called from `main.ts` whenever an IGC file is loaded. The altitude array comes from `igcFile.fixes.map(f => f.gnssAltitude)` — one value per GPS fix in the flight.
+### Altitude and timestamp data
+The sparkline receives data via `setAltitudes(altitudes: number[], timestamps?: Date[])`, called from `main.ts` whenever an IGC file is loaded. The altitude array comes from `igcFile.fixes.map(f => f.gnssAltitude)` and timestamps from `igcFile.fixes.map(f => f.time)` — one value per GPS fix in the flight.
 
 When the flight is cleared, `setAltitudes([])` is called, which hides the sparkline container.
 
@@ -75,6 +75,27 @@ Vertical linear gradient matching the track altitude colors on the map:
 | 100% | `rgb(79,195,247)` - Lighter blue | Very high altitude |
 
 Fill opacity: **0.4**
+
+### Axis labels
+
+Compact 9px labels with small tick marks are rendered as HTML overlays positioned absolutely over the chart area.
+
+**Y-axis (altitude):**
+- Positioned in a 32px-wide column to the left of the chart
+- Shows 2-3 altitude values at "nice" round numbers in the user's current unit (meters or feet)
+- Each label has the numeric value followed by a 4px horizontal tick mark pointing toward the chart
+- Nice step algorithm: converts rough step to display units, rounds to nearest 1/2/5 × power of 10, converts back to meters
+- Labels are vertically centered on their altitude position using `bottom: N%; transform: translateY(50%)`
+
+**X-axis (time):**
+- Positioned in a 16px-tall row below the chart
+- Shows 3-5 time values at nice intervals (5, 10, 15, 20, 30, or 60 minute steps)
+- Each label has a 4px vertical tick mark above the time string (HH:MM, 24-hour local timezone)
+- Time ticks snap to round multiples of the step (e.g., 10:00, 10:30, 11:00 for 30-min steps)
+- Uses **local timezone** (not UTC) to match event list timestamps
+- Labels are horizontally centered on their time position using `left: N%; transform: translateX(-50%)`
+
+Both axis containers have `overflow: hidden` and `pointer-events: none`.
 
 ### Selection marker
 When an event is selected (by clicking the list or the sparkline), an orange vertical line is overlaid at the corresponding position using a CSS `linear-gradient` layered on top of the sparkline background:
@@ -119,3 +140,4 @@ The public `selectByFixIndex` method (used when clicking the track on the map) d
 1. **Basic sparkline** (`8410a06`): Added `generateAltitudeSparkline` SVG generation and `setAltitudes` API. Rendered as a CSS background-image on the scrollable track panel at 0.15 opacity.
 2. **Selection marker and fixIndex** (`dbf7501`): Added orange marker line overlay on the sparkline when events are selected. Added `fixIndex` to all point event details in both TypeScript and Swift event detectors.
 3. **Fixed position and click interaction** (`abe47dc`): Moved sparkline to a dedicated 72px container above the scroll area. Increased opacity to 0.4. Made it clickable with per-tab nearest-event selection.
+4. **Axis labels**: Added compact Y-axis (altitude) and X-axis (time HH:MM) labels with tick marks. Container height increased to 88px. `setAltitudes` now accepts optional timestamps for X-axis rendering. Click handler moved from container to inner chart element for correct hit-testing with axis padding.

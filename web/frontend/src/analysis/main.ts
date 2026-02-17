@@ -643,7 +643,7 @@ async function init(): Promise<void> {
 
     // Update analysis panel
     analysisPanel?.setEvents(state.events);
-    analysisPanel?.setAltitudes(igcFile.fixes.map(f => f.gnssAltitude));
+    analysisPanel?.setAltitudes(igcFile.fixes.map(f => f.gnssAltitude), igcFile.fixes.map(f => f.time));
     if (state.task) {
       analysisPanel?.setTask(state.task);
     }
@@ -867,7 +867,7 @@ async function init(): Promise<void> {
 
       // Update analysis panel
       analysisPanel?.setEvents(state.events);
-      analysisPanel?.setAltitudes(igcFile.fixes.map(f => f.gnssAltitude));
+      analysisPanel?.setAltitudes(igcFile.fixes.map(f => f.gnssAltitude), igcFile.fixes.map(f => f.time));
 
       // Update map events
       if (mapRenderer) {

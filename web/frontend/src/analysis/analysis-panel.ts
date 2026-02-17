@@ -100,7 +100,7 @@ export interface AnalysisPanel {
   setEvents(events: FlightEvent[]): void;
   setFlightInfo(info: FlightInfo): void;
   setTask(task: XCTask | null): void;
-  setAltitudes(altitudes: number[]): void;
+  setAltitudes(altitudes: number[], timestamps?: Date[]): void;
   clearSelection(): void;
   toggle(): void;
   open(): void;
@@ -278,8 +278,12 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     </div>
 
     <!-- Altitude sparkline (fixed above scrollable list) -->
-    <div id="sparkline-container" class="hidden border-b border-border" style="height: 72px; min-height: 72px;">
-      <div id="sparkline-inner" style="width: 100%; height: 100%; position: relative;"></div>
+    <div id="sparkline-container" class="hidden border-b border-border" style="height: 88px; min-height: 88px;">
+      <div style="position: relative; width: 100%; height: 100%; padding-left: 32px; padding-bottom: 16px; box-sizing: border-box;">
+        <div id="sparkline-inner" style="width: 100%; height: 100%; position: relative;"></div>
+        <div id="sparkline-y-axis" style="position: absolute; left: 0; top: 0; bottom: 16px; width: 32px; pointer-events: none; overflow: hidden;"></div>
+        <div id="sparkline-x-axis" style="position: absolute; left: 32px; right: 0; bottom: 0; height: 16px; pointer-events: none; overflow: hidden;"></div>
+      </div>
     </div>
 
     <!-- Track content (Events, Glides, Climbs, Sinks) -->
@@ -304,6 +308,8 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   const taskPanelContent = panel.querySelector('#task-panel-content') as HTMLElement;
   const sparklineContainer = panel.querySelector('#sparkline-container') as HTMLElement;
   const sparklineInner = panel.querySelector('#sparkline-inner') as HTMLElement;
+  const sparklineYAxis = panel.querySelector('#sparkline-y-axis') as HTMLElement;
+  const sparklineXAxis = panel.querySelector('#sparkline-x-axis') as HTMLElement;
 
   const listContainer = trackPanelContent;
   const eventCountEl = panel.querySelector('.event-count') as HTMLElement;
@@ -330,9 +336,106 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   let fixCount = 0;
 
   /**
+   * Format a time as HH:MM (24h, local timezone to match event list)
+   */
+  function formatTimeShort(date: Date): string {
+    const h = date.getHours().toString().padStart(2, '0');
+    const m = date.getMinutes().toString().padStart(2, '0');
+    return `${h}:${m}`;
+  }
+
+  /**
+   * Render Y-axis (altitude) labels with tick marks
+   */
+  function renderYAxisLabels(minAlt: number, maxAlt: number): void {
+    sparklineYAxis.innerHTML = '';
+    const range = maxAlt - minAlt;
+    if (range <= 0) return;
+
+    // Pick 2-3 nice round values between min and max
+    const niceStep = niceAxisStep(range, 3);
+    const firstTick = Math.ceil(minAlt / niceStep) * niceStep;
+
+    for (let val = firstTick; val <= maxAlt; val += niceStep) {
+      const pct = ((val - minAlt) / range) * 100;
+      // pct=0 is bottom, pct=100 is top; CSS bottom percentage
+      const label = document.createElement('div');
+      label.style.cssText = `position: absolute; right: 2px; bottom: ${pct}%; transform: translateY(50%); font-size: 9px; line-height: 1; color: var(--color-muted-foreground); display: flex; align-items: center; gap: 1px;`;
+      const fv = formatAltitude(val);
+      label.innerHTML = `<span>${fv.formatted}</span><span style="width: 4px; height: 1px; background: var(--color-muted-foreground); display: inline-block; flex-shrink: 0;"></span>`;
+      sparklineYAxis.appendChild(label);
+    }
+  }
+
+  /**
+   * Render X-axis (time) labels with tick marks
+   */
+  function renderXAxisLabels(timestamps: Date[]): void {
+    sparklineXAxis.innerHTML = '';
+    if (timestamps.length < 2) return;
+
+    const startMs = timestamps[0].getTime();
+    const endMs = timestamps[timestamps.length - 1].getTime();
+    const durationMs = endMs - startMs;
+    if (durationMs <= 0) return;
+
+    // Pick ~3-5 evenly-spaced time ticks at nice intervals
+    const durationMin = durationMs / 60000;
+    const stepMin = niceTimeStep(durationMin, 4);
+    const stepMs = stepMin * 60000;
+
+    // Snap first tick to next multiple of stepMin from start (local timezone)
+    const startMinOfDay = timestamps[0].getHours() * 60 + timestamps[0].getMinutes();
+    const firstTickMin = Math.ceil(startMinOfDay / stepMin) * stepMin;
+    const firstTickMs = timestamps[0].getTime() - startMinOfDay * 60000 + firstTickMin * 60000;
+
+    for (let tickMs = firstTickMs; tickMs <= endMs; tickMs += stepMs) {
+      if (tickMs < startMs) continue;
+      const pct = ((tickMs - startMs) / durationMs) * 100;
+      const label = document.createElement('div');
+      label.style.cssText = `position: absolute; left: ${pct}%; top: 0; transform: translateX(-50%); font-size: 9px; line-height: 1; color: var(--color-muted-foreground); display: flex; flex-direction: column; align-items: center;`;
+      const tickDate = new Date(tickMs);
+      label.innerHTML = `<span style="width: 1px; height: 4px; background: var(--color-muted-foreground); display: block;"></span><span>${formatTimeShort(tickDate)}</span>`;
+      sparklineXAxis.appendChild(label);
+    }
+  }
+
+  /**
+   * Compute a nice round step for altitude axis given range and desired ~count ticks
+   */
+  function niceAxisStep(range: number, targetTicks: number): number {
+    const rough = range / targetTicks;
+    // Convert to current altitude unit for nice rounding, then back
+    const fv = formatAltitude(rough);
+    const unitValue = fv.value;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(unitValue)));
+    const residual = unitValue / magnitude;
+    let nice: number;
+    if (residual <= 1.5) nice = 1;
+    else if (residual <= 3.5) nice = 2;
+    else if (residual <= 7.5) nice = 5;
+    else nice = 10;
+    const niceUnitValue = nice * magnitude;
+    // Convert back to meters: niceUnitValue / fv.value * rough
+    return (niceUnitValue / unitValue) * rough;
+  }
+
+  /**
+   * Compute a nice time step in minutes for ~targetTicks ticks
+   */
+  function niceTimeStep(durationMinutes: number, targetTicks: number): number {
+    const rough = durationMinutes / targetTicks;
+    const steps = [5, 10, 15, 20, 30, 60, 120, 180, 240];
+    for (const s of steps) {
+      if (s >= rough) return s;
+    }
+    return 240;
+  }
+
+  /**
    * Apply altitude sparkline into the dedicated sparkline container
    */
-  function applySparklineBackground(altitudes: number[]): void {
+  function applySparklineBackground(altitudes: number[], timestamps?: Date[]): void {
     fixCount = altitudes.length;
     const svg = generateAltitudeSparkline(altitudes);
     if (svg) {
@@ -341,9 +444,24 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       sparklineInner.style.backgroundSize = '100% 100%';
       sparklineInner.style.backgroundRepeat = 'no-repeat';
       sparklineContainer.classList.remove('hidden');
+
+      // Compute min/max for Y labels
+      let minAlt = Infinity;
+      let maxAlt = -Infinity;
+      for (const a of altitudes) {
+        if (a < minAlt) minAlt = a;
+        if (a > maxAlt) maxAlt = a;
+      }
+      renderYAxisLabels(minAlt, maxAlt);
+
+      if (timestamps && timestamps.length >= 2) {
+        renderXAxisLabels(timestamps);
+      }
     } else {
       sparklineDataUri = '';
       sparklineInner.style.backgroundImage = '';
+      sparklineYAxis.innerHTML = '';
+      sparklineXAxis.innerHTML = '';
       sparklineContainer.classList.add('hidden');
     }
   }
@@ -424,14 +542,14 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   tabSinks?.addEventListener('click', () => switchTabInternal('sinks'));
 
   // Sparkline click handler - select nearest event for the current tab
-  sparklineContainer.addEventListener('click', (e: MouseEvent) => {
+  sparklineInner.addEventListener('click', (e: MouseEvent) => {
     if (fixCount < 2 || allEvents.length === 0) return;
-    const rect = sparklineContainer.getBoundingClientRect();
+    const rect = sparklineInner.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const fixIndex = Math.round((x / rect.width) * (fixCount - 1));
     selectNearestForCurrentTab(fixIndex);
   });
-  sparklineContainer.style.cursor = 'crosshair';
+  sparklineInner.style.cursor = 'crosshair';
 
   /**
    * Hide the panel
@@ -1258,8 +1376,8 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       }
     },
 
-    setAltitudes(altitudes: number[]) {
-      applySparklineBackground(altitudes);
+    setAltitudes(altitudes: number[], timestamps?: Date[]) {
+      applySparklineBackground(altitudes, timestamps);
     },
 
     clearSelection() {
