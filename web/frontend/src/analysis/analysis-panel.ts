@@ -841,9 +841,9 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       return;
     }
 
-    eventCountEl.textContent = `${currentTask.turnpoints.length} turnpoints`;
-
     const segmentDistances = getOptimizedSegmentDistances(currentTask);
+    const totalDistance = segmentDistances.reduce((sum, d) => sum + d, 0);
+    eventCountEl.textContent = `${currentTask.turnpoints.length} turnpoints · ${formatDistance(totalDistance).withUnit}`;
 
     let html = '<div class="space-y-2">';
 
