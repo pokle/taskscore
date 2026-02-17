@@ -204,9 +204,9 @@ Users can load task and track data from AirScore directly in the analysis tool:
 - Mobile: Collapsible sidebar that slides in from right, overlays map
 - Header with hamburger menu (mobile) and command menu (gear icon)
 
-**Map Provider:**
-- MapBox GL JS exclusively (removed Leaflet, Google Maps, MapLibre)
-- Configured via `VITE_MAPBOX_TOKEN` environment variable
+**Map Providers:**
+- MapBox GL JS (default) and Leaflet, switchable via command menu or `?m=l`/`?m=m` URL param
+- MapBox configured via `VITE_MAPBOX_TOKEN` environment variable
 
 ## UI Component Index
 
@@ -225,8 +225,9 @@ All paths relative to `web/frontend/src/`. The analysis page (`analysis.html`) i
   - Event count bar
 
 **Map:**
+- `analysis/map-provider.ts` - Map provider interface + factory (`createMapProvider()`)
 - `analysis/mapbox-provider.ts` - MapBox GL rendering (track, task cylinders, event markers, 3D)
-- `analysis/map-provider.ts` - Map provider interface
+- `analysis/leaflet-provider.ts` - Leaflet rendering (alternative provider)
 - `analysis/map-provider-shared.ts` - Shared helpers (altitude colors, glide legend)
 
 **Dialogs** (all defined in `analysis.html`):
