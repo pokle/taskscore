@@ -243,7 +243,7 @@ function generateAltitudeSparkline(altitudes: number[]): string {
   path += ` L${w},${h} Z`;
 
   // Vertical gradient: same color stops as getAltitudeColorNormalized
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="ag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="rgb(139,90,43)"/><stop offset="25%" stop-color="rgb(67,160,71)"/><stop offset="50%" stop-color="rgb(3,155,229)"/><stop offset="75%" stop-color="rgb(41,182,246)"/><stop offset="100%" stop-color="rgb(79,195,247)"/></linearGradient></defs><path d="${path}" fill="url(#ag)" opacity="0.15"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="ag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="rgb(139,90,43)"/><stop offset="25%" stop-color="rgb(67,160,71)"/><stop offset="50%" stop-color="rgb(3,155,229)"/><stop offset="75%" stop-color="rgb(41,182,246)"/><stop offset="100%" stop-color="rgb(79,195,247)"/></linearGradient></defs><path d="${path}" fill="url(#ag)" opacity="0.4"/></svg>`;
 }
 
 /**
@@ -277,6 +277,11 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       <span class="event-count">0 events</span>
     </div>
 
+    <!-- Altitude sparkline (fixed above scrollable list) -->
+    <div id="sparkline-container" class="hidden border-b border-border" style="height: 72px; min-height: 72px;">
+      <div id="sparkline-inner" style="width: 100%; height: 100%; position: relative;"></div>
+    </div>
+
     <!-- Track content (Events, Glides, Climbs, Sinks) -->
     <div id="track-panel-content" class="track-list flex-1 overflow-y-auto p-2 scrollbar">
       <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
@@ -297,6 +302,8 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   // Get references
   const trackPanelContent = panel.querySelector('#track-panel-content') as HTMLElement;
   const taskPanelContent = panel.querySelector('#task-panel-content') as HTMLElement;
+  const sparklineContainer = panel.querySelector('#sparkline-container') as HTMLElement;
+  const sparklineInner = panel.querySelector('#sparkline-inner') as HTMLElement;
 
   const listContainer = trackPanelContent;
   const eventCountEl = panel.querySelector('.event-count') as HTMLElement;
@@ -323,19 +330,21 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   let fixCount = 0;
 
   /**
-   * Apply altitude sparkline as CSS background on the track panel
+   * Apply altitude sparkline into the dedicated sparkline container
    */
   function applySparklineBackground(altitudes: number[]): void {
     fixCount = altitudes.length;
     const svg = generateAltitudeSparkline(altitudes);
     if (svg) {
       sparklineDataUri = `url('data:image/svg+xml,${encodeURIComponent(svg)}')`;
-      trackPanelContent.style.backgroundImage = sparklineDataUri;
-      trackPanelContent.style.backgroundSize = '100% 100%';
-      trackPanelContent.style.backgroundRepeat = 'no-repeat';
+      sparklineInner.style.backgroundImage = sparklineDataUri;
+      sparklineInner.style.backgroundSize = '100% 100%';
+      sparklineInner.style.backgroundRepeat = 'no-repeat';
+      sparklineContainer.classList.remove('hidden');
     } else {
       sparklineDataUri = '';
-      trackPanelContent.style.backgroundImage = '';
+      sparklineInner.style.backgroundImage = '';
+      sparklineContainer.classList.add('hidden');
     }
   }
 
@@ -349,23 +358,23 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   }
 
   /**
-   * Update the sparkline background with a vertical marker line at the given fix index
+   * Update the sparkline with a vertical marker line at the given fix index
    */
   function updateSparklineMarker(fixIndex: number | null): void {
     if (!sparklineDataUri) return;
 
     if (fixIndex === null || fixCount < 2) {
-      trackPanelContent.style.backgroundImage = sparklineDataUri;
-      trackPanelContent.style.backgroundSize = '100% 100%';
-      trackPanelContent.style.backgroundRepeat = 'no-repeat';
+      sparklineInner.style.backgroundImage = sparklineDataUri;
+      sparklineInner.style.backgroundSize = '100% 100%';
+      sparklineInner.style.backgroundRepeat = 'no-repeat';
       return;
     }
 
     const p = (fixIndex / (fixCount - 1)) * 100;
     const glow = `linear-gradient(to right, transparent calc(${p.toFixed(2)}% - 12px), rgba(249,115,22,0.15) calc(${p.toFixed(2)}% - 4px), rgba(249,115,22,0.9) calc(${p.toFixed(2)}% - 1px), rgb(249,115,22) calc(${p.toFixed(2)}%), rgba(249,115,22,0.9) calc(${p.toFixed(2)}% + 1px), rgba(249,115,22,0.15) calc(${p.toFixed(2)}% + 4px), transparent calc(${p.toFixed(2)}% + 12px))`;
-    trackPanelContent.style.backgroundImage = `${glow}, ${sparklineDataUri}`;
-    trackPanelContent.style.backgroundSize = '100% 100%, 100% 100%';
-    trackPanelContent.style.backgroundRepeat = 'no-repeat, no-repeat';
+    sparklineInner.style.backgroundImage = `${glow}, ${sparklineDataUri}`;
+    sparklineInner.style.backgroundSize = '100% 100%, 100% 100%';
+    sparklineInner.style.backgroundRepeat = 'no-repeat, no-repeat';
   }
 
   /**
@@ -390,11 +399,16 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     // Show appropriate content panel
     if (tab === 'task') {
       trackPanelContent.classList.add('hidden');
+      sparklineContainer.classList.add('hidden');
       taskPanelContent.classList.remove('hidden');
       renderTask();
     } else {
       taskPanelContent.classList.add('hidden');
       trackPanelContent.classList.remove('hidden');
+      // Show sparkline if we have data
+      if (sparklineDataUri) {
+        sparklineContainer.classList.remove('hidden');
+      }
       renderTrack();
       if (!selectedSegment) {
         listContainer.scrollTop = 0;
@@ -408,6 +422,16 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   tabGlides?.addEventListener('click', () => switchTabInternal('glides'));
   tabClimbs?.addEventListener('click', () => switchTabInternal('climbs'));
   tabSinks?.addEventListener('click', () => switchTabInternal('sinks'));
+
+  // Sparkline click handler - select nearest event for the current tab
+  sparklineContainer.addEventListener('click', (e: MouseEvent) => {
+    if (fixCount < 2 || allEvents.length === 0) return;
+    const rect = sparklineContainer.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const fixIndex = Math.round((x / rect.width) * (fixCount - 1));
+    selectNearestForCurrentTab(fixIndex);
+  });
+  sparklineContainer.style.cursor = 'crosshair';
 
   /**
    * Hide the panel
@@ -1030,6 +1054,167 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     });
   }
 
+  /**
+   * Find the nearest segment-based event to a fix index from a list of candidates.
+   * Checks containment first, then finds the closest segment start/end.
+   */
+  function findNearestSegmentEvent(fixIndex: number, candidates: { segment: { startIndex: number; endIndex: number }; sourceEvent: FlightEvent }[]): FlightEvent | null {
+    if (candidates.length === 0) return null;
+
+    // First check if fixIndex falls inside any segment
+    for (const c of candidates) {
+      if (fixIndex >= c.segment.startIndex && fixIndex <= c.segment.endIndex) {
+        return c.sourceEvent;
+      }
+    }
+
+    // Otherwise find the segment whose start or end is closest
+    let best: FlightEvent | null = null;
+    let bestDist = Infinity;
+    for (const c of candidates) {
+      const distToStart = Math.abs(fixIndex - c.segment.startIndex);
+      const distToEnd = Math.abs(fixIndex - c.segment.endIndex);
+      const dist = Math.min(distToStart, distToEnd);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = c.sourceEvent;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Select the nearest event for the current tab at the given fix index.
+   * Stays on the current tab rather than switching.
+   */
+  function selectNearestForCurrentTab(fixIndex: number): void {
+    let matchingEvent: FlightEvent | null = null;
+
+    if (currentTab === 'glides') {
+      const glides = extractGlides();
+      matchingEvent = findNearestSegmentEvent(fixIndex, glides);
+    } else if (currentTab === 'climbs') {
+      const climbs = extractClimbs();
+      matchingEvent = findNearestSegmentEvent(fixIndex, climbs);
+    } else if (currentTab === 'sinks') {
+      const sinks = extractSinks();
+      matchingEvent = findNearestSegmentEvent(fixIndex, sinks);
+    } else if (currentTab === 'events') {
+      // For the events tab, find the nearest event by fixIndex or segment
+      let bestDist = Infinity;
+      for (const event of filteredEvents) {
+        if (event.segment) {
+          if (fixIndex >= event.segment.startIndex && fixIndex <= event.segment.endIndex) {
+            matchingEvent = event;
+            break;
+          }
+          const dist = Math.min(
+            Math.abs(fixIndex - event.segment.startIndex),
+            Math.abs(fixIndex - event.segment.endIndex)
+          );
+          if (dist < bestDist) {
+            bestDist = dist;
+            matchingEvent = event;
+          }
+        } else {
+          const details = event.details as { fixIndex?: number } | undefined;
+          if (details?.fixIndex !== undefined) {
+            const dist = Math.abs(details.fixIndex - fixIndex);
+            if (dist < bestDist) {
+              bestDist = dist;
+              matchingEvent = event;
+            }
+          }
+        }
+      }
+    }
+
+    if (matchingEvent) {
+      selectedSegment = matchingEvent.segment || null;
+      updateSparklineMarker(fixIndex);
+      renderTrack(); // re-render to update selection highlight
+      onEventClick(matchingEvent);
+    }
+  }
+
+  /**
+   * Internal implementation of selectByFixIndex, used by the public method
+   */
+  function selectByFixIndexInternal(fixIndex: number, selectOptions?: { skipPan?: boolean }): void {
+    if (allEvents.length === 0) return;
+
+    let matchingEvent: FlightEvent | null = null;
+    let eventType: 'glide' | 'climb' | 'sink' | 'event' = 'event';
+
+    // Check glides
+    for (const event of allEvents) {
+      if (event.type === 'glide_start' && event.segment) {
+        if (fixIndex >= event.segment.startIndex && fixIndex <= event.segment.endIndex) {
+          matchingEvent = event;
+          const details = event.details as { glideRatio?: number } | undefined;
+          if (details?.glideRatio !== undefined && details.glideRatio <= 5) {
+            eventType = 'sink';
+          } else {
+            eventType = 'glide';
+          }
+          break;
+        }
+      }
+    }
+
+    // Check thermals
+    if (!matchingEvent) {
+      for (const event of allEvents) {
+        if (event.type === 'thermal_entry' && event.segment) {
+          if (fixIndex >= event.segment.startIndex && fixIndex <= event.segment.endIndex) {
+            matchingEvent = event;
+            eventType = 'climb';
+            break;
+          }
+        }
+      }
+    }
+
+    // Find closest point event
+    if (!matchingEvent) {
+      let minDistance = Infinity;
+      for (const event of allEvents) {
+        if (event.segment) continue;
+        const eventDetails = event.details as { fixIndex?: number } | undefined;
+        if (eventDetails?.fixIndex !== undefined) {
+          const distance = Math.abs(eventDetails.fixIndex - fixIndex);
+          if (distance < minDistance) {
+            minDistance = distance;
+            matchingEvent = event;
+            eventType = 'event';
+          }
+        }
+      }
+    }
+
+    if (!matchingEvent && allEvents.length > 0) {
+      matchingEvent = allEvents[0];
+      eventType = 'event';
+    }
+
+    if (matchingEvent) {
+      selectedSegment = matchingEvent.segment || null;
+      updateSparklineMarker(fixIndex);
+
+      if (eventType === 'glide') {
+        switchTabInternal('glides');
+      } else if (eventType === 'climb') {
+        switchTabInternal('climbs');
+      } else if (eventType === 'sink') {
+        switchTabInternal('sinks');
+      } else {
+        switchTabInternal('events');
+      }
+
+      options.onEventClick(matchingEvent, selectOptions?.skipPan ? { skipPan: true } : undefined);
+    }
+  }
+
   return {
     setEvents(events: FlightEvent[]) {
       allEvents = events;
@@ -1120,79 +1305,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     },
 
     selectByFixIndex(fixIndex: number, selectOptions?: { skipPan?: boolean }) {
-      if (allEvents.length === 0) return;
-
-      let matchingEvent: FlightEvent | null = null;
-      let eventType: 'glide' | 'climb' | 'sink' | 'event' = 'event';
-
-      // Check glides
-      for (const event of allEvents) {
-        if (event.type === 'glide_start' && event.segment) {
-          if (fixIndex >= event.segment.startIndex && fixIndex <= event.segment.endIndex) {
-            matchingEvent = event;
-            const details = event.details as { glideRatio?: number } | undefined;
-            if (details?.glideRatio !== undefined && details.glideRatio <= 5) {
-              eventType = 'sink';
-            } else {
-              eventType = 'glide';
-            }
-            break;
-          }
-        }
-      }
-
-      // Check thermals
-      if (!matchingEvent) {
-        for (const event of allEvents) {
-          if (event.type === 'thermal_entry' && event.segment) {
-            if (fixIndex >= event.segment.startIndex && fixIndex <= event.segment.endIndex) {
-              matchingEvent = event;
-              eventType = 'climb';
-              break;
-            }
-          }
-        }
-      }
-
-      // Find closest point event
-      if (!matchingEvent) {
-        let minDistance = Infinity;
-        for (const event of allEvents) {
-          if (event.segment) continue;
-          const eventDetails = event.details as { fixIndex?: number } | undefined;
-          if (eventDetails?.fixIndex !== undefined) {
-            const distance = Math.abs(eventDetails.fixIndex - fixIndex);
-            if (distance < minDistance) {
-              minDistance = distance;
-              matchingEvent = event;
-              eventType = 'event';
-            }
-          }
-        }
-      }
-
-      if (!matchingEvent && allEvents.length > 0) {
-        matchingEvent = allEvents[0];
-        eventType = 'event';
-      }
-
-      if (matchingEvent) {
-        selectedSegment = matchingEvent.segment || null;
-        updateSparklineMarker(fixIndex);
-
-        // Switch to the appropriate tab
-        if (eventType === 'glide') {
-          switchTabInternal('glides');
-        } else if (eventType === 'climb') {
-          switchTabInternal('climbs');
-        } else if (eventType === 'sink') {
-          switchTabInternal('sinks');
-        } else {
-          switchTabInternal('events');
-        }
-
-        options.onEventClick(matchingEvent, selectOptions?.skipPan ? { skipPan: true } : undefined);
-      }
+      selectByFixIndexInternal(fixIndex, selectOptions);
     },
 
     selectTurnpoint(turnpointIndex: number) {
