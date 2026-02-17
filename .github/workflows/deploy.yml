@@ -27,6 +27,8 @@ jobs:
 
       - name: Run tests
         run: bun run test
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
 
   deploy:
     name: Deploy
@@ -59,6 +61,7 @@ jobs:
         run: bun run build
         env:
           VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+          NODE_OPTIONS: "--max-old-space-size=8192"
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
