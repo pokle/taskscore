@@ -15,7 +15,7 @@ import { config } from './config';
 import {
   MAP_FONT_FAMILY, GLIDE_LABEL_SPEED_MIN_ZOOM, GLIDE_LABEL_DETAILS_MIN_ZOOM,
   KEY_EVENT_TYPES, getAltitudeColorNormalized,
-  calculateAltitudeGradient, findNearestFixIndex as sharedFindNearestFixIndex,
+  findNearestFixIndex as sharedFindNearestFixIndex,
   createCirclePolygon, createGlideLegend, showGlideLegend as sharedShowGlideLegend,
 } from './map-provider-shared';
 
@@ -71,7 +71,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
       // Altitude colors state
       let isAltitudeColorsMode = false;
-      let altitudeGradientStops: [number, string][] = [];
 
       // Task visibility state
       let isTaskVisible = true;
@@ -181,16 +180,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             type: 'geojson',
             data: { type: 'FeatureCollection', features: [] },
             tolerance: 0.1, // Minimal simplification
-          });
-        }
-
-        // Track gradient source with lineMetrics for altitude-based coloring
-        if (!map.getSource('track-gradient')) {
-          map.addSource('track-gradient', {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: [] },
-            lineMetrics: true, // Required for line-gradient
-            tolerance: 0.1,
           });
         }
 
@@ -305,14 +294,12 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           },
           paint: {
             'line-color': '#000000',
-            // Zoom-adaptive width: thicker at low zoom for visibility
+            // Altitude-adaptive width: wider at high altitude for depth effect
             'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              3, 8 * width_mul,    // At zoom 3, width 8
-              8, 12 * width_mul,   // At zoom 8, width 12
-              12, 10 * width_mul,  // At zoom 12, width 10
+              'interpolate', ['linear'], ['zoom'],
+              3, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 4 * width_mul, 1, 12 * width_mul],
+              8, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 6 * width_mul, 1, 18 * width_mul],
+              12, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 5 * width_mul, 1, 16 * width_mul],
             ],
             'line-opacity': 0.6,
           },
@@ -329,45 +316,42 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           },
           paint: {
             'line-color': '#f97316', // Bright orange
-            // Zoom-adaptive width: thicker at low zoom for visibility
+            // Altitude-adaptive width: wider at high altitude for depth effect
             'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              3, 4 * width_mul,    // At zoom 3, width 4
-              8, 6 * width_mul,    // At zoom 8, width 6
-              12, 6 * width_mul,   // At zoom 12, width 6
+              'interpolate', ['linear'], ['zoom'],
+              3, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 2 * width_mul, 1, 6 * width_mul],
+              8, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 3 * width_mul, 1, 9 * width_mul],
+              12, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 3 * width_mul, 1, 9 * width_mul],
             ],
             'line-opacity': 0.95,
           },
         });
 
-        // 5a. Track line with altitude gradient (hidden by default)
+        // 5a. Track line with altitude-based colors and width (hidden by default)
         map.addLayer({
           id: 'track-line-gradient',
           type: 'line',
-          source: 'track-gradient',
+          source: 'track',
           layout: {
             'line-join': 'round',
             'line-cap': 'round',
             'visibility': 'none', // Hidden by default
           },
           paint: {
-            // Default gradient - will be updated with altitude data
-            'line-gradient': [
-              'interpolate',
-              ['linear'],
-              ['line-progress'],
-              0, '#3b82f6',
-              1, '#ef4444',
+            // Altitude-based coloring: brown (low) → green → cyan → sky blue (high)
+            'line-color': [
+              'interpolate', ['linear'], ['get', 'normalizedAlt'],
+              0, '#8B5A2B',
+              0.25, '#43A047',
+              0.5, '#039BE5',
+              0.75, '#29B6F6',
+              1, '#4FC3F7',
             ],
             'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              3, 4 * width_mul,
-              8, 6 * width_mul,
-              12, 6 * width_mul,
+              'interpolate', ['linear'], ['zoom'],
+              3, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 2 * width_mul, 1, 6 * width_mul],
+              8, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 3 * width_mul, 1, 9 * width_mul],
+              12, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 3 * width_mul, 1, 9 * width_mul],
             ],
             'line-opacity': 0.95,
           },
@@ -734,21 +718,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
       // Altitude color functions and gradient calculation are imported from map-provider-shared
 
-      /**
-       * Update the gradient layer with altitude colors
-       */
-      function updateGradientLayer(): void {
-        if (!map.getLayer('track-line-gradient') || altitudeGradientStops.length < 2) return;
-
-        // Build the gradient expression
-        const gradientExpr: ['interpolate', ['linear'], ['line-progress'], ...unknown[]] =
-          ['interpolate', ['linear'], ['line-progress']];
-        for (const [progress, color] of altitudeGradientStops) {
-          gradientExpr.push(progress, color);
-        }
-
-        map.setPaintProperty('track-line-gradient', 'line-gradient', gradientExpr as mapboxgl.Expression);
-      }
 
       /**
        * Update track rendering based on current mode
@@ -875,51 +844,44 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
               type: 'FeatureCollection',
               features: [],
             });
-            (map.getSource('track-gradient') as mapboxgl.GeoJSONSource)?.setData({
-              type: 'FeatureCollection',
-              features: [],
-            });
-            altitudeGradientStops = [];
             return;
           }
 
-          // Create a single continuous LineString for better rendering at all zoom levels
-          const coordinates = fixes.map(fix => [fix.longitude, fix.latitude, fix.gnssAltitude]);
+          // Calculate altitude range for normalization
+          let minAlt = Infinity;
+          let maxAlt = -Infinity;
+          for (const fix of fixes) {
+            if (fix.gnssAltitude < minAlt) minAlt = fix.gnssAltitude;
+            if (fix.gnssAltitude > maxAlt) maxAlt = fix.gnssAltitude;
+          }
+          const altRange = maxAlt - minAlt;
 
-          // Calculate average altitude for basic coloring
-          const avgAltitude = fixes.reduce((sum, fix) => sum + fix.gnssAltitude, 0) / fixes.length;
+          // Create individual segments with normalized altitude for width/color variation
+          // Higher altitude segments render wider, creating a depth effect in top-down view
+          const features = [];
+          for (let i = 1; i < fixes.length; i++) {
+            const prev = fixes[i - 1];
+            const curr = fixes[i];
+            const avgAlt = (prev.gnssAltitude + curr.gnssAltitude) / 2;
+            const normalizedAlt = altRange > 0 ? (avgAlt - minAlt) / altRange : 0.5;
 
-          // Update solid track source
+            features.push({
+              type: 'Feature' as const,
+              properties: { normalizedAlt },
+              geometry: {
+                type: 'LineString' as const,
+                coordinates: [
+                  [prev.longitude, prev.latitude],
+                  [curr.longitude, curr.latitude],
+                ],
+              },
+            });
+          }
+
           (map.getSource('track') as mapboxgl.GeoJSONSource)?.setData({
             type: 'FeatureCollection',
-            features: [{
-              type: 'Feature',
-              properties: {
-                altitude: avgAltitude,
-              },
-              geometry: {
-                type: 'LineString',
-                coordinates,
-              },
-            }],
+            features,
           });
-
-          // Update gradient track source (same geometry, but with lineMetrics)
-          (map.getSource('track-gradient') as mapboxgl.GeoJSONSource)?.setData({
-            type: 'FeatureCollection',
-            features: [{
-              type: 'Feature',
-              properties: {},
-              geometry: {
-                type: 'LineString',
-                coordinates,
-              },
-            }],
-          });
-
-          // Calculate altitude gradient stops and update the gradient layer
-          altitudeGradientStops = calculateAltitudeGradient(fixes);
-          updateGradientLayer();
 
           // Fit map to track bounds
           const bounds = getBoundingBox(fixes);
@@ -946,11 +908,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             type: 'FeatureCollection',
             features: [],
           });
-          (map.getSource('track-gradient') as mapboxgl.GeoJSONSource)?.setData({
-            type: 'FeatureCollection',
-            features: [],
-          });
-          altitudeGradientStops = [];
           // Clear 3D track if present
           if (map.getLayer('track-3d')) {
             map.setLayoutProperty('track-3d', 'visibility', 'none');

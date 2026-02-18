@@ -43,6 +43,7 @@ bun run test         # Run tests with bun's built-in test runner
 bun run deploy       # Manual deploy to Cloudflare Pages
 bun run deploy:worker # Manual deploy AirScore API Worker
 bun run deploy:all   # Deploy Pages + all Workers
+bun run detect-events <flight.igc> [task.xctask]  # CLI: detect events from IGC file (CSV output)
 ```
 
 **CI/CD:**
