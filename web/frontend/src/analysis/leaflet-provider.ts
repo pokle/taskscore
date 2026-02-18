@@ -236,42 +236,53 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
       }
       const altRange = maxAlt - minAlt;
 
-      // Outline behind gradient segments (interactive for track click detection)
+      // Invisible hit area for click detection
       const allLatLngs: LatLngExpression[] = fixes.map(f => [f.latitude, f.longitude]);
-      const gradientOutline = new Polyline(allLatLngs, {
-        color: TRACK_OUTLINE_COLOR,
-        weight: 8,
-        opacity: 0.6,
+      const hitArea = new Polyline(allLatLngs, {
+        color: '#000000',
+        weight: 16,
+        opacity: 0.01,
       });
-      bindTrackClick(gradientOutline);
-      trackGradientGroup.addLayer(gradientOutline);
+      bindTrackClick(hitArea);
+      trackGradientGroup.addLayer(hitArea);
 
-      // Leaflet doesn't support gradients natively, so we approximate with colored segments.
-      // This creates separate polylines which is less efficient than MapBox's line-gradient,
-      // but provides reasonable performance for typical track sizes (< 20k fixes).
+      // Pre-compute segments with altitude data
       const maxSegments = 500;
       const numSegments = Math.min(maxSegments, fixes.length - 1);
       const step = Math.max(1, Math.floor(fixes.length / numSegments));
+      const segments: { latlngs: LatLngExpression[], normalizedAlt: number }[] = [];
 
       for (let i = 0; i < fixes.length - 1; i += step) {
         const end = Math.min(i + step + 1, fixes.length);
-        const segment: LatLngExpression[] = [];
+        const segLatLngs: LatLngExpression[] = [];
         for (let j = i; j < end; j++) {
-          segment.push([fixes[j].latitude, fixes[j].longitude]);
+          segLatLngs.push([fixes[j].latitude, fixes[j].longitude]);
         }
         const midIdx = Math.floor((i + end - 1) / 2);
         const normalizedAlt = altRange > 0
           ? (fixes[midIdx].gnssAltitude - minAlt) / altRange
           : 0;
+        segments.push({ latlngs: segLatLngs, normalizedAlt });
+      }
 
-        trackGradientGroup.addLayer(
-          new Polyline(segment, {
-            color: getAltitudeColorNormalized(normalizedAlt),
-            weight: 4,
-            opacity: 0.95,
-            interactive: false,
-          })
-        );
+      // Outline segments (bottom layer) - wider at higher altitude
+      for (const seg of segments) {
+        trackGradientGroup.addLayer(new Polyline(seg.latlngs, {
+          color: TRACK_OUTLINE_COLOR,
+          weight: 4 + seg.normalizedAlt * 8,
+          opacity: 0.6,
+          interactive: false,
+        }));
+      }
+
+      // Altitude-colored segments (top layer) - wider at higher altitude
+      for (const seg of segments) {
+        trackGradientGroup.addLayer(new Polyline(seg.latlngs, {
+          color: getAltitudeColorNormalized(seg.normalizedAlt),
+          weight: 2 + seg.normalizedAlt * 4,
+          opacity: 0.95,
+          interactive: false,
+        }));
       }
     }
 
@@ -341,23 +352,61 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
 
         const latlngs: LatLngExpression[] = fixes.map(f => [f.latitude, f.longitude]);
 
-        // Outline (behind)
-        const outline = new Polyline(latlngs, {
-          color: TRACK_OUTLINE_COLOR,
-          weight: 8,
-          opacity: 0.6,
+        // Invisible hit area for click detection
+        const hitArea = new Polyline(latlngs, {
+          color: '#000000',
+          weight: 16,
+          opacity: 0.01,
         });
-        bindTrackClick(outline);
-        trackGroup.addLayer(outline);
+        bindTrackClick(hitArea);
+        trackGroup.addLayer(hitArea);
 
-        // Solid orange track
-        const solid = new Polyline(latlngs, {
-          color: TRACK_COLOR,
-          weight: 4,
-          opacity: 0.95,
-        });
-        bindTrackClick(solid);
-        trackGroup.addLayer(solid);
+        // Calculate altitude range for normalization
+        let minAlt = Infinity, maxAlt = -Infinity;
+        for (const fix of fixes) {
+          if (fix.gnssAltitude < minAlt) minAlt = fix.gnssAltitude;
+          if (fix.gnssAltitude > maxAlt) maxAlt = fix.gnssAltitude;
+        }
+        const altRange = maxAlt - minAlt;
+
+        // Pre-compute segments with altitude data
+        // Higher altitude segments render wider, creating a depth effect in top-down view
+        const maxSegments = 500;
+        const step = Math.max(1, Math.floor(fixes.length / maxSegments));
+        const segments: { latlngs: LatLngExpression[], normalizedAlt: number }[] = [];
+
+        for (let i = 0; i < fixes.length - 1; i += step) {
+          const end = Math.min(i + step + 1, fixes.length);
+          const segLatLngs: LatLngExpression[] = [];
+          for (let j = i; j < end; j++) {
+            segLatLngs.push([fixes[j].latitude, fixes[j].longitude]);
+          }
+          const midIdx = Math.floor((i + end - 1) / 2);
+          const normalizedAlt = altRange > 0
+            ? (fixes[midIdx].gnssAltitude - minAlt) / altRange
+            : 0.5;
+          segments.push({ latlngs: segLatLngs, normalizedAlt });
+        }
+
+        // Outline segments (bottom layer) - wider at higher altitude
+        for (const seg of segments) {
+          trackGroup.addLayer(new Polyline(seg.latlngs, {
+            color: TRACK_OUTLINE_COLOR,
+            weight: 4 + seg.normalizedAlt * 8,
+            opacity: 0.6,
+            interactive: false,
+          }));
+        }
+
+        // Track segments (top layer) - wider at higher altitude
+        for (const seg of segments) {
+          trackGroup.addLayer(new Polyline(seg.latlngs, {
+            color: TRACK_COLOR,
+            weight: 2 + seg.normalizedAlt * 4,
+            opacity: 0.95,
+            interactive: false,
+          }));
+        }
 
         // Build altitude gradient variant
         buildGradientTrack(fixes);
