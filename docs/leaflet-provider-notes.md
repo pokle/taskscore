@@ -2,6 +2,8 @@
 
 Technical notes and bug fixes from implementing the Leaflet 2.0.0-alpha.1 map provider.
 
+> **Visual spec**: The Leaflet provider must match the visual behavior defined in [`mapbox-interactions-spec.md`](mapbox-interactions-spec.md) — the single source of truth for all map provider visuals and interactions.
+
 ## Canvas Renderer Bug (alpha.1)
 
 **Symptom:** With `preferCanvas: true`, canvas-drawn elements (Polyline, Polygon) rendered to the top-left corner of the map, while DOM-based elements (Marker, DivIcon, Tooltip) rendered at correct positions.

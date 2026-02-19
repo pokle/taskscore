@@ -116,24 +116,7 @@ import { haversineDistance, calculateBearingRadians, destinationPoint } from './
 
 ## Visual Representation
 
-### Task Line Display
-- **Style**: Dashed line (dash pattern: 4px on, 4px off)
-- **Color**: Indigo (#6366f1)
-- **Width**: 2px
-- **Opacity**: 0.8
-
-### Distance Labels
-Each segment between consecutive optimized points displays:
-- **Content**: Distance in kilometers with 1 decimal place (e.g., "23.4 km")
-- **Position**: Midpoint of the line segment
-- **Style**:
-  - Background: White
-  - Text color: Indigo (#6366f1)
-  - Border: 1px solid indigo
-  - Font size: 11px
-  - Font weight: 600 (semi-bold)
-  - Border radius: 4px
-  - Padding: 2px 6px
+Visual styling for the task line, distance labels, and turnpoint rendering is defined in the "Task" section of [`mapbox-interactions-spec.md`](mapbox-interactions-spec.md) — the single source of truth for all map visuals.
 
 ### Total Distance Display
 Shown in the flight info panel:

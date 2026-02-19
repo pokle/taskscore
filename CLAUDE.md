@@ -207,6 +207,7 @@ Users can load task and track data from AirScore directly in the analysis tool:
 **Map Providers:**
 - MapBox GL JS (default) and Leaflet, switchable via command menu or `?m=l`/`?m=m` URL param
 - MapBox configured via `VITE_MAPBOX_TOKEN` environment variable
+- **Single source of truth for map visuals/interactions**: [`docs/mapbox-interactions-spec.md`](docs/mapbox-interactions-spec.md) — all colors, widths, fonts, layer ordering, interactions, and zoom behaviors. All map providers must match this spec. Do not duplicate these details in other docs; reference the spec instead.
 
 ## UI Component Index
 
@@ -224,10 +225,10 @@ All paths relative to `web/frontend/src/`. The analysis page (`analysis.html`) i
   - Event list, glide list, climb list, sink list, task/turnpoint list
   - Event count bar
 
-**Map:**
+**Map** (visual spec: [`docs/mapbox-interactions-spec.md`](docs/mapbox-interactions-spec.md)):
 - `analysis/map-provider.ts` - Map provider interface + factory (`createMapProvider()`)
-- `analysis/mapbox-provider.ts` - MapBox GL rendering (track, task cylinders, event markers, 3D)
-- `analysis/leaflet-provider.ts` - Leaflet rendering (alternative provider)
+- `analysis/mapbox-provider.ts` - MapBox GL JS reference implementation
+- `analysis/leaflet-provider.ts` - Leaflet implementation (must match mapbox visual spec)
 - `analysis/map-provider-shared.ts` - Shared helpers (altitude colors, glide legend)
 
 **Dialogs** (all defined in `analysis.html`):
