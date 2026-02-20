@@ -15,18 +15,7 @@ Single page app
 - **XContest Task Code**: Load competition tasks by entering the task code from xcontest.org
 
 ### Map Display
-- **3D Terrain**: MapBox GL JS with terrain elevation and sky atmosphere
-- **Track Visualization**: Flight track displayed with altitude-based coloring (toggleable)
-  - Brown: Low altitude (0-1000m) - earthy colors near the ground
-  - Green: Medium altitude (1000-2000m) - transitional
-  - Light Blue: High altitude (2000-3000m) - approaching sky
-  - Sky Blue: Very high altitude (>3000m) - sky colors at altitude
-- **Task Display**:
-  - Turnpoint cylinders with color coding (green=SSS, yellow=ESS, purple=intermediate)
-    - Label at center of waypoint with name, radius, altitude and role (e.g. "ELLIOT, R 5km, A 3067m, SSS")
-  - Optimised line connecting turnpoints
-    - Dotted
-    - Label in the centre of line with distance and leg number (e.g. "Leg 1: 15.2km")
+All map visual details (colors, widths, fonts, interactions) are defined in [`mapbox-interactions-spec.md`](mapbox-interactions-spec.md) — the single source of truth for all map providers.
 
 ### Track Interaction
 Users can click directly on the flight track to view event details:
@@ -163,39 +152,13 @@ Sidebar panel with tabbed interface for viewing flight data. The main tabs appea
 - Selected item automatically scrolls into view when switching tabs
 
 ### Event Selection Visualization
-When an event is selected from the panel:
-
-- **Segment Highlighting**: For thermal and glide events, the corresponding track segment is highlighted with a bright cyan line (6px width) to clearly show the extent of the segment
-- **Auto-Popup**: A popup appears showing event details (description, time, altitude) anchored to:
-  - Entry/start point for thermal_entry and glide_start events
-  - Exit/end point for thermal_exit and glide_end events
-  - Event location for point events (takeoff, max altitude, etc.)
-- **Segment Markers**: For segment events (thermals, glides), two markers are displayed:
-  - **Start marker**: Ring/outline style circle at the segment start
-  - **End marker**: Filled circle at the segment end
-- **Point Marker**: For non-segment events, a single filled marker at the event location
-- **Glide Direction Chevrons**: When a glide event is selected, chevron markers are displayed along the glide path to indicate flight direction:
-  - Chevrons placed every 500m along the glide trail
-  - Each chevron rotated to match the local track bearing at that point
-  - Blue chevron markers with white outline for visibility
-  - Performance labels displayed 250m before each chevron showing metrics for the 500m segment (MapBox only):
-    - **Speed**: Average speed in km/h (e.g., "45km/h")
-    - **Glide ratio**: L/D ratio for the segment (e.g., "12:1"), shows "∞:1" if climbing/level
-    - **Altitude change**: Altitude difference in meters (e.g., "-42m" for descent, "+5m" for climb)
-    - Example display: "45km/h" on first line, "12:1 -42m" on second line
-    - Labels styled with blue text and white text shadow for readability
-- **Glide Metrics Legend**: A help button appears at the bottom-right of the map when a glide event is selected:
-  - Blue circular "?" button that expands on click
-  - Shows explanations for: chevron spacing (500m segments), speed, L/D ratio, and altitude change
-  - Automatically hidden when selecting non-glide events
+When an event is selected from the panel, the map highlights the event location with segment lines, endpoint markers, glide chevrons, and speed labels. Full visual details (colors, sizes, throb animation, zoom-dependent label visibility) are defined in the "Event Highlight" section of [`mapbox-interactions-spec.md`](mapbox-interactions-spec.md).
 
 **Selection Clearing**: Event selection and all associated visualizations (segment highlight, markers, legend) are automatically cleared when:
 - Loading a new IGC file
 - Toggling 3D track mode
 - Toggling altitude colors mode
 - Anything else that results in the visualisation or information presented being unrelated to the track or task being shown.
-
-This visual system helps pilots quickly identify and understand the spatial extent of flight phases.
 
 ## Technical Architecture
 

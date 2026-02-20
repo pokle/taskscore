@@ -64,15 +64,7 @@ Segment events (glides, thermals) already have `segment.startIndex` / `segment.e
 - The SVG is inlined as a data URI CSS background-image on the sparkline inner element
 
 ### Color gradient
-Vertical linear gradient matching the track altitude colors on the map:
-
-| Offset | Color | Meaning |
-|--------|-------|---------|
-| 0% | `rgb(139,90,43)` - Brown | Low altitude |
-| 25% | `rgb(67,160,71)` - Green | Medium altitude |
-| 50% | `rgb(3,155,229)` - Blue | Higher altitude |
-| 75% | `rgb(41,182,246)` - Light blue | High altitude |
-| 100% | `rgb(79,195,247)` - Lighter blue | Very high altitude |
+Vertical linear gradient matching the map's altitude color ramp (see "Altitude-color mode" in [`mapbox-interactions-spec.md`](mapbox-interactions-spec.md) for the canonical color definitions).
 
 Fill opacity: **0.4**
 
