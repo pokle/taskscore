@@ -383,6 +383,11 @@
     font-family: 'Atkinson Hyperlegible Next', ui-monospace, monospace;
   }
 
+  #track-point-hud .hud-wind {
+    @apply text-white/75 text-sm leading-tight;
+    font-family: 'Atkinson Hyperlegible Next', ui-monospace, monospace;
+  }
+
   #track-point-hud .hud-window {
     @apply text-white/40 text-xs leading-tight mt-0.5;
     font-family: 'Atkinson Hyperlegible Next', ui-monospace, monospace;

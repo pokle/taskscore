@@ -18,7 +18,7 @@ import {
   findNearestFixIndex as sharedFindNearestFixIndex,
   createCirclePolygon, createGlideLegend, showGlideLegend as sharedShowGlideLegend,
   createTrackPointHUD, updateTrackPointHUD, hideTrackPointHUD as sharedHideTrackPointHUD,
-  CROSSHAIR_MAP_SVG,
+  CROSSHAIR_MAP_SVG, estimateWindFromNearbyCircles,
 } from './map-provider-shared';
 
 // Set MapBox access token from environment variable
@@ -1486,7 +1486,17 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             req = `\u2198${metrics.requiredGlideRatio.toFixed(0)}:1 to ${metrics.targetName}`;
           }
 
-          updateTrackPointHUD(hudElement, speed, detail, req);
+          // Estimate wind from nearby circles
+          let wind: { direction: number; speedText: string } | undefined;
+          const windEst = estimateWindFromNearbyCircles(currentEvents, fixIndex);
+          if (windEst) {
+            wind = {
+              direction: windEst.direction,
+              speedText: formatSpeed(windEst.speed).withUnit,
+            };
+          }
+
+          updateTrackPointHUD(hudElement, speed, detail, req, wind);
         },
 
         hideTrackPointHUD() {

@@ -5,7 +5,7 @@
  * can reuse the same constants, color functions, geometry helpers, and DOM builders.
  */
 
-import { haversineDistance, getCirclePoints, type IGCFix } from '@taskscore/analysis';
+import { haversineDistance, getCirclePoints, type IGCFix, type FlightEvent } from '@taskscore/analysis';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -234,6 +234,70 @@ export function showGlideLegend(element: HTMLElement | null, show: boolean): voi
   }
 }
 
+// ── Wind estimation from nearby circles ─────────────────────────────────
+
+export interface NearbyWindEstimate {
+  speed: number;      // m/s
+  direction: number;  // degrees, direction wind is FROM (0-360)
+  count: number;      // number of circles averaged
+}
+
+/**
+ * Estimate wind from up to 3 nearest circle_complete events to a fix index.
+ * Averages their ground-speed wind estimates using circular mean for direction.
+ */
+export function estimateWindFromNearbyCircles(
+  events: FlightEvent[],
+  fixIndex: number,
+  maxCircles: number = 3,
+): NearbyWindEstimate | null {
+  // Collect circles that have wind data, with their distance to fixIndex
+  const circlesWithWind: { dist: number; speed: number; direction: number }[] = [];
+
+  for (const e of events) {
+    if (e.type !== 'circle_complete' || !e.segment) continue;
+    const details = e.details as Record<string, unknown> | undefined;
+    if (!details) continue;
+
+    // Prefer ground-speed wind; fall back to drift wind
+    let speed = details.windSpeed as number | undefined;
+    let dir = details.windDirection as number | undefined;
+    if (speed == null || dir == null) {
+      speed = details.driftWindSpeed as number | undefined;
+      dir = details.driftWindDirection as number | undefined;
+    }
+    if (speed == null || dir == null) continue;
+
+    // Distance = closest segment boundary to fixIndex
+    const midIndex = Math.round((e.segment.startIndex + e.segment.endIndex) / 2);
+    const dist = Math.abs(midIndex - fixIndex);
+    circlesWithWind.push({ dist, speed, direction: dir });
+  }
+
+  if (circlesWithWind.length === 0) return null;
+
+  // Sort by distance and take nearest N
+  circlesWithWind.sort((a, b) => a.dist - b.dist);
+  const nearest = circlesWithWind.slice(0, maxCircles);
+
+  // Average speed (arithmetic) and direction (circular mean)
+  let sumSpeed = 0;
+  let sumSin = 0;
+  let sumCos = 0;
+  for (const c of nearest) {
+    sumSpeed += c.speed;
+    const rad = (c.direction * Math.PI) / 180;
+    sumSin += Math.sin(rad);
+    sumCos += Math.cos(rad);
+  }
+
+  const avgSpeed = sumSpeed / nearest.length;
+  let avgDirection = (Math.atan2(sumSin / nearest.length, sumCos / nearest.length) * 180) / Math.PI;
+  if (avgDirection < 0) avgDirection += 360;
+
+  return { speed: avgSpeed, direction: avgDirection, count: nearest.length };
+}
+
 // ── Crosshair SVG ───────────────────────────────────────────────────────
 
 /** Crosshair SVG for the map marker (white with drop-shadow for visibility) */
@@ -265,10 +329,19 @@ export function createTrackPointHUD(container: HTMLElement): HTMLElement {
     <div class="hud-speed"></div>
     <div class="hud-detail"></div>
     <div class="hud-req"></div>
+    <div class="hud-wind"></div>
     <div class="hud-window">1 km avg</div>
   `;
   container.appendChild(hud);
   return hud;
+}
+
+/** Wind arrow SVG pointing down (south). Rotate by wind-FROM direction to show flow. */
+function windArrowSVG(direction: number): string {
+  return `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="display:inline-block;vertical-align:middle;margin-right:3px;transform:rotate(${direction}deg)">
+    <line x1="7" y1="1" x2="7" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <path d="M3 8 L7 12 L11 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
 }
 
 /** Update HUD content and show it */
@@ -277,10 +350,12 @@ export function updateTrackPointHUD(
   speed: string,
   detail: string,
   req?: string,
+  wind?: { direction: number; speedText: string },
 ): void {
   const speedEl = el.querySelector('.hud-speed') as HTMLElement;
   const detailEl = el.querySelector('.hud-detail') as HTMLElement;
   const reqEl = el.querySelector('.hud-req') as HTMLElement;
+  const windEl = el.querySelector('.hud-wind') as HTMLElement;
 
   speedEl.innerHTML = `${CROSSHAIR_HUD_SVG}${speed}`;
   detailEl.textContent = detail;
@@ -291,6 +366,14 @@ export function updateTrackPointHUD(
   } else {
     reqEl.textContent = '';
     reqEl.style.display = 'none';
+  }
+
+  if (wind) {
+    windEl.innerHTML = `${windArrowSVG(wind.direction)}${wind.speedText}`;
+    windEl.style.display = '';
+  } else {
+    windEl.innerHTML = '';
+    windEl.style.display = 'none';
   }
 
   el.style.display = '';
