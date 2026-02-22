@@ -205,9 +205,9 @@ function getTurnpointTypeLabel(type?: 'TAKEOFF' | 'SSS' | 'ESS'): string {
  */
 function getTurnpointTypeClass(type?: 'TAKEOFF' | 'SSS' | 'ESS'): string {
   switch (type) {
-    case 'SSS': return 'text-green-600 dark:text-green-400';
-    case 'ESS': return 'text-red-600 dark:text-red-400';
-    default: return 'text-blue-600 dark:text-blue-400';
+    case 'SSS': return 'text-green-600';
+    case 'ESS': return 'text-red-600';
+    default: return 'text-blue-600';
   }
 }
 
@@ -1160,11 +1160,11 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
 
     // A. Status banner
     if (result.madeGoal) {
-      html += `<div class="rounded-lg bg-green-500/15 px-3 py-2 text-sm font-medium text-green-700 dark:text-green-400">Goal</div>`;
+      html += `<div class="rounded-lg bg-green-500/15 px-3 py-2 text-sm font-medium text-green-700">Goal</div>`;
     } else if (result.sequence.length > 0) {
       const lastTP = result.sequence[result.sequence.length - 1];
       const tpName = currentTask.turnpoints[lastTP.taskIndex]?.waypoint.name || getTurnpointLabel(lastTP.taskIndex);
-      html += `<div class="rounded-lg bg-yellow-500/15 px-3 py-2 text-sm font-medium text-yellow-700 dark:text-yellow-400">${getTurnpointLabel(lastTP.taskIndex)} reached &ndash; ${tpName}</div>`;
+      html += `<div class="rounded-lg bg-yellow-500/15 px-3 py-2 text-sm font-medium text-yellow-700">${getTurnpointLabel(lastTP.taskIndex)} reached &ndash; ${tpName}</div>`;
     } else {
       html += `<div class="rounded-lg bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">Not started</div>`;
     }
@@ -1214,7 +1214,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       const toName = toTp?.waypoint.name ? `${toTp.waypoint.name} <span class="text-xs text-muted-foreground">(${toLabel})</span>` : toLabel;
       const legDist = formatDistance(leg.distance).withUnit;
       const icon = leg.completed
-        ? '<span class="text-green-600 dark:text-green-400">&#10003;</span>'
+        ? '<span class="text-green-600">&#10003;</span>'
         : '<span class="text-muted-foreground">&#10007;</span>';
       html += `
         <div class="flex items-center justify-between py-1 text-sm">

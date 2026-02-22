@@ -9,49 +9,11 @@
     <!-- Styles -->
     <link rel="stylesheet" href="/styles.css">
 
-    <!-- Theme initialization - must run before render to prevent flash -->
-    <script>
-      (function() {
-        const stored = localStorage.getItem('themeMode');
-        if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-          document.documentElement.classList.add('dark');
-        }
-      })();
-    </script>
-
 
 </head>
 
 <body class="h-screen overflow-hidden bg-background text-foreground">
     <main class="relative h-full overflow-hidden">
-        <!-- Floating command-menu button (top-left) -->
-        <button
-            class="fixed top-3 left-3 z-40 btn btn-ghost btn-icon bg-card shadow-md border border-border rounded-lg"
-            aria-label="Menu (⌘K)"
-            title="Menu (⌘K)"
-            onclick="document.getElementById('command-dialog').showModal()"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="4" x2="20" y1="12" y2="12"/>
-                <line x1="4" x2="20" y1="6" y2="6"/>
-                <line x1="4" x2="20" y1="18" y2="18"/>
-            </svg>
-        </button>
-
-        <!-- Floating panel-toggle button (top-right) -->
-        <button
-            type="button"
-            id="header-panel-toggle"
-            class="fixed top-3 right-3 z-40 btn btn-ghost btn-icon bg-card shadow-md border border-border rounded-lg"
-            title="Toggle panel"
-            aria-label="Toggle panel"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect width="18" height="18" x="3" y="3" rx="2"/>
-                <path d="M15 3v18"/>
-            </svg>
-        </button>
-
         <!-- Analysis Panel Sidebar (slides in from right) -->
         <aside
             id="waypoint-sidebar"
@@ -190,34 +152,6 @@
                 <!-- Display Options -->
                 <div role="group" aria-labelledby="display-options-heading">
                     <div role="heading" id="display-options-heading">Display Options</div>
-                    <div role="menuitem" id="menu-theme-light" data-keywords="light theme mode bright day">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="4"/>
-                            <path d="M12 2v2"/>
-                            <path d="M12 20v2"/>
-                            <path d="m4.93 4.93 1.41 1.41"/>
-                            <path d="m17.66 17.66 1.41 1.41"/>
-                            <path d="M2 12h2"/>
-                            <path d="M20 12h2"/>
-                            <path d="m6.34 17.66-1.41 1.41"/>
-                            <path d="m19.07 4.93-1.41 1.41"/>
-                        </svg>
-                        <span>Light Theme</span>
-                    </div>
-                    <div role="menuitem" id="menu-theme-dark" data-keywords="dark theme mode night">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
-                        </svg>
-                        <span>Dark Theme</span>
-                    </div>
-                    <div role="menuitem" id="menu-theme-system" data-keywords="system theme auto automatic">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect width="20" height="14" x="2" y="3" rx="2"/>
-                            <line x1="8" x2="16" y1="21" y2="21"/>
-                            <line x1="12" x2="12" y1="17" y2="21"/>
-                        </svg>
-                        <span>System Theme</span>
-                    </div>
                     <div role="menuitem" id="menu-altitude-colors" data-keywords="altitude colors gradient">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12 20V10"/>
