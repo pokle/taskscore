@@ -1523,6 +1523,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
           const speed = formatSpeed(metrics.speedMps).withUnit;
           const pointAlt = formatAltitude(fix.gnssAltitude).withUnit;
+          const pointTime = fix.time.toLocaleTimeString();
           const altChange = formatAltitudeChange(metrics.altitudeDiff).withUnit;
 
           let req: string | undefined;
@@ -1546,7 +1547,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             }
           }
 
-          updateTrackPointHUD(hudElement, { pointAlt, speed, altChange, req, thermal });
+          updateTrackPointHUD(hudElement, { pointAlt, pointTime, speed, altChange, req, thermal });
         },
 
         hideTrackPointHUD() {

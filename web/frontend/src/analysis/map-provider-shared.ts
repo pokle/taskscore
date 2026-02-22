@@ -450,6 +450,7 @@ export function updateTrackPointHUD(
   el: HTMLElement,
   opts: {
     pointAlt: string;
+    pointTime: string;
     speed: string;
     altChange: string;
     req?: string;
@@ -464,7 +465,7 @@ export function updateTrackPointHUD(
   const thermalAltEl = el.querySelector('.hud-thermal-alt') as HTMLElement;
   const windEl = el.querySelector('.hud-wind') as HTMLElement;
 
-  altEl.textContent = opts.pointAlt;
+  altEl.textContent = `${opts.pointAlt} at ${opts.pointTime}`;
   speedEl.textContent = `${opts.speed}  ${opts.altChange}`;
 
   if (opts.req) {
