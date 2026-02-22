@@ -782,9 +782,7 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
 
             // Glide chevrons and speed labels
             if (isGlideEvent) {
-              const glideStartTime = segmentFixes[0].time.getTime();
-              const glideContext = getNextTurnpointContext(glideStartTime);
-              const glideMarkers = calculateGlideMarkers(segmentFixes, glideContext);
+              const glideMarkers = calculateGlideMarkers(segmentFixes, getNextTurnpointContext);
 
               for (const gm of glideMarkers) {
                 if (gm.type === 'speed-label') {
