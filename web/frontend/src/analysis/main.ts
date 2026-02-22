@@ -1058,6 +1058,11 @@ async function init(): Promise<void> {
 
   // Load from query params if present (e.g., ?task=buje&track=sample.igc)
   await loadFromQueryParams(loadTask, loadLocalTask, loadIGCFile);
+
+  // If no task or track was loaded, open the command menu to guide users
+  if (!params.get('task') && !params.get('track')) {
+    commandDialog?.showModal();
+  }
 }
 
 /**
