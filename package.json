@@ -5,7 +5,7 @@
   "description": "Hanggliding/paragliding competition track log analysis",
   "type": "module",
   "scripts": {
-    "dev": "bun run --filter '@taskscore/frontend' dev",
+    "dev": "[ -d node_modules ] || bun install && bun run --filter '@taskscore/frontend' dev",
     "build": "bun run --filter '@taskscore/frontend' build",
     "deploy": "bun run --filter '@taskscore/frontend' deploy",
     "deploy:worker": "bun run --filter airscore-api deploy",
