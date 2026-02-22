@@ -105,12 +105,15 @@ async function init(): Promise<void> {
   }
 
   // Determine map provider: URL param > saved preference > default
+  // Fall back to leaflet if no MapBox token is configured
   const mapParam = new URLSearchParams(window.location.search).get('m');
   const savedMapProvider = config.getPreferences().mapProvider;
+  const hasMapboxToken = !!import.meta.env.VITE_MAPBOX_TOKEN;
+  const defaultProvider: MapProviderType = hasMapboxToken ? 'mapbox' : 'leaflet';
   const providerType: MapProviderType =
     mapParam === 'l' ? 'leaflet' :
     mapParam === 'm' ? 'mapbox' :
-    savedMapProvider ?? 'mapbox';
+    savedMapProvider ?? defaultProvider;
 
   // Initialize map
   try {
