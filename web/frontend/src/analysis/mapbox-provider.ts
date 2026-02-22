@@ -1284,10 +1284,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
               // For glide events, add direction chevrons every ~1km with speed labels
               if (event.type === 'glide_start' || event.type === 'glide_end') {
-                // Compute required GR context for the glide
-                const glideStartTime = segmentFixes[0].time.getTime();
-                const glideContext = getNextTurnpointContext(glideStartTime);
-                const glideMarkers = calculateGlideMarkers(segmentFixes, glideContext);
+                const glideMarkers = calculateGlideMarkers(segmentFixes, getNextTurnpointContext);
 
                 for (const marker of glideMarkers) {
                   if (marker.type === 'speed-label') {

@@ -33,6 +33,8 @@ export interface GlideContext {
   nextTurnpoint: { lat: number; lon: number; altitude: number; name: string } | null;
 }
 
+export type GlideContextResolver = (timeMs: number) => GlideContext | undefined;
+
 /**
  * Calculate positions along a glide segment at regular intervals.
  * Returns positions at every `interval` meters (e.g., 250m).
@@ -128,7 +130,7 @@ export function calculateGlidePositions(
  * @param fixes - Array of IGC fixes for the glide segment
  * @returns Array of markers with positions, speeds, glide ratios, and altitude differences
  */
-export function calculateGlideMarkers(fixes: IGCFix[], context?: GlideContext): GlideMarker[] {
+export function calculateGlideMarkers(fixes: IGCFix[], contextResolver?: GlideContextResolver): GlideMarker[] {
   const SEGMENT_LENGTH = 1000; // meters
   const LABEL_INTERVAL = SEGMENT_LENGTH / 2; // label at segment midpoint
 
@@ -201,6 +203,7 @@ export function calculateGlideMarkers(fixes: IGCFix[], context?: GlideContext): 
       // Calculate required glide ratio to next turnpoint
       let requiredGlideRatio: number | undefined;
       let targetName: string | undefined;
+      const context = contextResolver?.(pos.time);
       const nextTP = context?.nextTurnpoint;
       if (nextTP && pos.altitude > nextTP.altitude) {
         const distToTP = haversineDistance(pos.lat, pos.lon, nextTP.lat, nextTP.lon);

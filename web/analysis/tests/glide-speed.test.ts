@@ -6,6 +6,7 @@ import {
   calculatePointMetrics,
   GlideMarker,
   GlideContext,
+  GlideContextResolver,
 } from '../src/glide-speed';
 import { haversineDistance } from '../src/geo';
 import type { IGCFix } from '../src/igc-parser';
@@ -329,7 +330,7 @@ describe('Glide Speed Calculations', () => {
     it('should not include requiredGlideRatio when nextTurnpoint is null', () => {
       const fixes = createStraightGlide(1500, 10);
       const context: GlideContext = { nextTurnpoint: null };
-      const markers = calculateGlideMarkers(fixes, context);
+      const markers = calculateGlideMarkers(fixes, () => context);
       const labels = markers.filter(m => m.type === 'speed-label');
       expect(labels.length).toBeGreaterThan(0);
       for (const label of labels) {
@@ -344,7 +345,7 @@ describe('Glide Speed Calculations', () => {
       const context: GlideContext = {
         nextTurnpoint: { lat: 47.0, lon: 11.2, altitude: 500, name: 'TINTAL' },
       };
-      const markers = calculateGlideMarkers(fixes, context);
+      const markers = calculateGlideMarkers(fixes, () => context);
       const labels = markers.filter(m => m.type === 'speed-label');
       expect(labels.length).toBeGreaterThan(0);
       for (const label of labels) {
@@ -363,7 +364,7 @@ describe('Glide Speed Calculations', () => {
       const context: GlideContext = {
         nextTurnpoint: { lat: 47.0, lon: targetLon, altitude: 500, name: 'GOAL' },
       };
-      const markers = calculateGlideMarkers(fixes, context);
+      const markers = calculateGlideMarkers(fixes, () => context);
       const firstLabel = markers.find(m => m.type === 'speed-label');
       expect(firstLabel).toBeDefined();
       // The first label is at 500m into the glide, so distance to target
@@ -378,7 +379,7 @@ describe('Glide Speed Calculations', () => {
       const context: GlideContext = {
         nextTurnpoint: { lat: 47.0, lon: 11.2, altitude: 1500, name: 'HIGH_TP' },
       };
-      const markers = calculateGlideMarkers(fixes, context);
+      const markers = calculateGlideMarkers(fixes, () => context);
       const labels = markers.filter(m => m.type === 'speed-label');
       expect(labels.length).toBeGreaterThan(0);
       for (const label of labels) {
@@ -393,13 +394,45 @@ describe('Glide Speed Calculations', () => {
       const context: GlideContext = {
         nextTurnpoint: { lat: 47.0, lon: 11.2, altitude: 1000, name: 'LEVEL_TP' },
       };
-      const markers = calculateGlideMarkers(fixes, context);
+      const markers = calculateGlideMarkers(fixes, () => context);
       const labels = markers.filter(m => m.type === 'speed-label');
       expect(labels.length).toBeGreaterThan(0);
       for (const label of labels) {
         expect(label.requiredGlideRatio).toBeUndefined();
         expect(label.targetName).toBeUndefined();
       }
+    });
+
+    it('should resolve different targets for markers before and after a turnpoint transition', () => {
+      // 3500m glide at 10 m/s — produces labels at 500m, 1500m, 2500m, 3500m
+      // The resolver switches from CUDG to NCORGL at t=200s (2000m into glide)
+      const fixes = createStraightGlide(3500, 10, 47.0, 11.0);
+      const startTime = fixes[0].time.getTime();
+      const transitionTimeMs = startTime + 200 * 1000; // 200s = 2000m at 10m/s
+
+      const contextBefore: GlideContext = {
+        nextTurnpoint: { lat: 47.0, lon: 11.2, altitude: 500, name: 'CUDG' },
+      };
+      const contextAfter: GlideContext = {
+        nextTurnpoint: { lat: 47.1, lon: 11.3, altitude: 600, name: 'NCORGL' },
+      };
+
+      const resolver: GlideContextResolver = (timeMs: number) =>
+        timeMs < transitionTimeMs ? contextBefore : contextAfter;
+
+      const markers = calculateGlideMarkers(fixes, resolver);
+      const labels = markers.filter(m => m.type === 'speed-label');
+
+      // Should have labels at 500m, 1500m, 2500m, 3500m
+      expect(labels.length).toBeGreaterThanOrEqual(3);
+
+      // Labels before transition (500m @ 50s, 1500m @ 150s) should target CUDG
+      const beforeLabels = labels.filter(l => l.targetName === 'CUDG');
+      expect(beforeLabels.length).toBeGreaterThanOrEqual(1);
+
+      // Labels after transition (2500m @ 250s, 3500m @ 350s) should target NCORGL
+      const afterLabels = labels.filter(l => l.targetName === 'NCORGL');
+      expect(afterLabels.length).toBeGreaterThanOrEqual(1);
     });
   });
 
