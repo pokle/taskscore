@@ -7,76 +7,14 @@
 
 import { getEventStyle, getOptimizedSegmentDistances, resolveTurnpointSequence, type FlightEvent, type FlightEventType, type XCTask, type TurnpointSequenceResult } from '@taskscore/analysis';
 import { formatAltitude, formatSpeed, formatDistance, formatClimbRate } from './units-browser';
+import { extractGlides, type GlideData } from './glide-extractor';
+import { extractClimbs, type ClimbData } from './climb-extractor';
+import { extractSinks, type SinkData } from './sink-extractor';
 
 /**
  * Unified panel tabs
  */
 export type PanelTabType = 'task' | 'score' | 'events' | 'glides' | 'climbs' | 'sinks';
-
-/**
- * Combined glide data from start and end events
- */
-interface GlideData {
-  id: string;
-  startTime: Date;
-  endTime: Date;
-  startAltitude: number;
-  endAltitude: number;
-  distance: number;
-  duration: number;
-  averageSpeed: number;
-  glideRatio: number;
-  altitudeLost: number;
-  startLat: number;
-  startLon: number;
-  endLat: number;
-  endLon: number;
-  segment: { startIndex: number; endIndex: number };
-  sourceEvent: FlightEvent;
-}
-
-/**
- * Combined climb/thermal data from entry and exit events
- */
-interface ClimbData {
-  id: string;
-  startTime: Date;
-  endTime: Date;
-  startAltitude: number;
-  endAltitude: number;
-  altitudeGain: number;
-  duration: number;
-  avgClimbRate: number;
-  startLat: number;
-  startLon: number;
-  endLat: number;
-  endLon: number;
-  segment: { startIndex: number; endIndex: number };
-  sourceEvent: FlightEvent;
-}
-
-/**
- * Combined sink/descent data
- */
-interface SinkData {
-  id: string;
-  startTime: Date;
-  endTime: Date;
-  startAltitude: number;
-  endAltitude: number;
-  altitudeLost: number;
-  distance: number;
-  duration: number;
-  averageSpeed: number;
-  avgSinkRate: number;
-  glideRatio: number;
-  startLat: number;
-  startLon: number;
-  endLat: number;
-  endLon: number;
-  segment: { startIndex: number; endIndex: number };
-  sourceEvent: FlightEvent;
-}
 
 export interface AnalysisPanelOptions {
   container: HTMLElement;
@@ -632,154 +570,22 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   /**
    * Extract combined glide data
    */
-  function extractGlides(): GlideData[] {
-    const glides: GlideData[] = [];
-
-    for (const event of allEvents) {
-      if (event.type === 'glide_start' && event.segment && event.details) {
-        const details = event.details as {
-          distance?: number;
-          averageSpeed?: number;
-          glideRatio?: number;
-          duration?: number;
-        };
-
-        const endEvent = allEvents.find(
-          e => e.type === 'glide_end' &&
-               e.segment?.startIndex === event.segment?.startIndex &&
-               e.segment?.endIndex === event.segment?.endIndex
-        );
-
-        if (endEvent) {
-          glides.push({
-            id: event.id,
-            startTime: event.time,
-            endTime: endEvent.time,
-            startAltitude: event.altitude,
-            endAltitude: endEvent.altitude,
-            distance: details.distance || 0,
-            duration: details.duration || 0,
-            averageSpeed: details.averageSpeed || 0,
-            glideRatio: details.glideRatio || 0,
-            altitudeLost: event.altitude - endEvent.altitude,
-            startLat: event.latitude,
-            startLon: event.longitude,
-            endLat: endEvent.latitude,
-            endLon: endEvent.longitude,
-            segment: event.segment,
-            sourceEvent: event,
-          });
-        }
-      }
-    }
-
-    glides.sort((a, b) => b.distance - a.distance);
-    return glides;
+  function extractGlidesLocal(): GlideData[] {
+    return extractGlides(allEvents);
   }
 
   /**
    * Extract combined climb data
    */
-  function extractClimbs(): ClimbData[] {
-    const climbs: ClimbData[] = [];
-
-    for (const event of allEvents) {
-      if (event.type === 'thermal_entry' && event.segment && event.details) {
-        const details = event.details as {
-          avgClimbRate?: number;
-          duration?: number;
-          altitudeGain?: number;
-        };
-
-        const exitEvent = allEvents.find(
-          e => e.type === 'thermal_exit' &&
-               e.segment?.startIndex === event.segment?.startIndex &&
-               e.segment?.endIndex === event.segment?.endIndex
-        );
-
-        if (exitEvent) {
-          climbs.push({
-            id: event.id,
-            startTime: event.time,
-            endTime: exitEvent.time,
-            startAltitude: event.altitude,
-            endAltitude: exitEvent.altitude,
-            altitudeGain: details.altitudeGain || (exitEvent.altitude - event.altitude),
-            duration: details.duration || 0,
-            avgClimbRate: details.avgClimbRate || 0,
-            startLat: event.latitude,
-            startLon: event.longitude,
-            endLat: exitEvent.latitude,
-            endLon: exitEvent.longitude,
-            segment: event.segment,
-            sourceEvent: event,
-          });
-        }
-      }
-    }
-
-    climbs.sort((a, b) => b.altitudeGain - a.altitudeGain);
-    return climbs;
+  function extractClimbsLocal(): ClimbData[] {
+    return extractClimbs(allEvents);
   }
 
   /**
    * Extract sink data
    */
-  function extractSinks(): SinkData[] {
-    const sinks: SinkData[] = [];
-    const maxGlideRatioForSink = 5;
-
-    for (const event of allEvents) {
-      if (event.type === 'glide_start' && event.segment && event.details) {
-        const details = event.details as {
-          distance?: number;
-          averageSpeed?: number;
-          glideRatio?: number;
-          duration?: number;
-        };
-
-        const glideRatio = details.glideRatio || 0;
-
-        if (glideRatio > maxGlideRatioForSink) {
-          continue;
-        }
-
-        const endEvent = allEvents.find(
-          e => e.type === 'glide_end' &&
-               e.segment?.startIndex === event.segment?.startIndex &&
-               e.segment?.endIndex === event.segment?.endIndex
-        );
-
-        if (endEvent) {
-          const altitudeLost = event.altitude - endEvent.altitude;
-          const duration = details.duration || 0;
-          const avgSinkRate = duration > 0 ? altitudeLost / duration : 0;
-
-          sinks.push({
-            id: event.id,
-            startTime: event.time,
-            endTime: endEvent.time,
-            startAltitude: event.altitude,
-            endAltitude: endEvent.altitude,
-            altitudeLost: altitudeLost,
-            distance: details.distance || 0,
-            duration: duration,
-            averageSpeed: details.averageSpeed || 0,
-            avgSinkRate: avgSinkRate,
-            glideRatio: glideRatio,
-            startLat: event.latitude,
-            startLon: event.longitude,
-            endLat: endEvent.latitude,
-            endLon: endEvent.longitude,
-            segment: event.segment,
-            sourceEvent: event,
-          });
-        }
-      }
-    }
-
-    sinks.sort((a, b) => b.altitudeLost - a.altitudeLost);
-    return sinks;
+  function extractSinksLocal(): SinkData[] {
+    return extractSinks(allEvents);
   }
 
   /**
@@ -873,7 +679,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
    * Render glides list
    */
   function renderGlides(): void {
-    const glides = extractGlides();
+    const glides = extractGlidesLocal();
 
     if (glides.length === 0) {
       listContainer.innerHTML = `
@@ -957,7 +763,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
    * Render climbs list
    */
   function renderClimbs(): void {
-    const climbs = extractClimbs();
+    const climbs = extractClimbsLocal();
 
     if (climbs.length === 0) {
       listContainer.innerHTML = `
@@ -1037,7 +843,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
    * Render sinks list
    */
   function renderSinks(): void {
-    const sinks = extractSinks();
+    const sinks = extractSinksLocal();
 
     if (sinks.length === 0) {
       listContainer.innerHTML = `
@@ -1467,13 +1273,13 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     let matchingEvent: FlightEvent | null = null;
 
     if (currentTab === 'glides') {
-      const glides = extractGlides();
+      const glides = extractGlidesLocal();
       matchingEvent = findNearestSegmentEvent(fixIndex, glides);
     } else if (currentTab === 'climbs') {
-      const climbs = extractClimbs();
+      const climbs = extractClimbsLocal();
       matchingEvent = findNearestSegmentEvent(fixIndex, climbs);
     } else if (currentTab === 'sinks') {
-      const sinks = extractSinks();
+      const sinks = extractSinksLocal();
       matchingEvent = findNearestSegmentEvent(fixIndex, sinks);
     } else if (currentTab === 'events') {
       // For the events tab, find the nearest event by fixIndex or segment
