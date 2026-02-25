@@ -5,25 +5,12 @@
  * by pairing start/end events and computing performance metrics.
  */
 
-import type { FlightEvent, TrackSegment } from './event-detector';
+import type { FlightEvent, TrackSegment, GlideEventDetails, ThermalEventDetails } from './event-detector';
 
-// ── Detail types for the untyped `event.details` bag ──────────────────────
-
-/** Details attached to glide_start and glide_end events */
-export interface GlideEventDetails {
-  distance?: number;
-  averageSpeed?: number;
-  glideRatio?: number;
-  duration?: number;
-  altitudeLost?: number;
-}
-
-/** Details attached to thermal_entry and thermal_exit events */
-export interface ClimbEventDetails {
-  avgClimbRate?: number;
-  duration?: number;
-  altitudeGain?: number;
-}
+// Re-export detail types for consumers that imported from here
+export type { GlideEventDetails } from './event-detector';
+/** @deprecated Use ThermalEventDetails from event-detector instead */
+export type ClimbEventDetails = ThermalEventDetails;
 
 // ── Extracted data interfaces ─────────────────────────────────────────────
 
@@ -107,7 +94,7 @@ export function extractGlides(events: FlightEvent[]): GlideData[] {
   for (const event of events) {
     if (event.type !== 'glide_start' || !event.segment || !event.details) continue;
 
-    const details = event.details as GlideEventDetails;
+    const details = event.details as GlideEventDetails | undefined;
     const endEvent = findEndEvent(event, events, 'glide_end');
     if (!endEvent) continue;
 
@@ -117,10 +104,10 @@ export function extractGlides(events: FlightEvent[]): GlideData[] {
       endTime: endEvent.time,
       startAltitude: event.altitude,
       endAltitude: endEvent.altitude,
-      distance: details.distance ?? 0,
-      duration: details.duration ?? 0,
-      averageSpeed: details.averageSpeed ?? 0,
-      glideRatio: details.glideRatio ?? 0,
+      distance: details?.distance ?? 0,
+      duration: details?.duration ?? 0,
+      averageSpeed: details?.averageSpeed ?? 0,
+      glideRatio: details?.glideRatio ?? 0,
       altitudeLost: event.altitude - endEvent.altitude,
       startLat: event.latitude,
       startLon: event.longitude,
@@ -145,7 +132,7 @@ export function extractClimbs(events: FlightEvent[]): ClimbData[] {
   for (const event of events) {
     if (event.type !== 'thermal_entry' || !event.segment || !event.details) continue;
 
-    const details = event.details as ClimbEventDetails;
+    const details = event.details as ThermalEventDetails | undefined;
     const exitEvent = findEndEvent(event, events, 'thermal_exit');
     if (!exitEvent) continue;
 
@@ -155,9 +142,9 @@ export function extractClimbs(events: FlightEvent[]): ClimbData[] {
       endTime: exitEvent.time,
       startAltitude: event.altitude,
       endAltitude: exitEvent.altitude,
-      altitudeGain: details.altitudeGain ?? (exitEvent.altitude - event.altitude),
-      duration: details.duration ?? 0,
-      avgClimbRate: details.avgClimbRate ?? 0,
+      altitudeGain: details?.altitudeGain ?? (exitEvent.altitude - event.altitude),
+      duration: details?.duration ?? 0,
+      avgClimbRate: details?.avgClimbRate ?? 0,
       startLat: event.latitude,
       startLon: event.longitude,
       endLat: exitEvent.latitude,
@@ -182,15 +169,15 @@ export function extractSinks(events: FlightEvent[]): SinkData[] {
   for (const event of events) {
     if (event.type !== 'glide_start' || !event.segment || !event.details) continue;
 
-    const details = event.details as GlideEventDetails;
-    const glideRatio = details.glideRatio ?? 0;
+    const details = event.details as GlideEventDetails | undefined;
+    const glideRatio = details?.glideRatio ?? 0;
     if (glideRatio > MAX_GLIDE_RATIO_FOR_SINK) continue;
 
     const endEvent = findEndEvent(event, events, 'glide_end');
     if (!endEvent) continue;
 
     const altitudeLost = event.altitude - endEvent.altitude;
-    const duration = details.duration ?? 0;
+    const duration = details?.duration ?? 0;
 
     sinks.push({
       id: event.id,
@@ -199,9 +186,9 @@ export function extractSinks(events: FlightEvent[]): SinkData[] {
       startAltitude: event.altitude,
       endAltitude: endEvent.altitude,
       altitudeLost,
-      distance: details.distance ?? 0,
+      distance: details?.distance ?? 0,
       duration,
-      averageSpeed: details.averageSpeed ?? 0,
+      averageSpeed: details?.averageSpeed ?? 0,
       avgSinkRate: duration > 0 ? altitudeLost / duration : 0,
       glideRatio,
       startLat: event.latitude,

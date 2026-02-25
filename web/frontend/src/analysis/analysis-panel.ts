@@ -5,7 +5,7 @@
  * Provides a unified interface for flight analysis data.
  */
 
-import { getEventStyle, getOptimizedSegmentDistances, resolveTurnpointSequence, extractGlides, extractClimbs, extractSinks, type FlightEvent, type FlightEventType, type XCTask, type TurnpointSequenceResult, type GlideData, type ClimbData, type SinkData } from '@taskscore/analysis';
+import { getEventStyle, getOptimizedSegmentDistances, resolveTurnpointSequence, extractGlides, extractClimbs, extractSinks, type FlightEvent, type FlightEventType, type XCTask, type TurnpointSequenceResult, type GlideData, type ClimbData, type SinkData, type FixIndexDetails, type GlideEventDetails } from '@taskscore/analysis';
 import { formatAltitude, formatSpeed, formatDistance, formatClimbRate } from './units-browser';
 
 /**
@@ -433,7 +433,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
    */
   function getEventFixIndex(event: FlightEvent): number | null {
     if (event.segment) return event.segment.startIndex;
-    const details = event.details as { fixIndex?: number } | undefined;
+    const details = event.details as FixIndexDetails | undefined;
     return details?.fixIndex ?? null;
   }
 
@@ -652,253 +652,176 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   }
 
   /**
-   * Render glides list
+   * Generic renderer for segment lists (glides, climbs, sinks).
+   * Handles empty state, click handlers, and selection restore.
    */
+  function renderSegmentList<T extends { id: string; sourceEvent: FlightEvent; segment: { startIndex: number; endIndex: number } }>(opts: {
+    items: T[];
+    itemClass: string;
+    dataAttr: string;
+    emptyLabel: string;
+    countLabel: string;
+    sortDescription: string;
+    renderItem: (item: T, index: number) => string;
+  }): void {
+    if (opts.items.length === 0) {
+      listContainer.innerHTML = `
+        <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
+          ${allEvents.length === 0 ? `Load an IGC file to see ${opts.countLabel}` : opts.emptyLabel}
+        </div>
+      `;
+      eventCountEl.textContent = `0 ${opts.countLabel}`;
+      return;
+    }
+
+    eventCountEl.textContent = `${opts.items.length} ${opts.countLabel}`;
+
+    let html = '<div class="space-y-2">';
+    html += `<div class="text-xs text-muted-foreground px-1 pb-2">${opts.sortDescription}</div>`;
+    for (let i = 0; i < opts.items.length; i++) {
+      html += opts.renderItem(opts.items[i], i);
+    }
+    html += '</div>';
+    listContainer.innerHTML = html;
+
+    // Add click handlers
+    listContainer.querySelectorAll(`.${opts.itemClass}`).forEach(el => {
+      el.addEventListener('click', () => {
+        const id = el.getAttribute(opts.dataAttr);
+        const item = opts.items.find(it => it.id === id);
+        if (item) {
+          onEventClick(item.sourceEvent);
+          selectedSegment = item.segment;
+          updateSparklineMarker(item.segment.startIndex);
+          listContainer.querySelectorAll(`.${opts.itemClass}`).forEach(e => e.classList.remove('selected'));
+          el.classList.add('selected');
+        }
+      });
+    });
+
+    // Restore selection
+    if (selectedSegment) {
+      const match = opts.items.find(it =>
+        it.segment.startIndex === selectedSegment!.startIndex &&
+        it.segment.endIndex === selectedSegment!.endIndex
+      );
+      if (match) {
+        const el = listContainer.querySelector(`[${opts.dataAttr}="${match.id}"]`);
+        if (el) {
+          el.classList.add('selected');
+          el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+        }
+      }
+    }
+  }
+
   function renderGlides(): void {
-    const glides = extractGlides(allEvents);
-
-    if (glides.length === 0) {
-      listContainer.innerHTML = `
-        <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
-          ${allEvents.length === 0 ? 'Load an IGC file to see glides' : 'No glides detected'}
-        </div>
-      `;
-      eventCountEl.textContent = '0 glides';
-      return;
-    }
-
-    eventCountEl.textContent = `${glides.length} glides`;
-
-    let html = '<div class="space-y-2">';
-    html += '<div class="text-xs text-muted-foreground px-1 pb-2">Sorted by distance (longest first)</div>';
-
-    for (let i = 0; i < glides.length; i++) {
-      const glide = glides[i];
-      const distanceStr = formatDistance(glide.distance).withUnit;
-      const speedStr = formatSpeed(glide.averageSpeed).withUnit;
-      const glideRatioStr = glide.glideRatio > 0 ? glide.glideRatio.toFixed(1) : '∞';
-      const altLostStr = formatAltitude(glide.altitudeLost).withUnit;
-      const startAltStr = formatAltitude(glide.startAltitude).withUnit;
-      const endAltStr = formatAltitude(glide.endAltitude).withUnit;
-
-      html += `
-        <button class="glide-item" data-glide-id="${glide.id}">
-          <div class="glide-rank">#${i + 1}</div>
-          <div class="glide-details">
-            <div class="glide-primary">
-              <span class="glide-distance">${distanceStr}</span>
-              <span class="glide-time">${formatTime(glide.startTime)} → ${formatTime(glide.endTime)}</span>
+    renderSegmentList({
+      items: extractGlides(allEvents),
+      itemClass: 'glide-item',
+      dataAttr: 'data-glide-id',
+      emptyLabel: 'No glides detected',
+      countLabel: 'glides',
+      sortDescription: 'Sorted by distance (longest first)',
+      renderItem: (glide, i) => {
+        const distanceStr = formatDistance(glide.distance).withUnit;
+        const speedStr = formatSpeed(glide.averageSpeed).withUnit;
+        const glideRatioStr = glide.glideRatio > 0 ? glide.glideRatio.toFixed(1) : '∞';
+        const altLostStr = formatAltitude(glide.altitudeLost).withUnit;
+        const startAltStr = formatAltitude(glide.startAltitude).withUnit;
+        const endAltStr = formatAltitude(glide.endAltitude).withUnit;
+        return `
+          <button class="glide-item" data-glide-id="${glide.id}">
+            <div class="glide-rank">#${i + 1}</div>
+            <div class="glide-details">
+              <div class="glide-primary">
+                <span class="glide-distance">${distanceStr}</span>
+                <span class="glide-time">${formatTime(glide.startTime)} → ${formatTime(glide.endTime)}</span>
+              </div>
+              <div class="glide-stats">
+                <span class="glide-stat" title="Glide Ratio"><strong>L/D</strong> ${glideRatioStr}:1</span>
+                <span class="glide-stat" title="Speed"><strong>Spd</strong> ${speedStr}</span>
+                <span class="glide-stat" title="Altitude Lost"><strong>Alt</strong> -${altLostStr}</span>
+                <span class="glide-stat" title="Duration"><strong>Dur</strong> ${formatDuration(glide.duration)}</span>
+              </div>
+              <div class="glide-altitudes">${startAltStr} → ${endAltStr}</div>
             </div>
-            <div class="glide-stats">
-              <span class="glide-stat" title="Glide Ratio"><strong>L/D</strong> ${glideRatioStr}:1</span>
-              <span class="glide-stat" title="Speed"><strong>Spd</strong> ${speedStr}</span>
-              <span class="glide-stat" title="Altitude Lost"><strong>Alt</strong> -${altLostStr}</span>
-              <span class="glide-stat" title="Duration"><strong>Dur</strong> ${formatDuration(glide.duration)}</span>
-            </div>
-            <div class="glide-altitudes">${startAltStr} → ${endAltStr}</div>
-          </div>
-        </button>
-      `;
-    }
-
-    html += '</div>';
-    listContainer.innerHTML = html;
-
-    // Add click handlers
-    listContainer.querySelectorAll('.glide-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const glideId = item.getAttribute('data-glide-id');
-        const glide = glides.find(g => g.id === glideId);
-        if (glide) {
-          onEventClick(glide.sourceEvent);
-          selectedSegment = glide.segment;
-          updateSparklineMarker(glide.segment.startIndex);
-          listContainer.querySelectorAll('.glide-item').forEach(el => el.classList.remove('selected'));
-          item.classList.add('selected');
-        }
-      });
+          </button>
+        `;
+      },
     });
-
-    // Restore selection
-    if (selectedSegment) {
-      const matchingGlide = glides.find(g =>
-        g.segment.startIndex === selectedSegment!.startIndex &&
-        g.segment.endIndex === selectedSegment!.endIndex
-      );
-      if (matchingGlide) {
-        const item = listContainer.querySelector(`[data-glide-id="${matchingGlide.id}"]`);
-        if (item) {
-          item.classList.add('selected');
-          item.scrollIntoView({ block: 'nearest', behavior: 'instant' });
-        }
-      }
-    }
   }
 
-  /**
-   * Render climbs list
-   */
   function renderClimbs(): void {
-    const climbs = extractClimbs(allEvents);
-
-    if (climbs.length === 0) {
-      listContainer.innerHTML = `
-        <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
-          ${allEvents.length === 0 ? 'Load an IGC file to see climbs' : 'No thermals detected'}
-        </div>
-      `;
-      eventCountEl.textContent = '0 climbs';
-      return;
-    }
-
-    eventCountEl.textContent = `${climbs.length} climbs`;
-
-    let html = '<div class="space-y-2">';
-    html += '<div class="text-xs text-muted-foreground px-1 pb-2">Sorted by altitude gain (highest first)</div>';
-
-    for (let i = 0; i < climbs.length; i++) {
-      const climb = climbs[i];
-      const altGainStr = formatAltitude(climb.altitudeGain).withUnit;
-      const climbRateStr = formatClimbRate(climb.avgClimbRate).withUnit;
-      const startAltStr = formatAltitude(climb.startAltitude).withUnit;
-      const endAltStr = formatAltitude(climb.endAltitude).withUnit;
-
-      html += `
-        <button class="climb-item" data-climb-id="${climb.id}">
-          <div class="climb-rank">#${i + 1}</div>
-          <div class="climb-details">
-            <div class="climb-primary">
-              <span class="climb-gain">+${altGainStr}</span>
-              <span class="climb-time">${formatTime(climb.startTime)} → ${formatTime(climb.endTime)}</span>
+    renderSegmentList({
+      items: extractClimbs(allEvents),
+      itemClass: 'climb-item',
+      dataAttr: 'data-climb-id',
+      emptyLabel: 'No thermals detected',
+      countLabel: 'climbs',
+      sortDescription: 'Sorted by altitude gain (highest first)',
+      renderItem: (climb, i) => {
+        const altGainStr = formatAltitude(climb.altitudeGain).withUnit;
+        const climbRateStr = formatClimbRate(climb.avgClimbRate).withUnit;
+        const startAltStr = formatAltitude(climb.startAltitude).withUnit;
+        const endAltStr = formatAltitude(climb.endAltitude).withUnit;
+        return `
+          <button class="climb-item" data-climb-id="${climb.id}">
+            <div class="climb-rank">#${i + 1}</div>
+            <div class="climb-details">
+              <div class="climb-primary">
+                <span class="climb-gain">+${altGainStr}</span>
+                <span class="climb-time">${formatTime(climb.startTime)} → ${formatTime(climb.endTime)}</span>
+              </div>
+              <div class="climb-stats">
+                <span class="climb-stat" title="Average Climb Rate"><strong>Avg</strong> ${climbRateStr}</span>
+                <span class="climb-stat" title="Duration"><strong>Dur</strong> ${formatDuration(climb.duration)}</span>
+              </div>
+              <div class="climb-altitudes">${startAltStr} → ${endAltStr}</div>
             </div>
-            <div class="climb-stats">
-              <span class="climb-stat" title="Average Climb Rate"><strong>Avg</strong> ${climbRateStr}</span>
-              <span class="climb-stat" title="Duration"><strong>Dur</strong> ${formatDuration(climb.duration)}</span>
-            </div>
-            <div class="climb-altitudes">${startAltStr} → ${endAltStr}</div>
-          </div>
-        </button>
-      `;
-    }
-
-    html += '</div>';
-    listContainer.innerHTML = html;
-
-    // Add click handlers
-    listContainer.querySelectorAll('.climb-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const climbId = item.getAttribute('data-climb-id');
-        const climb = climbs.find(c => c.id === climbId);
-        if (climb) {
-          onEventClick(climb.sourceEvent);
-          selectedSegment = climb.segment;
-          updateSparklineMarker(climb.segment.startIndex);
-          listContainer.querySelectorAll('.climb-item').forEach(el => el.classList.remove('selected'));
-          item.classList.add('selected');
-        }
-      });
+          </button>
+        `;
+      },
     });
-
-    // Restore selection
-    if (selectedSegment) {
-      const matchingClimb = climbs.find(c =>
-        c.segment.startIndex === selectedSegment!.startIndex &&
-        c.segment.endIndex === selectedSegment!.endIndex
-      );
-      if (matchingClimb) {
-        const item = listContainer.querySelector(`[data-climb-id="${matchingClimb.id}"]`);
-        if (item) {
-          item.classList.add('selected');
-          item.scrollIntoView({ block: 'nearest', behavior: 'instant' });
-        }
-      }
-    }
   }
 
-  /**
-   * Render sinks list
-   */
   function renderSinks(): void {
-    const sinks = extractSinks(allEvents);
-
-    if (sinks.length === 0) {
-      listContainer.innerHTML = `
-        <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
-          ${allEvents.length === 0 ? 'Load an IGC file to see sinks' : 'No descents detected'}
-        </div>
-      `;
-      eventCountEl.textContent = '0 sinks';
-      return;
-    }
-
-    eventCountEl.textContent = `${sinks.length} sinks`;
-
-    let html = '<div class="space-y-2">';
-    html += '<div class="text-xs text-muted-foreground px-1 pb-2">Glides with L/D ≤ 5:1, sorted by altitude lost</div>';
-
-    for (let i = 0; i < sinks.length; i++) {
-      const sink = sinks[i];
-      const distanceStr = formatDistance(sink.distance).withUnit;
-      const speedStr = formatSpeed(sink.averageSpeed).withUnit;
-      const glideRatioStr = sink.glideRatio > 0 ? sink.glideRatio.toFixed(1) : '0';
-      const altLostStr = formatAltitude(sink.altitudeLost).withUnit;
-      const sinkRateStr = formatClimbRate(-sink.avgSinkRate).withUnit;
-      const startAltStr = formatAltitude(sink.startAltitude).withUnit;
-      const endAltStr = formatAltitude(sink.endAltitude).withUnit;
-
-      html += `
-        <button class="sink-item" data-sink-id="${sink.id}">
-          <div class="sink-rank">#${i + 1}</div>
-          <div class="sink-details">
-            <div class="sink-primary">
-              <span class="sink-drop">-${altLostStr}</span>
-              <span class="sink-time">${formatTime(sink.startTime)} → ${formatTime(sink.endTime)}</span>
+    renderSegmentList({
+      items: extractSinks(allEvents),
+      itemClass: 'sink-item',
+      dataAttr: 'data-sink-id',
+      emptyLabel: 'No descents detected',
+      countLabel: 'sinks',
+      sortDescription: 'Glides with L/D \u2264 5:1, sorted by altitude lost',
+      renderItem: (sink, i) => {
+        const distanceStr = formatDistance(sink.distance).withUnit;
+        const speedStr = formatSpeed(sink.averageSpeed).withUnit;
+        const glideRatioStr = sink.glideRatio > 0 ? sink.glideRatio.toFixed(1) : '0';
+        const altLostStr = formatAltitude(sink.altitudeLost).withUnit;
+        const sinkRateStr = formatClimbRate(-sink.avgSinkRate).withUnit;
+        const startAltStr = formatAltitude(sink.startAltitude).withUnit;
+        const endAltStr = formatAltitude(sink.endAltitude).withUnit;
+        return `
+          <button class="sink-item" data-sink-id="${sink.id}">
+            <div class="sink-rank">#${i + 1}</div>
+            <div class="sink-details">
+              <div class="sink-primary">
+                <span class="sink-drop">-${altLostStr}</span>
+                <span class="sink-time">${formatTime(sink.startTime)} → ${formatTime(sink.endTime)}</span>
+              </div>
+              <div class="sink-stats">
+                <span class="sink-stat" title="Glide Ratio"><strong>L/D</strong> ${glideRatioStr}:1</span>
+                <span class="sink-stat" title="Average Sink Rate"><strong>Avg</strong> ${sinkRateStr}</span>
+                <span class="sink-stat" title="Distance"><strong>Dist</strong> ${distanceStr}</span>
+                <span class="sink-stat" title="Speed"><strong>Spd</strong> ${speedStr}</span>
+                <span class="sink-stat" title="Duration"><strong>Dur</strong> ${formatDuration(sink.duration)}</span>
+              </div>
+              <div class="sink-altitudes">${startAltStr} → ${endAltStr}</div>
             </div>
-            <div class="sink-stats">
-              <span class="sink-stat" title="Glide Ratio"><strong>L/D</strong> ${glideRatioStr}:1</span>
-              <span class="sink-stat" title="Average Sink Rate"><strong>Avg</strong> ${sinkRateStr}</span>
-              <span class="sink-stat" title="Distance"><strong>Dist</strong> ${distanceStr}</span>
-              <span class="sink-stat" title="Speed"><strong>Spd</strong> ${speedStr}</span>
-              <span class="sink-stat" title="Duration"><strong>Dur</strong> ${formatDuration(sink.duration)}</span>
-            </div>
-            <div class="sink-altitudes">${startAltStr} → ${endAltStr}</div>
-          </div>
-        </button>
-      `;
-    }
-
-    html += '</div>';
-    listContainer.innerHTML = html;
-
-    // Add click handlers
-    listContainer.querySelectorAll('.sink-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const sinkId = item.getAttribute('data-sink-id');
-        const sink = sinks.find(s => s.id === sinkId);
-        if (sink) {
-          onEventClick(sink.sourceEvent);
-          selectedSegment = sink.segment;
-          updateSparklineMarker(sink.segment.startIndex);
-          listContainer.querySelectorAll('.sink-item').forEach(el => el.classList.remove('selected'));
-          item.classList.add('selected');
-        }
-      });
+          </button>
+        `;
+      },
     });
-
-    // Restore selection
-    if (selectedSegment) {
-      const matchingSink = sinks.find(s =>
-        s.segment.startIndex === selectedSegment!.startIndex &&
-        s.segment.endIndex === selectedSegment!.endIndex
-      );
-      if (matchingSink) {
-        const item = listContainer.querySelector(`[data-sink-id="${matchingSink.id}"]`);
-        if (item) {
-          item.classList.add('selected');
-          item.scrollIntoView({ block: 'nearest', behavior: 'instant' });
-        }
-      }
-    }
   }
 
   /**
@@ -1275,7 +1198,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
             matchingEvent = event;
           }
         } else {
-          const details = event.details as { fixIndex?: number } | undefined;
+          const details = event.details as FixIndexDetails | undefined;
           if (details?.fixIndex !== undefined) {
             const dist = Math.abs(details.fixIndex - fixIndex);
             if (dist < bestDist) {
@@ -1322,7 +1245,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
         if (event.type === 'glide_start' && event.segment) {
           if (fixIndex >= event.segment.startIndex && fixIndex <= event.segment.endIndex) {
             matchingEvent = event;
-            const details = event.details as { glideRatio?: number } | undefined;
+            const details = event.details as GlideEventDetails | undefined;
             if (details?.glideRatio !== undefined && details.glideRatio <= 5) {
               eventType = 'sink';
             } else {
@@ -1339,7 +1262,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       let minDistance = Infinity;
       for (const event of allEvents) {
         if (event.segment) continue;
-        const eventDetails = event.details as { fixIndex?: number } | undefined;
+        const eventDetails = event.details as FixIndexDetails | undefined;
         if (eventDetails?.fixIndex !== undefined) {
           const distance = Math.abs(eventDetails.fixIndex - fixIndex);
           if (distance < minDistance) {

@@ -10,29 +10,14 @@ import {
 } from '../src/task-optimizer';
 import { isInsideCylinder, haversineDistance, calculateBearingRadians, destinationPoint } from '../src/geo';
 import type { XCTask, Turnpoint, SSSConfig, GoalConfig } from '../src/xctsk-parser';
-import type { IGCFix } from '../src/igc-parser';
+import { createFix as createFixSeconds, BASE_TIME, type IGCFix } from './test-helpers';
 
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
-const BASE_TIME = new Date('2024-01-15T10:00:00Z');
-
-function createFix(
-  timeMinutes: number,
-  lat: number,
-  lon: number,
-  altitude: number = 1000
-): IGCFix {
-  const time = new Date(BASE_TIME.getTime() + timeMinutes * 60_000);
-  return {
-    time,
-    latitude: lat,
-    longitude: lon,
-    pressureAltitude: altitude,
-    gnssAltitude: altitude,
-    valid: true,
-  };
+function createFix(timeMinutes: number, lat: number, lon: number, altitude = 1000) {
+  return createFixSeconds(timeMinutes * 60, lat, lon, altitude);
 }
 
 interface TaskDef {

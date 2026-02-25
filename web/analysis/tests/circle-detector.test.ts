@@ -6,29 +6,8 @@ import {
   normalizeBearingDelta,
   detectCirclingSegments,
 } from '../src/circle-detector';
-import { IGCFix } from '../src/igc-parser';
 import { destinationPoint } from '../src/geo';
-
-/**
- * Helper to create a mock fix at a specific time offset (seconds).
- */
-function createFix(
-  timeSeconds: number,
-  lat: number,
-  lon: number,
-  altitude: number
-): IGCFix {
-  const time = new Date('2024-01-15T10:00:00Z');
-  time.setTime(time.getTime() + timeSeconds * 1000);
-  return {
-    time,
-    latitude: lat,
-    longitude: lon,
-    pressureAltitude: altitude,
-    gnssAltitude: altitude,
-    valid: true,
-  };
-}
+import { createFix, type IGCFix } from './test-helpers';
 
 /**
  * Generate a straight flight track heading north.
@@ -628,9 +607,10 @@ describe('integration with detectFlightEvents', () => {
       expect(event.details).toBeDefined();
       expect(event.segment).toBeDefined();
       if (event.details) {
-        expect(event.details.turnDirection).toBeDefined();
-        expect(event.details.radius).toBeDefined();
-        expect(event.details.quality).toBeDefined();
+        const d = event.details as import('../src/event-detector').CircleEventDetails;
+        expect(d.turnDirection).toBeDefined();
+        expect(d.radius).toBeDefined();
+        expect(d.quality).toBeDefined();
       }
     }
   });

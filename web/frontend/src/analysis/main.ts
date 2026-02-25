@@ -335,19 +335,11 @@ async function init(): Promise<void> {
 
   // Subscribe to unit changes for reactive updates
   onUnitsChanged(() => {
-    // Re-detect events to regenerate descriptions with new units
-    if (state.fixes.length > 0) {
-      state.events = detectFlightEvents(state.fixes, state.task || undefined);
-      analysisPanel?.setEvents(state.events);
-      mapRenderer?.setEvents(state.events);
-    }
-
-    updateFlightInfo();
-    updateScore();
+    redetectEvents();
 
     // Re-render map task labels with new units
-    if (state.task && mapRenderer) {
-      mapRenderer.setTask(state.task);
+    if (state.task) {
+      mapRenderer?.setTask(state.task);
       analysisPanel?.setTask(state.task);
     }
   });
@@ -587,6 +579,33 @@ async function init(): Promise<void> {
     }
   });
 
+  // --- State sync helpers ---
+
+  function redetectEvents(): void {
+    if (state.fixes.length > 0) {
+      state.events = detectFlightEvents(state.fixes, state.task || undefined);
+      analysisPanel?.setEvents(state.events);
+      mapRenderer?.setEvents(state.events);
+    }
+    updateFlightInfo();
+    updateScore();
+  }
+
+  function applyTask(task: XCTask): void {
+    state.task = task;
+    mapRenderer?.setTask(task);
+    analysisPanel?.setTask(task);
+    redetectEvents();
+  }
+
+  function applyTrack(igcFile: IGCFile): void {
+    state.igcFile = igcFile;
+    state.fixes = igcFile.fixes;
+    mapRenderer?.setTrack(igcFile.fixes);
+    redetectEvents();
+    analysisPanel?.setAltitudes(igcFile.fixes.map(f => f.gnssAltitude), igcFile.fixes.map(f => f.time));
+  }
+
   /**
    * Load and parse an IGC file
    */
@@ -609,42 +628,13 @@ async function init(): Promise<void> {
   async function loadIGCContent(content: string, filename: string, shouldStore: boolean): Promise<void> {
     const igcFile = parseIGC(content);
 
-    state.igcFile = igcFile;
-    state.fixes = igcFile.fixes;
-
-    // Update map
-    if (mapRenderer) {
-      mapRenderer.setTrack(igcFile.fixes);
-    }
-
     // If IGC file has a declared task and no external task is loaded, use it
     if (igcFile.task && igcFile.task.start && !state.task) {
       const xcTask = igcTaskToXCTask(igcFile.task, { waypoints: waypointDatabase });
-      state.task = xcTask;
-
-      if (mapRenderer) {
-        await mapRenderer.setTask(xcTask);
-      }
+      applyTask(xcTask);
     }
 
-    // Detect events
-    state.events = detectFlightEvents(igcFile.fixes, state.task || undefined);
-
-    // Update analysis panel
-    analysisPanel?.setEvents(state.events);
-    analysisPanel?.setAltitudes(igcFile.fixes.map(f => f.gnssAltitude), igcFile.fixes.map(f => f.time));
-    if (state.task) {
-      analysisPanel?.setTask(state.task);
-    }
-
-    // Update map events
-    if (mapRenderer) {
-      mapRenderer.setEvents(state.events);
-    }
-
-    // Update flight info and score
-    updateFlightInfo();
-    updateScore();
+    applyTrack(igcFile);
 
     // Store for future use
     if (shouldStore) {
@@ -709,30 +699,7 @@ async function init(): Promise<void> {
         }
       }
 
-      state.task = task;
-
-      // Update map
-      if (mapRenderer) {
-        mapRenderer.setTask(task);
-      }
-
-      // Update analysis panel with task
-      analysisPanel?.setTask(task);
-
-      // Re-detect events with task
-      if (state.fixes.length > 0) {
-        state.events = detectFlightEvents(state.fixes, task);
-
-        analysisPanel?.setEvents(state.events);
-
-        if (mapRenderer) {
-          mapRenderer.setEvents(state.events);
-        }
-      }
-
-      // Update flight info and score
-      updateFlightInfo();
-      updateScore();
+      applyTask(task);
 
       showStatus(`Loaded task: ${task.turnpoints.length} turnpoints`, 'success');
     } catch (err) {
@@ -755,30 +722,7 @@ async function init(): Promise<void> {
       }
 
       await storage.touchTask(code);
-      state.task = stored.task;
-
-      // Update map
-      if (mapRenderer) {
-        mapRenderer.setTask(stored.task);
-      }
-
-      // Update analysis panel with task
-      analysisPanel?.setTask(stored.task);
-
-      // Re-detect events with task
-      if (state.fixes.length > 0) {
-        state.events = detectFlightEvents(state.fixes, stored.task);
-
-        analysisPanel?.setEvents(state.events);
-
-        if (mapRenderer) {
-          mapRenderer.setEvents(state.events);
-        }
-      }
-
-      // Update flight info and score
-      updateFlightInfo();
-      updateScore();
+      applyTask(stored.task);
 
       showStatus(`Loaded task: ${stored.task.turnpoints.length} turnpoints`, 'success');
     } catch (err) {
@@ -831,44 +775,12 @@ async function init(): Promise<void> {
       // Fetch task data first
       const taskData = await fetchAirScoreTask(params.comPk, params.tasPk);
 
-      // Set the task
-      state.task = taskData.task;
-
-      if (mapRenderer) {
-        mapRenderer.setTask(taskData.task);
-      }
-
-      analysisPanel?.setTask(taskData.task);
+      applyTask(taskData.task);
 
       // Now fetch the track
       const igcContent = await fetchAirScoreTrack(params.trackId, params.comPk, params.tasPk);
-
-      // Parse and load the IGC content
       const igcFile = parseIGC(igcContent);
-
-      state.igcFile = igcFile;
-      state.fixes = igcFile.fixes;
-
-      // Update map with track
-      if (mapRenderer) {
-        mapRenderer.setTrack(igcFile.fixes);
-      }
-
-      // Detect events with the loaded task
-      state.events = detectFlightEvents(igcFile.fixes, state.task);
-
-      // Update analysis panel
-      analysisPanel?.setEvents(state.events);
-      analysisPanel?.setAltitudes(igcFile.fixes.map(f => f.gnssAltitude), igcFile.fixes.map(f => f.time));
-
-      // Update map events
-      if (mapRenderer) {
-        mapRenderer.setEvents(state.events);
-      }
-
-      // Update flight info and score
-      updateFlightInfo();
-      updateScore();
+      applyTrack(igcFile);
 
       // Build a descriptive filename
       const pilotName = taskData.pilots.find(p => p.trackId === params.trackId)?.name || 'Unknown';
@@ -1018,25 +930,7 @@ async function init(): Promise<void> {
       }
       const rawJson = await response.text();
       const task = parseXCTask(rawJson);
-
-      state.task = task;
-
-      if (mapRenderer) {
-        mapRenderer.setTask(task);
-      }
-
-      analysisPanel?.setTask(task);
-
-      if (state.fixes.length > 0) {
-        state.events = detectFlightEvents(state.fixes, task);
-        analysisPanel?.setEvents(state.events);
-        if (mapRenderer) {
-          mapRenderer.setEvents(state.events);
-        }
-      }
-
-      updateFlightInfo();
-      updateScore();
+      applyTask(task);
     } catch (err) {
       console.warn('Failed to load local task:', err);
       throw err;

@@ -5,7 +5,7 @@
  */
 
 import type { IGCFix } from './igc-parser';
-import { haversineDistance, calculateBearing } from './geo';
+import { haversineDistance, calculateBearing, calculateTrackDistance } from './geo';
 
 
 export interface ChevronPosition {
@@ -296,13 +296,7 @@ export function calculatePointMetrics(
   if (startIndex === endIndex) return null;
 
   // Compute total distance between start and end
-  let totalDistance = 0;
-  for (let i = startIndex; i < endIndex; i++) {
-    totalDistance += haversineDistance(
-      fixes[i].latitude, fixes[i].longitude,
-      fixes[i + 1].latitude, fixes[i + 1].longitude,
-    );
-  }
+  const totalDistance = calculateTrackDistance(fixes, startIndex, endIndex);
 
   const timeDiffSeconds =
     (fixes[endIndex].time.getTime() - fixes[startIndex].time.getTime()) / 1000;
@@ -351,14 +345,5 @@ export function calculateTotalGlideDistance(fixes: IGCFix[]): number {
     return 0;
   }
 
-  let totalDistance = 0;
-  for (let i = 1; i < fixes.length; i++) {
-    totalDistance += haversineDistance(
-      fixes[i - 1].latitude,
-      fixes[i - 1].longitude,
-      fixes[i].latitude,
-      fixes[i].longitude
-    );
-  }
-  return totalDistance;
+  return calculateTrackDistance(fixes);
 }

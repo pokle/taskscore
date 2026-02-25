@@ -19,6 +19,20 @@ import { IGCFix } from './igc-parser';
 import { calculateBearing, haversineDistance } from './geo';
 import { TrackSegment } from './event-detector';
 
+// --- Constants ---
+
+/** Maximum plausible bearing rate (deg/s). Anything beyond this is a GPS spike. */
+const MAX_BEARING_RATE = 50;
+
+/** Maximum reasonable wind speed (m/s) — reject estimates above this. */
+const MAX_REASONABLE_WIND_SPEED = 30;
+
+/** Approximate meters per degree of latitude at the Earth's surface. */
+const METERS_PER_DEGREE_LAT = 111320;
+
+/** Minimum ground speed variation (m/s) needed for a meaningful wind estimate. */
+const MIN_GROUND_SPEED_VARIATION = 1;
+
 // --- Types ---
 
 export type TurnDirection = 'left' | 'right';
@@ -129,8 +143,8 @@ export function computeBearingRates(
     let rate = delta / dt;
 
     // Clamp to reject GPS spikes
-    if (rate > 50) rate = 50;
-    if (rate < -50) rate = -50;
+    if (rate > MAX_BEARING_RATE) rate = MAX_BEARING_RATE;
+    if (rate < -MAX_BEARING_RATE) rate = -MAX_BEARING_RATE;
 
     rates[i] = rate;
   }
@@ -266,8 +280,8 @@ export function fitCircleLeastSquares(
   meanLon /= n;
 
   // Flat-earth conversion factors
-  const latToMeters = 111320; // ~111.32 km per degree latitude
-  const lonToMeters = 111320 * Math.cos(meanLat * Math.PI / 180);
+  const latToMeters = METERS_PER_DEGREE_LAT;
+  const lonToMeters = METERS_PER_DEGREE_LAT * Math.cos(meanLat * Math.PI / 180);
 
   const xs: number[] = [];
   const ys: number[] = [];
@@ -515,10 +529,10 @@ function estimateWindFromGroundSpeed(
   if (maxGS === -Infinity || minGS === Infinity) return undefined;
 
   const variation = maxGS - minGS;
-  if (variation < 1) return undefined; // Too little variation to be meaningful
+  if (variation < MIN_GROUND_SPEED_VARIATION) return undefined; // Too little variation to be meaningful
 
   const speed = variation / 2;
-  if (speed > 30) return undefined; // Reject unreasonable wind speeds
+  if (speed > MAX_REASONABLE_WIND_SPEED) return undefined; // Reject unreasonable wind speeds
 
   // Track bearing at max ground speed point
   const trackBearing = calculateBearing(
@@ -555,14 +569,14 @@ function estimateWindFromCenterDrift(
   if (dt <= 0) return undefined;
 
   // Drift in meters
-  const dLat = (currentFit.centerLat - prevFit.centerLat) * 111320;
+  const dLat = (currentFit.centerLat - prevFit.centerLat) * METERS_PER_DEGREE_LAT;
   const dLon = (currentFit.centerLon - prevFit.centerLon) *
-    111320 * Math.cos(((currentFit.centerLat + prevFit.centerLat) / 2) * Math.PI / 180);
+    METERS_PER_DEGREE_LAT * Math.cos(((currentFit.centerLat + prevFit.centerLat) / 2) * Math.PI / 180);
 
   const driftDist = Math.sqrt(dLat * dLat + dLon * dLon);
   const speed = driftDist / dt;
 
-  if (speed > 30) return undefined; // Reject unreasonable
+  if (speed > MAX_REASONABLE_WIND_SPEED) return undefined; // Reject unreasonable
 
   // Direction wind is blowing TO (atan2 gives angle from north)
   const dirTo = Math.atan2(dLon, dLat) * 180 / Math.PI;

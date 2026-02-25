@@ -1,25 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { detectFlightEvents } from '../src/event-detector';
-import { IGCFix } from '../src/igc-parser';
-
-/**
- * Helper to create a mock fix with specific time
- */
-function createFixAtTime(
-  time: Date,
-  lat: number,
-  lon: number,
-  altitude: number
-): IGCFix {
-  return {
-    time,
-    latitude: lat,
-    longitude: lon,
-    pressureAltitude: altitude,
-    gnssAltitude: altitude,
-    valid: true,
-  };
-}
+import { createFixAt as createFixAtTime, type IGCFix } from './test-helpers';
+import type { GlideEventDetails } from '../src/event-detector';
 
 describe('Event Detector - Trailing Glide', () => {
   it('should detect a glide after the last thermal', () => {
@@ -115,9 +97,10 @@ describe('Event Detector - Trailing Glide', () => {
 
     expect(lastGlideStart).toBeDefined();
     expect(lastGlideStart!.details).toBeDefined();
-    expect(lastGlideStart!.details!.distance).toBeGreaterThan(0);
-    expect(lastGlideStart!.details!.glideRatio).toBeGreaterThan(0);
-    expect(lastGlideStart!.details!.duration).toBeGreaterThan(30);
+    const details = lastGlideStart!.details as GlideEventDetails;
+    expect(details.distance).toBeGreaterThan(0);
+    expect(details.glideRatio).toBeGreaterThan(0);
+    expect(details.duration).toBeGreaterThan(30);
   });
 });
 
@@ -168,8 +151,9 @@ describe('Event Detector - No-Thermal Flights', () => {
     expect(glideEnds.length).toBe(glideStarts.length);
 
     // The glide should have meaningful statistics
-    expect(glideStarts[0].details!.distance).toBeGreaterThan(0);
-    expect(glideStarts[0].details!.duration).toBeGreaterThan(30);
+    const glideDetails = glideStarts[0].details as GlideEventDetails;
+    expect(glideDetails.distance).toBeGreaterThan(0);
+    expect(glideDetails.duration).toBeGreaterThan(30);
   });
 
   it('should have valid segment indices for a no-thermal glide', () => {
