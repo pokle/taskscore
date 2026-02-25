@@ -9,29 +9,7 @@ import {
   GlideContextResolver,
 } from '../src/glide-speed';
 import { haversineDistance } from '../src/geo';
-import type { IGCFix } from '../src/igc-parser';
-
-/**
- * Helper to create a fix at a specific position and time
- */
-function createFix(
-  timeSeconds: number,
-  lat: number,
-  lon: number,
-  altitude: number = 1000
-): IGCFix {
-  const time = new Date('2024-01-15T10:00:00Z');
-  time.setSeconds(time.getSeconds() + timeSeconds);
-
-  return {
-    time,
-    latitude: lat,
-    longitude: lon,
-    pressureAltitude: altitude,
-    gnssAltitude: altitude,
-    valid: true,
-  };
-}
+import { createFix, type IGCFix } from './test-helpers';
 
 /**
  * Create a straight glide of a specific distance.

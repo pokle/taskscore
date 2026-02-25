@@ -1,25 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { detectFlightEvents } from '../src/event-detector';
-import { IGCFix } from '../src/igc-parser';
-
-/**
- * Helper to create a mock fix with specific time
- */
-function createFixAtTime(
-  time: Date,
-  lat: number,
-  lon: number,
-  altitude: number
-): IGCFix {
-  return {
-    time,
-    latitude: lat,
-    longitude: lon,
-    pressureAltitude: altitude,
-    gnssAltitude: altitude,
-    valid: true,
-  };
-}
+import { createFixAt as createFixAtTime, type IGCFix } from './test-helpers';
 
 describe('Event Detector - Edge Cases (Zero Ground Speed)', () => {
   describe('Takeoff in strong headwind', () => {

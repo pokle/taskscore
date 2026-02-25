@@ -1,27 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { detectFlightEvents, FlightEvent } from '../src/event-detector';
-import { IGCFix } from '../src/igc-parser';
-
-/**
- * Helper to create a mock fix with specific time
- */
-function createFixAtTime(
-  time: Date,
-  lat: number,
-  lon: number,
-  altitude: number,
-  groundSpeedKmh: number = 0
-): IGCFix {
-  return {
-    time,
-    latitude: lat,
-    longitude: lon,
-    pressureAltitude: altitude,
-    gnssAltitude: altitude,
-    valid: true,
-    // Note: groundSpeed is calculated from position deltas, not stored in fix
-  };
-}
+import { createFixAt as createFixAtTime, type IGCFix } from './test-helpers';
 
 /**
  * Helper to create a flight track with pre-takeoff period

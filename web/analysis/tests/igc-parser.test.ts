@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { parseIGC, IGCFix } from '../src/igc-parser';
-import { haversineDistance, getBoundingBox } from '../src/geo';
+import { parseIGC } from '../src/igc-parser';
 
 describe('IGC Parser', () => {
   describe('parseIGC', () => {
@@ -131,50 +130,4 @@ HFCCL:Sport
     });
   });
 
-  describe('haversineDistance', () => {
-    it('should calculate distance between two points', () => {
-      // Distance from Big Ben to Eiffel Tower is approximately 344 km
-      const londonLat = 51.5007;
-      const londonLon = -0.1246;
-      const parisLat = 48.8584;
-      const parisLon = 2.2945;
-
-      const distance = haversineDistance(londonLat, londonLon, parisLat, parisLon);
-
-      // Allow for some tolerance (within 5km)
-      expect(distance).toBeGreaterThan(339000);
-      expect(distance).toBeLessThan(349000);
-    });
-
-    it('should return 0 for same point', () => {
-      const distance = haversineDistance(47.0, 11.0, 47.0, 11.0);
-      expect(distance).toBe(0);
-    });
-  });
-
-  describe('getBoundingBox', () => {
-    it('should calculate bounding box for fixes', () => {
-      const fixes: IGCFix[] = [
-        { time: new Date(), latitude: 47.0, longitude: 11.0, pressureAltitude: 1000, gnssAltitude: 1000, valid: true },
-        { time: new Date(), latitude: 48.0, longitude: 12.0, pressureAltitude: 1000, gnssAltitude: 1000, valid: true },
-        { time: new Date(), latitude: 47.5, longitude: 11.5, pressureAltitude: 1000, gnssAltitude: 1000, valid: true },
-      ];
-
-      const bounds = getBoundingBox(fixes);
-
-      expect(bounds.minLat).toBe(47.0);
-      expect(bounds.maxLat).toBe(48.0);
-      expect(bounds.minLon).toBe(11.0);
-      expect(bounds.maxLon).toBe(12.0);
-    });
-
-    it('should return zeros for empty fixes array', () => {
-      const bounds = getBoundingBox([]);
-
-      expect(bounds.minLat).toBe(0);
-      expect(bounds.maxLat).toBe(0);
-      expect(bounds.minLon).toBe(0);
-      expect(bounds.maxLon).toBe(0);
-    });
-  });
 });

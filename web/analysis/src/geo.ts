@@ -151,6 +151,29 @@ export function getBoundingBox(fixes: LatLonPoint[]): {
 }
 
 /**
+ * Sum haversine distances over consecutive fixes in a slice.
+ *
+ * @param fixes - Array of IGC fixes (must have latitude/longitude)
+ * @param startIndex - First index in the range (inclusive, default 0)
+ * @param endIndex - Last index in the range (inclusive, default fixes.length - 1)
+ * @returns Total track distance in meters
+ */
+export function calculateTrackDistance(
+  fixes: LatLonPoint[],
+  startIndex = 0,
+  endIndex = fixes.length - 1
+): number {
+  let total = 0;
+  for (let i = startIndex; i < endIndex; i++) {
+    total += haversineDistance(
+      fixes[i].latitude, fixes[i].longitude,
+      fixes[i + 1].latitude, fixes[i + 1].longitude
+    );
+  }
+  return total;
+}
+
+/**
  * Check if a point is inside a cylinder.
  *
  * @param lat - Latitude of point to check

@@ -1,39 +1,19 @@
 /**
- * Characterization Tests for Geo Math Functions
- *
- * These tests document the exact behavior of the current implementations
- * before migrating to Turf.js. They ensure that the new implementations
- * maintain the same behavior.
+ * Tests for Geo Math Functions (Turf.js wrappers in geo.ts)
  */
 
 import { describe, it, expect } from 'bun:test';
 
-// Import from geo (the canonical export location after library extraction)
 import {
-  haversineDistance as oldHaversineDistance,
-  getBoundingBox as oldGetBoundingBox,
-  calculateBearing as oldCalculateBearing,
-} from '../src/geo';
-import type { IGCFix } from '../src/igc-parser';
-
-// Import new Turf.js implementations
-import {
-  haversineDistance as turfHaversineDistance,
-  getBoundingBox as turfGetBoundingBox,
-  calculateBearing as turfCalculateBearing,
-  destinationPoint as turfDestinationPoint,
-  calculateBearingRadians as turfCalculateBearingRadians,
-  isInsideCylinder as turfIsInsideCylinder,
+  haversineDistance,
+  getBoundingBox,
+  calculateBearing,
+  destinationPoint,
+  calculateBearingRadians,
+  isInsideCylinder,
   getCirclePoints
 } from '../src/geo';
-
-// Use the old implementations by default for backwards compatibility tests
-const haversineDistance = oldHaversineDistance;
-const getBoundingBox = oldGetBoundingBox;
-const calculateBearing = oldCalculateBearing;
-
-// Note: destinationPoint and calculateBearing (radians) in xctsk-parser are private
-// We'll test them indirectly through calculateOptimizedTaskLine
+import { createFix } from './test-helpers';
 
 describe('Geo Math Functions - Characterization Tests', () => {
   describe('haversineDistance', () => {
@@ -211,22 +191,11 @@ describe('Geo Math Functions - Characterization Tests', () => {
   });
 
   describe('getBoundingBox', () => {
-    function createFix(lat: number, lon: number): IGCFix {
-      return {
-        time: new Date(),
-        latitude: lat,
-        longitude: lon,
-        pressureAltitude: 1000,
-        gnssAltitude: 1000,
-        valid: true,
-      };
-    }
-
     it('should calculate bounding box for multiple fixes', () => {
-      const fixes: IGCFix[] = [
-        createFix(47.0, 11.0),
-        createFix(48.0, 12.0),
-        createFix(47.5, 11.5),
+      const fixes = [
+        createFix(0, 47.0, 11.0),
+        createFix(0, 48.0, 12.0),
+        createFix(0, 47.5, 11.5),
       ];
 
       const bounds = getBoundingBox(fixes);
@@ -238,7 +207,7 @@ describe('Geo Math Functions - Characterization Tests', () => {
     });
 
     it('should handle single fix', () => {
-      const fixes: IGCFix[] = [createFix(47.5, 11.5)];
+      const fixes = [createFix(0, 47.5, 11.5)];
 
       const bounds = getBoundingBox(fixes);
 
@@ -258,10 +227,10 @@ describe('Geo Math Functions - Characterization Tests', () => {
     });
 
     it('should handle negative coordinates (southern/western hemisphere)', () => {
-      const fixes: IGCFix[] = [
-        createFix(-37.0, -175.0),
-        createFix(-35.0, -173.0),
-        createFix(-36.0, -174.0),
+      const fixes = [
+        createFix(0, -37.0, -175.0),
+        createFix(0, -35.0, -173.0),
+        createFix(0, -36.0, -174.0),
       ];
 
       const bounds = getBoundingBox(fixes);
@@ -273,9 +242,9 @@ describe('Geo Math Functions - Characterization Tests', () => {
     });
 
     it('should handle coordinates crossing equator and prime meridian', () => {
-      const fixes: IGCFix[] = [
-        createFix(-1.0, -1.0),
-        createFix(1.0, 1.0),
+      const fixes = [
+        createFix(0, -1.0, -1.0),
+        createFix(0, 1.0, 1.0),
       ];
 
       const bounds = getBoundingBox(fixes);
@@ -366,270 +335,156 @@ describe('Snapshot Tests for Known Values', () => {
   });
 });
 
-describe('Turf.js Implementation Comparison', () => {
-  describe('haversineDistance comparison', () => {
-    const testCases = [
-      { name: 'London to Paris', args: [51.5007, -0.1246, 48.8584, 2.2945] },
-      { name: 'same point', args: [47.0, 11.0, 47.0, 11.0] },
-      { name: '1 degree latitude', args: [47.0, 11.0, 48.0, 11.0] },
-      { name: 'across equator', args: [1.0, 0.0, -1.0, 0.0] },
-      { name: 'southern hemisphere', args: [-37.8136, 144.9631, -33.8688, 151.2093] },
-      { name: 'short distance', args: [47.0, 11.0, 47.0, 11.000657] },
-      { name: 'antipodal', args: [0, 0, 0, 180] },
-    ] as const;
+describe('destinationPoint tests', () => {
+  it('should calculate correct destination going north', () => {
+    const result = destinationPoint(47.0, 11.0, 1000, 0);
+    expect(result.lat).toBeGreaterThan(47.0);
+    expect(result.lon).toBeCloseTo(11.0, 4);
+  });
 
-    for (const { name, args } of testCases) {
-      it(`should match old implementation: ${name}`, () => {
-        const oldResult = oldHaversineDistance(args[0], args[1], args[2], args[3]);
-        const turfResult = turfHaversineDistance(args[0], args[1], args[2], args[3]);
+  it('should calculate correct destination going east', () => {
+    const result = destinationPoint(47.0, 11.0, 1000, Math.PI / 2);
+    expect(result.lat).toBeCloseTo(47.0, 4);
+    expect(result.lon).toBeGreaterThan(11.0);
+  });
 
-        // Allow 0.1% tolerance for different earth models
-        const tolerance = Math.max(oldResult * 0.001, 1);
-        expect(turfResult).toBeCloseTo(oldResult, -Math.log10(tolerance));
-      });
+  it('should return to approximately same point after round trip', () => {
+    const distance = 10000; // 10km
+    const bearing = Math.PI / 4; // 45 degrees
+
+    const dest = destinationPoint(47.0, 11.0, distance, bearing);
+    const returnTrip = destinationPoint(dest.lat, dest.lon, distance, bearing + Math.PI);
+
+    expect(returnTrip.lat).toBeCloseTo(47.0, 2);
+    expect(returnTrip.lon).toBeCloseTo(11.0, 2);
+  });
+});
+
+describe('isInsideCylinder tests', () => {
+  it('should return true for point at center', () => {
+    expect(isInsideCylinder(47.0, 11.0, 47.0, 11.0, 1000)).toBe(true);
+  });
+
+  it('should return true for point inside cylinder', () => {
+    expect(isInsideCylinder(47.0, 11.005, 47.0, 11.0, 1000)).toBe(true);
+  });
+
+  it('should return false for point outside cylinder', () => {
+    expect(isInsideCylinder(47.02, 11.0, 47.0, 11.0, 1000)).toBe(false);
+  });
+
+  it('should handle point very close to boundary', () => {
+    const dest = destinationPoint(47.0, 11.0, 999.9, 0);
+    expect(isInsideCylinder(dest.lat, dest.lon, 47.0, 11.0, 1000)).toBe(true);
+
+    const destOutside = destinationPoint(47.0, 11.0, 1001, 0);
+    expect(isInsideCylinder(destOutside.lat, destOutside.lon, 47.0, 11.0, 1000)).toBe(false);
+  });
+});
+
+describe('calculateBearingRadians tests', () => {
+  it('should return radians for due north', () => {
+    const result = calculateBearingRadians(47.0, 11.0, 48.0, 11.0);
+    expect(result).toBeCloseTo(0, 2);
+  });
+
+  it('should return PI/2 for due east', () => {
+    const result = calculateBearingRadians(47.0, 11.0, 47.0, 12.0);
+    expect(result).toBeCloseTo(Math.PI / 2, 1);
+  });
+
+  it('should return ±PI for due south', () => {
+    const result = calculateBearingRadians(48.0, 11.0, 47.0, 11.0);
+    expect(Math.abs(result)).toBeCloseTo(Math.PI, 1);
+  });
+
+  it('should return -PI/2 for due west', () => {
+    const result = calculateBearingRadians(47.0, 12.0, 47.0, 11.0);
+    expect(result).toBeCloseTo(-Math.PI / 2, 1);
+  });
+});
+
+describe('getCirclePoints tests', () => {
+  it('should return correct number of points (numPoints + 1 for closure)', () => {
+    const points = getCirclePoints(47.0, 11.0, 1000, 64);
+    expect(points).toHaveLength(65);
+  });
+
+  it('should return closed polygon (first and last points match)', () => {
+    const points = getCirclePoints(47.0, 11.0, 1000, 32);
+    const first = points[0];
+    const last = points[points.length - 1];
+    expect(first.lat).toBeCloseTo(last.lat, 10);
+    expect(first.lon).toBeCloseTo(last.lon, 10);
+  });
+
+  it('should generate points at correct distance from center', () => {
+    const centerLat = 47.0;
+    const centerLon = 11.0;
+    const radius = 1000;
+
+    const points = getCirclePoints(centerLat, centerLon, radius, 16);
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const dist = haversineDistance(centerLat, centerLon, points[i].lat, points[i].lon);
+      expect(dist).toBeCloseTo(radius, -1);
     }
   });
 
-  describe('calculateBearing comparison', () => {
-    const testCases = [
-      { name: 'due north', args: [47.0, 11.0, 48.0, 11.0] },
-      { name: 'due east', args: [47.0, 11.0, 47.0, 12.0] },
-      { name: 'due south', args: [48.0, 11.0, 47.0, 11.0] },
-      { name: 'due west', args: [47.0, 12.0, 47.0, 11.0] },
-      { name: 'northeast', args: [47.0, 11.0, 48.0, 12.47] },
-      { name: 'cross date line', args: [0, 170, 0, -170] },
-    ] as const;
+  it('should generate evenly distributed points around the circle', () => {
+    const points = getCirclePoints(47.0, 11.0, 1000, 4);
+    expect(points).toHaveLength(5);
 
-    for (const { name, args } of testCases) {
-      it(`should match old implementation: ${name}`, () => {
-        const oldResult = oldCalculateBearing(args[0], args[1], args[2], args[3]);
-        const turfResult = turfCalculateBearing(args[0], args[1], args[2], args[3]);
+    expect(points[0].lat).toBeGreaterThan(47.0);
+    expect(points[0].lon).toBeCloseTo(11.0, 3);
 
-        // Allow 0.1 degree tolerance
-        expect(turfResult).toBeCloseTo(oldResult, 0);
-      });
+    expect(points[1].lat).toBeCloseTo(47.0, 3);
+    expect(points[1].lon).toBeGreaterThan(11.0);
+
+    expect(points[2].lat).toBeLessThan(47.0);
+    expect(points[2].lon).toBeCloseTo(11.0, 3);
+
+    expect(points[3].lat).toBeCloseTo(47.0, 3);
+    expect(points[3].lon).toBeLessThan(11.0);
+  });
+
+  it('should handle small radius', () => {
+    const points = getCirclePoints(47.0, 11.0, 100, 8);
+    expect(points).toHaveLength(9);
+
+    for (const point of points) {
+      const dist = haversineDistance(47.0, 11.0, point.lat, point.lon);
+      expect(dist).toBeCloseTo(100, -1);
     }
   });
 
-  describe('getBoundingBox comparison', () => {
-    function createFix(lat: number, lon: number): IGCFix {
-      return {
-        time: new Date(),
-        latitude: lat,
-        longitude: lon,
-        pressureAltitude: 1000,
-        gnssAltitude: 1000,
-        valid: true,
-      };
+  it('should handle large radius', () => {
+    const points = getCirclePoints(47.0, 11.0, 50000, 8);
+    expect(points).toHaveLength(9);
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const dist = haversineDistance(47.0, 11.0, points[i].lat, points[i].lon);
+      expect(dist).toBeCloseTo(50000, -2);
     }
-
-    it('should match old implementation: multiple fixes', () => {
-      const fixes: IGCFix[] = [
-        createFix(47.0, 11.0),
-        createFix(48.0, 12.0),
-        createFix(47.5, 11.5),
-      ];
-
-      const oldResult = oldGetBoundingBox(fixes);
-      const turfResult = turfGetBoundingBox(fixes);
-
-      expect(turfResult.minLat).toBe(oldResult.minLat);
-      expect(turfResult.maxLat).toBe(oldResult.maxLat);
-      expect(turfResult.minLon).toBe(oldResult.minLon);
-      expect(turfResult.maxLon).toBe(oldResult.maxLon);
-    });
-
-    it('should match old implementation: single fix', () => {
-      const fixes: IGCFix[] = [createFix(47.5, 11.5)];
-
-      const oldResult = oldGetBoundingBox(fixes);
-      const turfResult = turfGetBoundingBox(fixes);
-
-      expect(turfResult.minLat).toBe(oldResult.minLat);
-      expect(turfResult.maxLat).toBe(oldResult.maxLat);
-      expect(turfResult.minLon).toBe(oldResult.minLon);
-      expect(turfResult.maxLon).toBe(oldResult.maxLon);
-    });
-
-    it('should match old implementation: empty array', () => {
-      const oldResult = oldGetBoundingBox([]);
-      const turfResult = turfGetBoundingBox([]);
-
-      expect(turfResult.minLat).toBe(oldResult.minLat);
-      expect(turfResult.maxLat).toBe(oldResult.maxLat);
-      expect(turfResult.minLon).toBe(oldResult.minLon);
-      expect(turfResult.maxLon).toBe(oldResult.maxLon);
-    });
   });
 
-  describe('destinationPoint tests', () => {
-    it('should calculate correct destination going north', () => {
-      const result = turfDestinationPoint(47.0, 11.0, 1000, 0);
-      // 1km north should increase latitude by ~0.009 degrees
-      expect(result.lat).toBeGreaterThan(47.0);
-      expect(result.lon).toBeCloseTo(11.0, 4);
-    });
+  it('should work at different latitudes', () => {
+    const equatorPoints = getCirclePoints(0.0, 11.0, 1000, 8);
+    expect(equatorPoints).toHaveLength(9);
 
-    it('should calculate correct destination going east', () => {
-      const result = turfDestinationPoint(47.0, 11.0, 1000, Math.PI / 2);
-      // 1km east should increase longitude
-      expect(result.lat).toBeCloseTo(47.0, 4);
-      expect(result.lon).toBeGreaterThan(11.0);
-    });
+    const highLatPoints = getCirclePoints(70.0, 11.0, 1000, 8);
+    expect(highLatPoints).toHaveLength(9);
 
-    it('should return to approximately same point after round trip', () => {
-      const distance = 10000; // 10km
-      const bearing = Math.PI / 4; // 45 degrees
-
-      const dest = turfDestinationPoint(47.0, 11.0, distance, bearing);
-      const returnTrip = turfDestinationPoint(dest.lat, dest.lon, distance, bearing + Math.PI);
-
-      expect(returnTrip.lat).toBeCloseTo(47.0, 2);
-      expect(returnTrip.lon).toBeCloseTo(11.0, 2);
-    });
+    for (let i = 0; i < 8; i++) {
+      const equatorDist = haversineDistance(0.0, 11.0, equatorPoints[i].lat, equatorPoints[i].lon);
+      const highLatDist = haversineDistance(70.0, 11.0, highLatPoints[i].lat, highLatPoints[i].lon);
+      expect(equatorDist).toBeCloseTo(1000, -1);
+      expect(highLatDist).toBeCloseTo(1000, -1);
+    }
   });
 
-  describe('isInsideCylinder tests', () => {
-    it('should return true for point at center', () => {
-      expect(turfIsInsideCylinder(47.0, 11.0, 47.0, 11.0, 1000)).toBe(true);
-    });
-
-    it('should return true for point inside cylinder', () => {
-      // Point about 500m from center
-      expect(turfIsInsideCylinder(47.0, 11.005, 47.0, 11.0, 1000)).toBe(true);
-    });
-
-    it('should return false for point outside cylinder', () => {
-      // Point about 2km from center
-      expect(turfIsInsideCylinder(47.02, 11.0, 47.0, 11.0, 1000)).toBe(false);
-    });
-
-    it('should handle point very close to boundary', () => {
-      // Create a point just inside 1km distance (accounting for floating point)
-      const dest = turfDestinationPoint(47.0, 11.0, 999.9, 0);
-      expect(turfIsInsideCylinder(dest.lat, dest.lon, 47.0, 11.0, 1000)).toBe(true);
-
-      // Point slightly outside should be false
-      const destOutside = turfDestinationPoint(47.0, 11.0, 1001, 0);
-      expect(turfIsInsideCylinder(destOutside.lat, destOutside.lon, 47.0, 11.0, 1000)).toBe(false);
-    });
-  });
-
-  describe('calculateBearingRadians tests', () => {
-    it('should return radians for due north', () => {
-      const result = turfCalculateBearingRadians(47.0, 11.0, 48.0, 11.0);
-      expect(result).toBeCloseTo(0, 2);
-    });
-
-    it('should return PI/2 for due east', () => {
-      const result = turfCalculateBearingRadians(47.0, 11.0, 47.0, 12.0);
-      expect(result).toBeCloseTo(Math.PI / 2, 1);
-    });
-
-    it('should return ±PI for due south', () => {
-      const result = turfCalculateBearingRadians(48.0, 11.0, 47.0, 11.0);
-      expect(Math.abs(result)).toBeCloseTo(Math.PI, 1);
-    });
-
-    it('should return -PI/2 for due west', () => {
-      const result = turfCalculateBearingRadians(47.0, 12.0, 47.0, 11.0);
-      expect(result).toBeCloseTo(-Math.PI / 2, 1);
-    });
-  });
-
-  describe('getCirclePoints tests', () => {
-    it('should return correct number of points (numPoints + 1 for closure)', () => {
-      const points = getCirclePoints(47.0, 11.0, 1000, 64);
-      expect(points).toHaveLength(65); // 64 + 1 for closed polygon
-    });
-
-    it('should return closed polygon (first and last points match)', () => {
-      const points = getCirclePoints(47.0, 11.0, 1000, 32);
-      const first = points[0];
-      const last = points[points.length - 1];
-      expect(first.lat).toBeCloseTo(last.lat, 10);
-      expect(first.lon).toBeCloseTo(last.lon, 10);
-    });
-
-    it('should generate points at correct distance from center', () => {
-      const centerLat = 47.0;
-      const centerLon = 11.0;
-      const radius = 1000; // 1km
-
-      const points = getCirclePoints(centerLat, centerLon, radius, 16);
-
-      // Check several points are at the correct distance
-      for (let i = 0; i < points.length - 1; i++) {
-        const dist = turfHaversineDistance(centerLat, centerLon, points[i].lat, points[i].lon);
-        expect(dist).toBeCloseTo(radius, -1); // Within 10m
-      }
-    });
-
-    it('should generate evenly distributed points around the circle', () => {
-      const points = getCirclePoints(47.0, 11.0, 1000, 4);
-      // 4 points + closure = 5 points
-      expect(points).toHaveLength(5);
-
-      // Points should be at 0°, 90°, 180°, 270° from center
-      // First point is at bearing 0° (north)
-      expect(points[0].lat).toBeGreaterThan(47.0); // North of center
-      expect(points[0].lon).toBeCloseTo(11.0, 3); // Same longitude
-
-      // Second point is at bearing 90° (east)
-      expect(points[1].lat).toBeCloseTo(47.0, 3); // Same latitude
-      expect(points[1].lon).toBeGreaterThan(11.0); // East of center
-
-      // Third point is at bearing 180° (south)
-      expect(points[2].lat).toBeLessThan(47.0); // South of center
-      expect(points[2].lon).toBeCloseTo(11.0, 3); // Same longitude
-
-      // Fourth point is at bearing 270° (west)
-      expect(points[3].lat).toBeCloseTo(47.0, 3); // Same latitude
-      expect(points[3].lon).toBeLessThan(11.0); // West of center
-    });
-
-    it('should handle small radius', () => {
-      const points = getCirclePoints(47.0, 11.0, 100, 8); // 100m radius
-      expect(points).toHaveLength(9);
-
-      // All points should be close to center
-      for (const point of points) {
-        const dist = turfHaversineDistance(47.0, 11.0, point.lat, point.lon);
-        expect(dist).toBeCloseTo(100, -1);
-      }
-    });
-
-    it('should handle large radius', () => {
-      const points = getCirclePoints(47.0, 11.0, 50000, 8); // 50km radius
-      expect(points).toHaveLength(9);
-
-      for (let i = 0; i < points.length - 1; i++) {
-        const dist = turfHaversineDistance(47.0, 11.0, points[i].lat, points[i].lon);
-        expect(dist).toBeCloseTo(50000, -2); // Within 100m
-      }
-    });
-
-    it('should work at different latitudes', () => {
-      // Near equator
-      const equatorPoints = getCirclePoints(0.0, 11.0, 1000, 8);
-      expect(equatorPoints).toHaveLength(9);
-
-      // High latitude
-      const highLatPoints = getCirclePoints(70.0, 11.0, 1000, 8);
-      expect(highLatPoints).toHaveLength(9);
-
-      // Verify distances are correct at both latitudes
-      for (let i = 0; i < 8; i++) {
-        const equatorDist = turfHaversineDistance(0.0, 11.0, equatorPoints[i].lat, equatorPoints[i].lon);
-        const highLatDist = turfHaversineDistance(70.0, 11.0, highLatPoints[i].lat, highLatPoints[i].lon);
-        expect(equatorDist).toBeCloseTo(1000, -1);
-        expect(highLatDist).toBeCloseTo(1000, -1);
-      }
-    });
-
-    it('should use default numPoints of 64', () => {
-      const points = getCirclePoints(47.0, 11.0, 1000);
-      expect(points).toHaveLength(65); // 64 + 1 for closure
-    });
+  it('should use default numPoints of 64', () => {
+    const points = getCirclePoints(47.0, 11.0, 1000);
+    expect(points).toHaveLength(65);
   });
 });

@@ -1,28 +1,11 @@
 import { describe, it, expect } from 'bun:test';
 import { detectFlightEvents, filterEventsByBounds, getEventStyle, FlightEvent } from '../src/event-detector';
-import { IGCFix } from '../src/igc-parser';
 import { XCTask } from '../src/xctsk-parser';
+import { createFix as createFixSeconds, type IGCFix } from './test-helpers';
 
-/**
- * Helper to create a mock fix
- */
-function createFix(
-  timeMinutes: number,
-  lat: number,
-  lon: number,
-  altitude: number
-): IGCFix {
-  const time = new Date('2024-01-15T10:00:00Z');
-  time.setMinutes(time.getMinutes() + timeMinutes);
-
-  return {
-    time,
-    latitude: lat,
-    longitude: lon,
-    pressureAltitude: altitude,
-    gnssAltitude: altitude,
-    valid: true,
-  };
+/** Create a fix using minutes (for backward compatibility with existing tests) */
+function createFix(timeMinutes: number, lat: number, lon: number, altitude: number) {
+  return createFixSeconds(timeMinutes * 60, lat, lon, altitude);
 }
 
 /**

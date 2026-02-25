@@ -2,7 +2,7 @@
 import { readFileSync } from 'fs';
 import { parseIGC } from '../analysis/src/igc-parser';
 import { parseXCTask } from '../analysis/src/xctsk-parser';
-import { detectFlightEvents } from '../analysis/src/event-detector';
+import { detectFlightEvents, type CircleEventDetails } from '../analysis/src/event-detector';
 
 function formatTime(date: Date): string {
   const h = String(date.getUTCHours()).padStart(2, '0');
@@ -46,12 +46,14 @@ const events = detectFlightEvents(igc.fixes, task);
 
 console.log('time,type,lat,lon,altitude,wind_dir,wind_speed,description');
 for (const event of events) {
-  const d = event.details;
-  const windDir = d?.windDirection ?? d?.driftWindDirection;
-  const windSpeed = d?.windSpeed ?? d?.driftWindSpeed;
-
+  let windDir: number | undefined;
+  let windSpeed: number | undefined;
   let description = event.description;
-  if (event.type === 'circle_complete' && d) {
+
+  if (event.type === 'circle_complete' && event.details) {
+    const d = event.details as CircleEventDetails;
+    windDir = d.windDirection ?? d.driftWindDirection;
+    windSpeed = d.windSpeed ?? d.driftWindSpeed;
     const parts = [
       `#${d.circleNumber}`,
       d.turnDirection,

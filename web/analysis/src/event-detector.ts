@@ -10,10 +10,42 @@
  */
 
 import { IGCFix } from './igc-parser';
-import { haversineDistance } from './geo';
+import { haversineDistance, calculateTrackDistance } from './geo';
 import { XCTask, getSSSIndex, getESSIndex } from './xctsk-parser';
 import { resolveTurnpointSequence } from './turnpoint-sequence';
 import { detectCircles } from './circle-detector';
+
+// --- Detection thresholds ---
+
+/** Minimum average climb rate (m/s) to enter/stay in a thermal */
+const MIN_CLIMB_RATE = 0.5;
+
+/** Minimum thermal duration (seconds) to emit a thermal event */
+const MIN_THERMAL_DURATION = 20;
+
+/** Minimum time gap (seconds) between consecutive thermals */
+const MIN_THERMAL_GAP = 20;
+
+/** Minimum glide duration (seconds) to emit a glide event */
+const MIN_GLIDE_DURATION = 30;
+
+/** Minimum index gap between thermals to consider a glide between them */
+const MIN_GLIDE_GAP_INDICES = 10;
+
+/** Landing speed threshold is this factor of takeoff speed threshold */
+const LANDING_SPEED_FACTOR = 0.5;
+
+/** Minimum climb rate (m/s) for a "significant climb" vario extreme */
+const MIN_SIGNIFICANT_CLIMB = 0.5;
+
+/** Maximum sink rate (m/s) for a "significant sink" vario extreme */
+const MIN_SIGNIFICANT_SINK = -1;
+
+/** Window size (fixes) for vario averaging */
+const VARIO_WINDOW_SIZE = 10;
+
+/** Descent rate (m/s) threshold to consider still on approach, not landed */
+const LANDING_DESCENT_THRESHOLD = -0.5;
 
 export type FlightEventType =
   | 'takeoff'
@@ -45,6 +77,76 @@ export interface TrackSegment {
   endIndex: number;
 }
 
+// --- Event detail types ---
+
+export interface ThermalEventDetails {
+  avgClimbRate: number;
+  duration: number;
+  altitudeGain: number;
+}
+
+export interface GlideEventDetails {
+  distance: number;
+  glideRatio: number;
+  duration?: number;
+  averageSpeed: number;
+  altitudeLost?: number;
+}
+
+export interface FixIndexDetails {
+  fixIndex: number;
+  climbRate?: number;
+  sinkRate?: number;
+  startAltitude?: number;
+  altitudeGain?: number;
+}
+
+export interface TurnpointCrossingDetails {
+  fixIndex: number;
+  turnpointIndex: number;
+  turnpointName: string;
+  radius: number;
+  direction: string;
+  distanceToCenter: number;
+}
+
+export interface TurnpointReachingDetails {
+  fixIndex: number;
+  turnpointIndex: number;
+  turnpointName: string;
+  selectionReason: string;
+  candidateCount: number;
+  madeGoal: boolean;
+  flownDistance: number;
+  taskDistance: number;
+  speedSectionTime?: number | null;
+}
+
+export interface CircleEventDetails {
+  turnDirection: string;
+  duration: number;
+  climbRate: number;
+  radius: number;
+  centerLat: number;
+  centerLon: number;
+  fitError: number;
+  quality: number;
+  strongestLiftBearing: number;
+  circleNumber: number;
+  windSpeed?: number;
+  windDirection?: number;
+  driftWindSpeed?: number;
+  driftWindDirection?: number;
+}
+
+export type EventDetails =
+  | ThermalEventDetails
+  | GlideEventDetails
+  | FixIndexDetails
+  | TurnpointCrossingDetails
+  | TurnpointReachingDetails
+  | CircleEventDetails;
+
 export interface FlightEvent {
   id: string;
   type: FlightEventType;
@@ -53,7 +155,7 @@ export interface FlightEvent {
   longitude: number;
   altitude: number;
   description: string;
-  details?: Record<string, unknown>;
+  details?: EventDetails;
   /** For segment events (thermals, glides), contains the track indices */
   segment?: TrackSegment;
 }
@@ -138,8 +240,8 @@ function buildThermalSegment(fixes: IGCFix[], startIndex: number, endIndex: numb
  */
 function detectThermals(fixes: IGCFix[], windowSize = 10): ThermalSegment[] {
   const thermals: ThermalSegment[] = [];
-  const minClimbRate = 0.5; // m/s
-  const minDuration = 20; // seconds
+  const minClimbRate = MIN_CLIMB_RATE;
+  const minDuration = MIN_THERMAL_DURATION;
 
   let inThermal = false;
   let thermalStart = 0;
@@ -165,7 +267,7 @@ function detectThermals(fixes: IGCFix[], windowSize = 10): ThermalSegment[] {
       // Entering thermal - but only if we're past the last thermal's end
       // and at least minGapDuration seconds have passed
       const potentialStart = i - windowSize;
-      const minGapDuration = 20; // seconds between thermals
+      const minGapDuration = MIN_THERMAL_GAP;
       const timeSinceLastThermal = lastThermalEnd >= 0
         ? (fixes[potentialStart].time.getTime() - fixes[lastThermalEnd].time.getTime()) / 1000
         : Infinity;
@@ -220,16 +322,9 @@ function detectThermals(fixes: IGCFix[], windowSize = 10): ThermalSegment[] {
  */
 function buildGlideSegment(fixes: IGCFix[], startIdx: number, endIdx: number): GlideSegment | null {
   const duration = (fixes[endIdx].time.getTime() - fixes[startIdx].time.getTime()) / 1000;
-  if (duration <= 30) return null;
+  if (duration <= MIN_GLIDE_DURATION) return null;
 
-  let totalDist = 0;
-  for (let i = startIdx; i < endIdx; i++) {
-    totalDist += haversineDistance(
-      fixes[i].latitude, fixes[i].longitude,
-      fixes[i + 1].latitude, fixes[i + 1].longitude
-    );
-  }
-
+  const totalDist = calculateTrackDistance(fixes, startIdx, endIdx);
   const altLoss = fixes[startIdx].gnssAltitude - fixes[endIdx].gnssAltitude;
 
   return {
@@ -256,7 +351,7 @@ function detectGlides(fixes: IGCFix[], thermals: ThermalSegment[]): GlideSegment
   let prevEnd = 0;
 
   for (const thermal of sortedThermals) {
-    if (thermal.startIndex > prevEnd + 10) {
+    if (thermal.startIndex > prevEnd + MIN_GLIDE_GAP_INDICES) {
       // Glide ends one index before the thermal starts to avoid timestamp overlap
       const glide = buildGlideSegment(fixes, prevEnd, thermal.startIndex - 1);
       if (glide) glides.push(glide);
@@ -265,7 +360,7 @@ function detectGlides(fixes: IGCFix[], thermals: ThermalSegment[]): GlideSegment
   }
 
   // Trailing glide: from last thermal end (or start of flight) to end of track
-  if (fixes.length - 1 > prevEnd + 10) {
+  if (fixes.length - 1 > prevEnd + MIN_GLIDE_GAP_INDICES) {
     const glide = buildGlideSegment(fixes, prevEnd, fixes.length - 1);
     if (glide) glides.push(glide);
   }
@@ -383,22 +478,28 @@ function detectTurnpointEvents(
   return events;
 }
 
+// Configuration for takeoff/landing detection (based on XCSoar)
+interface TakeoffLandingConfig {
+  minGroundSpeed: number;  // m/s
+  minAltitudeGain: number; // meters above start altitude
+  minClimbRate: number;    // m/s sustained climb
+  takeoffTimeWindow: number; // seconds
+  landingTimeWindow: number; // seconds
+}
+
+const DEFAULT_TAKEOFF_LANDING_CONFIG: TakeoffLandingConfig = {
+  minGroundSpeed: 5,
+  minAltitudeGain: 50,
+  minClimbRate: 1.0,
+  takeoffTimeWindow: 10,
+  landingTimeWindow: 30,
+};
+
 /**
- * Detect takeoff and landing using multiple criteria
- * Based on XCSoar's approach - uses ground speed, altitude gain, and climb rate
+ * Detect takeoff index by scanning forward for sustained flight criteria.
+ * Returns the fix index of takeoff, or -1 if not found.
  */
-function detectTakeoffLanding(fixes: IGCFix[]): FlightEvent[] {
-  const events: FlightEvent[] = [];
-
-  if (fixes.length < 10) return events;
-
-  // Configuration (based on XCSoar)
-  const minGroundSpeed = 5; // m/s (~18 km/h)
-  const minAltitudeGain = 50; // meters above start altitude
-  const minClimbRate = 1.0; // m/s sustained climb
-  const takeoffTimeWindow = 10; // seconds - must sustain criteria
-  const landingTimeWindow = 30; // seconds - asymmetric for safety
-
+function detectTakeoff(fixes: IGCFix[], config: TakeoffLandingConfig): { index: number; startAltitude: number } | null {
   // Find starting altitude (average of first few fixes to reduce noise)
   let startAltitude = 0;
   const startSampleSize = Math.min(10, fixes.length);
@@ -407,135 +508,84 @@ function detectTakeoffLanding(fixes: IGCFix[]): FlightEvent[] {
   }
   startAltitude /= startSampleSize;
 
-  // === TAKEOFF DETECTION ===
-  // Scan forward to find first point where flight criteria are continuously met
-  let takeoffIndex = -1;
-
   for (let i = 1; i < fixes.length; i++) {
-    // Calculate criteria at current position
     let criteriaMetCount = 0;
 
     // Criteria 1: Instant ground speed check
     if (i < fixes.length - 1) {
       const speed = calculateGroundSpeed(fixes[i - 1], fixes[i]);
-      if (speed > minGroundSpeed) {
-        criteriaMetCount++;
-      }
+      if (speed > config.minGroundSpeed) criteriaMetCount++;
     }
 
     // Criteria 2: Current altitude gain above start
-    const altitudeGain = fixes[i].gnssAltitude - startAltitude;
-    if (altitudeGain > minAltitudeGain) {
+    if (fixes[i].gnssAltitude - startAltitude > config.minAltitudeGain) {
       criteriaMetCount++;
     }
 
     // Criteria 3: Recent climb rate (over last few fixes)
-    const climbWindowSize = Math.min(5, i); // Look back up to 5 fixes
+    const climbWindowSize = Math.min(5, i);
     if (climbWindowSize > 0) {
       const climbStartIdx = i - climbWindowSize;
       const climbDuration = (fixes[i].time.getTime() - fixes[climbStartIdx].time.getTime()) / 1000;
       const altitudeChange = fixes[i].gnssAltitude - fixes[climbStartIdx].gnssAltitude;
-      const avgClimbRate = climbDuration > 0 ? altitudeChange / climbDuration : 0;
-
-      if (avgClimbRate > minClimbRate) {
+      if (climbDuration > 0 && altitudeChange / climbDuration > config.minClimbRate) {
         criteriaMetCount++;
       }
     }
 
-    // Found flight indication - verify it sustains for takeoffTimeWindow
-    if (criteriaMetCount >= 1) {
-      // Check if flight criteria continue for the next N seconds
-      const verifyEndTime = fixes[i].time.getTime() + takeoffTimeWindow * 1000;
-      let verifyEndIndex = i;
+    if (criteriaMetCount < 1) continue;
 
-      for (let j = i + 1; j < fixes.length; j++) {
-        if (fixes[j].time.getTime() >= verifyEndTime) {
-          verifyEndIndex = j;
-          break;
-        }
-      }
-
-      if (verifyEndIndex > i) {
-        // Check if we're still flying at the end of the window
-        let stillFlying = false;
-
-        // Check sustained altitude gain
-        const futureAltGain = fixes[verifyEndIndex].gnssAltitude - startAltitude;
-        if (futureAltGain > minAltitudeGain) {
-          stillFlying = true;
-        }
-
-        // Check sustained climb over window
-        const windowDuration = (fixes[verifyEndIndex].time.getTime() - fixes[i].time.getTime()) / 1000;
-        const windowAltChange = fixes[verifyEndIndex].gnssAltitude - fixes[i].gnssAltitude;
-        const windowClimbRate = windowDuration > 0 ? windowAltChange / windowDuration : 0;
-
-        if (windowClimbRate > minClimbRate) {
-          stillFlying = true;
-        }
-
-        // Check for any good ground speed in the window
-        for (let j = i; j < verifyEndIndex - 1; j++) {
-          const speed = calculateGroundSpeed(fixes[j], fixes[j + 1]);
-          if (speed > minGroundSpeed) {
-            stillFlying = true;
-            break;
-          }
-        }
-
-        if (stillFlying) {
-          takeoffIndex = i;
-          break;
-        }
-      }
+    // Verify sustained flight for takeoffTimeWindow
+    const verifyEndTime = fixes[i].time.getTime() + config.takeoffTimeWindow * 1000;
+    let verifyEndIndex = i;
+    for (let j = i + 1; j < fixes.length; j++) {
+      if (fixes[j].time.getTime() >= verifyEndTime) { verifyEndIndex = j; break; }
     }
+    if (verifyEndIndex <= i) continue;
+
+    let stillFlying = false;
+
+    if (fixes[verifyEndIndex].gnssAltitude - startAltitude > config.minAltitudeGain) {
+      stillFlying = true;
+    }
+
+    const windowDuration = (fixes[verifyEndIndex].time.getTime() - fixes[i].time.getTime()) / 1000;
+    const windowAltChange = fixes[verifyEndIndex].gnssAltitude - fixes[i].gnssAltitude;
+    if (windowDuration > 0 && windowAltChange / windowDuration > config.minClimbRate) {
+      stillFlying = true;
+    }
+
+    for (let j = i; j < verifyEndIndex - 1; j++) {
+      const speed = calculateGroundSpeed(fixes[j], fixes[j + 1]);
+      if (speed > config.minGroundSpeed) { stillFlying = true; break; }
+    }
+
+    if (stillFlying) return { index: i, startAltitude };
   }
 
-  if (takeoffIndex >= 0) {
-    const takeoffFix = fixes[takeoffIndex];
-    events.push({
-      id: 'takeoff',
-      type: 'takeoff',
-      time: takeoffFix.time,
-      latitude: takeoffFix.latitude,
-      longitude: takeoffFix.longitude,
-      altitude: takeoffFix.gnssAltitude,
-      description: 'Takeoff',
-      details: {
-        fixIndex: takeoffIndex,
-        startAltitude,
-        altitudeGain: takeoffFix.gnssAltitude - startAltitude,
-      },
-    });
-  }
+  return null;
+}
 
-  // === LANDING DETECTION ===
-  // Scan backward to find last sustained flight indication
-  let landingIndex = -1;
+/**
+ * Detect landing index by scanning backward for the last sustained flight indication.
+ * Returns the fix index of landing, or -1 if not found.
+ */
+function detectLanding(fixes: IGCFix[], config: TakeoffLandingConfig): { index: number } | null {
+  for (let i = fixes.length - 2; i >= config.landingTimeWindow; i--) {
+    const windowStartTime = fixes[i].time.getTime() - config.landingTimeWindow * 1000;
 
-  for (let i = fixes.length - 2; i >= landingTimeWindow; i--) {
-    // Check if we're still flying in the time window BEFORE this point
-    let windowStartTime = fixes[i].time.getTime() - landingTimeWindow * 1000;
-
-    // Find the index at start of time window
     let windowStartIndex = i;
     for (let j = i; j >= 0; j--) {
-      if (fixes[j].time.getTime() <= windowStartTime) {
-        windowStartIndex = j;
-        break;
-      }
+      if (fixes[j].time.getTime() <= windowStartTime) { windowStartIndex = j; break; }
     }
+    if (windowStartIndex === i) continue;
 
-    if (windowStartIndex === i) continue; // Window too short
-
-    // Check for flight indicators in the window before this point
     let stillFlying = false;
 
     // Check 1: Any significant ground speed?
     for (let j = windowStartIndex; j < i; j++) {
       const speed = calculateGroundSpeed(fixes[j], fixes[j + 1]);
-      if (speed > minGroundSpeed / 2) {
-        // Lower threshold for landing (hysteresis)
+      if (speed > config.minGroundSpeed * LANDING_SPEED_FACTOR) {
         stillFlying = true;
         break;
       }
@@ -545,32 +595,58 @@ function detectTakeoffLanding(fixes: IGCFix[]): FlightEvent[] {
     if (!stillFlying) {
       const altChange = fixes[i].gnssAltitude - fixes[windowStartIndex].gnssAltitude;
       const timeDiff = (fixes[i].time.getTime() - fixes[windowStartIndex].time.getTime()) / 1000;
-      const vario = timeDiff > 0 ? altChange / timeDiff : 0;
-
-      if (vario < -0.5) {
-        // Descending > 0.5 m/s = still on approach
+      if (timeDiff > 0 && altChange / timeDiff < LANDING_DESCENT_THRESHOLD) {
         stillFlying = true;
       }
     }
 
-    // If still flying in the window before this point, this is our landing
-    if (stillFlying) {
-      landingIndex = i;
-      break;
-    }
+    if (stillFlying) return { index: i };
   }
 
-  if (landingIndex >= 0) {
-    const landingFix = fixes[landingIndex];
+  return null;
+}
+
+/**
+ * Detect takeoff and landing using multiple criteria.
+ * Based on XCSoar's approach - uses ground speed, altitude gain, and climb rate.
+ */
+function detectTakeoffLanding(fixes: IGCFix[]): FlightEvent[] {
+  const events: FlightEvent[] = [];
+  if (fixes.length < 10) return events;
+
+  const config = DEFAULT_TAKEOFF_LANDING_CONFIG;
+
+  const takeoff = detectTakeoff(fixes, config);
+  if (takeoff) {
+    const fix = fixes[takeoff.index];
+    events.push({
+      id: 'takeoff',
+      type: 'takeoff',
+      time: fix.time,
+      latitude: fix.latitude,
+      longitude: fix.longitude,
+      altitude: fix.gnssAltitude,
+      description: 'Takeoff',
+      details: {
+        fixIndex: takeoff.index,
+        startAltitude: takeoff.startAltitude,
+        altitudeGain: fix.gnssAltitude - takeoff.startAltitude,
+      },
+    });
+  }
+
+  const landing = detectLanding(fixes, config);
+  if (landing) {
+    const fix = fixes[landing.index];
     events.push({
       id: 'landing',
       type: 'landing',
-      time: landingFix.time,
-      latitude: landingFix.latitude,
-      longitude: landingFix.longitude,
-      altitude: landingFix.gnssAltitude,
+      time: fix.time,
+      latitude: fix.latitude,
+      longitude: fix.longitude,
+      altitude: fix.gnssAltitude,
       description: 'Landing',
-      details: { fixIndex: landingIndex },
+      details: { fixIndex: landing.index },
     });
   }
 
@@ -631,7 +707,7 @@ function detectAltitudeExtremes(fixes: IGCFix[]): FlightEvent[] {
  */
 function detectVarioExtremes(fixes: IGCFix[]): FlightEvent[] {
   const events: FlightEvent[] = [];
-  const windowSize = 10; // Average over 10 fixes for smoother values
+  const windowSize = VARIO_WINDOW_SIZE;
 
   if (fixes.length < windowSize * 2) return events;
 
@@ -653,7 +729,7 @@ function detectVarioExtremes(fixes: IGCFix[]): FlightEvent[] {
     }
   }
 
-  if (maxClimb > 0.5) {
+  if (maxClimb > MIN_SIGNIFICANT_CLIMB) {
     events.push({
       id: 'max-climb',
       type: 'max_climb',
@@ -666,7 +742,7 @@ function detectVarioExtremes(fixes: IGCFix[]): FlightEvent[] {
     });
   }
 
-  if (maxSink < -1) {
+  if (maxSink < MIN_SIGNIFICANT_SINK) {
     events.push({
       id: 'max-sink',
       type: 'max_sink',
@@ -878,53 +954,5 @@ export function filterEventsByBounds(
   );
 }
 
-/**
- * Get event icon/color based on type
- */
-export function getEventStyle(type: FlightEventType): {
-  icon: string;
-  color: string;
-} {
-  switch (type) {
-    case 'takeoff':
-      return { icon: 'plane-departure', color: '#22c55e' };
-    case 'landing':
-      return { icon: 'plane-arrival', color: '#ef4444' };
-    case 'thermal_entry':
-      return { icon: 'arrow-up', color: '#f97316' };
-    case 'thermal_exit':
-      return { icon: 'arrow-down', color: '#f97316' };
-    case 'glide_start':
-      return { icon: 'arrow-right', color: '#3b82f6' };
-    case 'glide_end':
-      return { icon: 'arrow-right', color: '#3b82f6' };
-    case 'turnpoint_entry':
-      return { icon: 'map-pin', color: '#a855f7' };
-    case 'turnpoint_exit':
-      return { icon: 'map-pin', color: '#a855f7' };
-    case 'start_crossing':
-      return { icon: 'flag', color: '#22c55e' };
-    case 'goal_crossing':
-      return { icon: 'trophy', color: '#eab308' };
-    case 'start_reaching':
-      return { icon: 'flag', color: '#16a34a' };
-    case 'turnpoint_reaching':
-      return { icon: 'check-circle', color: '#7c3aed' };
-    case 'ess_reaching':
-      return { icon: 'check-circle', color: '#dc2626' };
-    case 'goal_reaching':
-      return { icon: 'trophy', color: '#ca8a04' };
-    case 'max_altitude':
-      return { icon: 'mountain', color: '#06b6d4' };
-    case 'min_altitude':
-      return { icon: 'valley', color: '#64748b' };
-    case 'max_climb':
-      return { icon: 'trending-up', color: '#22c55e' };
-    case 'max_sink':
-      return { icon: 'trending-down', color: '#ef4444' };
-    case 'circle_complete':
-      return { icon: 'rotate-cw', color: '#8b5cf6' };
-    default:
-      return { icon: 'circle', color: '#64748b' };
-  }
-}
+// getEventStyle has been moved to event-styles.ts
+export { getEventStyle } from './event-styles';
