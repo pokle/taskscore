@@ -99,6 +99,7 @@ async function init(): Promise<void> {
   const menuUseMapbox = document.getElementById('menu-use-mapbox');
   const menuUseLeaflet = document.getElementById('menu-use-leaflet');
   const menuUseThreejs = document.getElementById('menu-use-threejs');
+  const menuUseThreejsSat = document.getElementById('menu-use-threejs-sat');
 
   if (!mapContainer || !eventPanelContainer) {
     console.error('Required containers not found');
@@ -111,15 +112,16 @@ async function init(): Promise<void> {
   const savedMapProvider = config.getPreferences().mapProvider;
   const hasMapboxToken = !!import.meta.env.VITE_MAPBOX_TOKEN;
   const defaultProvider: MapProviderType = hasMapboxToken ? 'mapbox' : 'leaflet';
+  const threejsFullQuality = mapParam === 't-full';
   const providerType: MapProviderType =
     mapParam === 'l' ? 'leaflet' :
     mapParam === 'm' ? 'mapbox' :
-    mapParam === 't' ? 'threejs' :
+    mapParam === 't' || threejsFullQuality ? 'threejs' :
     savedMapProvider ?? defaultProvider;
 
   // Initialize map
   try {
-    mapRenderer = await createMapProvider(mapContainer, providerType);
+    mapRenderer = await createMapProvider(mapContainer, providerType, { threejsFullQuality });
   } catch (err) {
     console.error('Failed to initialize map:', err);
     showStatus('Failed to initialize map', 'error');
@@ -127,12 +129,12 @@ async function init(): Promise<void> {
   }
 
   // Mark the active provider in the command menu
-  const activeLabels: Record<MapProviderType, string> = {
-    mapbox: 'mapbox-provider-label',
-    leaflet: 'leaflet-provider-label',
-    threejs: 'threejs-provider-label',
-  };
-  const activeEl = document.getElementById(activeLabels[providerType]);
+  const activeLabelId =
+    providerType === 'mapbox' ? 'mapbox-provider-label' :
+    providerType === 'leaflet' ? 'leaflet-provider-label' :
+    threejsFullQuality ? 'threejs-sat-provider-label' :
+    'threejs-provider-label';
+  const activeEl = document.getElementById(activeLabelId);
   if (activeEl) activeEl.textContent += ' (active)';
 
   // Load waypoint database for enriching IGC tasks
@@ -273,17 +275,18 @@ async function init(): Promise<void> {
   }
 
   // Switch Map Provider handlers
-  function switchToProvider(p: MapProviderType) {
+  function switchToProvider(p: MapProviderType, urlCode?: string) {
     config.setPreferences({ mapProvider: p });
     const params = new URLSearchParams(window.location.search);
     const codes: Record<MapProviderType, string> = { mapbox: 'm', leaflet: 'l', threejs: 't' };
-    params.set('m', codes[p]);
+    params.set('m', urlCode ?? codes[p]);
     window.location.search = params.toString();
   }
 
   menuUseMapbox?.addEventListener('click', () => switchToProvider('mapbox'));
   menuUseLeaflet?.addEventListener('click', () => switchToProvider('leaflet'));
   menuUseThreejs?.addEventListener('click', () => switchToProvider('threejs'));
+  menuUseThreejsSat?.addEventListener('click', () => switchToProvider('threejs', 't-full'));
 
   // Units dialog handlers
   const populateUnitsDialog = () => {

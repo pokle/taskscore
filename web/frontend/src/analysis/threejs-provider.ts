@@ -94,7 +94,11 @@ function cameraToLatLng(camera: THREE.Camera): { lat: number; lng: number } {
 
 // ── Provider ─────────────────────────────────────────────────────────────────
 
-export function createThreeJsProvider(container: HTMLElement): Promise<MapProvider> {
+export interface ThreeJsProviderOptions {
+  fullQuality?: boolean;
+}
+
+export function createThreeJsProvider(container: HTMLElement, options?: ThreeJsProviderOptions): Promise<MapProvider> {
   return new Promise((resolve) => {
     // State
     let currentFixes: IGCFix[] = [];
@@ -178,9 +182,31 @@ export function createThreeJsProvider(container: HTMLElement): Promise<MapProvid
     scene.add(sun);
 
     // Globe
-    const globe = new ThreeGlobe({ animateIn: false })
-      .globeImageUrl('/textures/earth.webp')
-      .bumpImageUrl('/textures/earth-bump.webp')
+    const useFullQuality = options?.fullQuality ?? false;
+    const globe = new ThreeGlobe({ animateIn: false });
+
+    if (useFullQuality) {
+      // Use tiled satellite imagery for maximum detail at all zoom levels
+      const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
+      if (mapboxToken) {
+        globe.globeTileEngineUrl(
+          (x: number, y: number, l: number) =>
+            `https://api.mapbox.com/v4/mapbox.satellite/${l}/${x}/${y}@2x.jpg90?access_token=${mapboxToken}`,
+        );
+      } else {
+        // Fallback to Esri World Imagery (no token required)
+        globe.globeTileEngineUrl(
+          (x: number, y: number, l: number) =>
+            `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${l}/${y}/${x}`,
+        );
+      }
+    } else {
+      globe
+        .globeImageUrl('/textures/earth.webp')
+        .bumpImageUrl('/textures/earth-bump.webp');
+    }
+
+    globe
       .atmosphereColor('#4FC3F7')
       .atmosphereAltitude(0.15)
       .showGraticules(false)

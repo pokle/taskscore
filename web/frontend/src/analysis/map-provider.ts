@@ -100,13 +100,18 @@ export interface MapProvider {
  * Factory function to create a map provider.
  * Uses dynamic import so only the selected provider's code is bundled.
  */
+export interface MapProviderOptions {
+    threejsFullQuality?: boolean;
+}
+
 export async function createMapProvider(
     container: HTMLElement,
-    providerType: MapProviderType = 'mapbox'
+    providerType: MapProviderType = 'mapbox',
+    options?: MapProviderOptions,
 ): Promise<MapProvider> {
     if (providerType === 'threejs') {
         const { createThreeJsProvider } = await import('./threejs-provider');
-        return createThreeJsProvider(container);
+        return createThreeJsProvider(container, { fullQuality: options?.threejsFullQuality });
     }
     if (providerType === 'leaflet') {
         const { createLeafletProvider } = await import('./leaflet-provider');
