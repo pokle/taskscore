@@ -18,6 +18,8 @@ bun install   # from repo root — installs all workspace deps
    ```
 3. Open https://www.windy.com — the plugin loads automatically from `https://localhost:9999/plugin.js`
 
+See the [Windy debugging guide](https://docs.windy-plugins.com/getting-started/debugging.html) for more detail on the dev workflow.
+
 ## Build
 
 ```bash
