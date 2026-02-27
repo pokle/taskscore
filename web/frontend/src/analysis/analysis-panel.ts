@@ -7,6 +7,7 @@
 
 import { getEventStyle, getOptimizedSegmentDistances, resolveTurnpointSequence, extractGlides, extractClimbs, extractSinks, type FlightEvent, type FlightEventType, type XCTask, type TurnpointSequenceResult, type GlideData, type ClimbData, type SinkData, type FixIndexDetails, type GlideEventDetails } from '@taskscore/engine';
 import { formatAltitude, formatSpeed, formatDistance, formatClimbRate } from './units-browser';
+import { escapeHtml } from './escape-html';
 
 /**
  * Unified panel tabs
@@ -608,7 +609,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
           </span>
           <div class="event-content">
             <span class="event-type">${getEventTypeLabel(event.type)}</span>
-            <span class="event-desc">${event.description}</span>
+            <span class="event-desc">${escapeHtml(event.description)}</span>
             <span class="event-meta">
               ${formatTime(event.time)} | ${formatAltitude(event.altitude).withUnit}
             </span>
@@ -872,7 +873,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     } else if (result.sequence.length > 0) {
       const lastTP = result.sequence[result.sequence.length - 1];
       const tpName = currentTask.turnpoints[lastTP.taskIndex]?.waypoint.name || getTurnpointLabel(lastTP.taskIndex);
-      html += `<div class="rounded-lg bg-yellow-500/15 px-3 py-2 text-sm font-medium text-yellow-700">${getTurnpointLabel(lastTP.taskIndex)} reached &ndash; ${tpName}</div>`;
+      html += `<div class="rounded-lg bg-yellow-500/15 px-3 py-2 text-sm font-medium text-yellow-700">${getTurnpointLabel(lastTP.taskIndex)} reached &ndash; ${escapeHtml(tpName)}</div>`;
     } else {
       html += `<div class="rounded-lg bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">Not started</div>`;
     }
@@ -918,8 +919,8 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       const toTp = currentTask.turnpoints[leg.toTaskIndex];
       const fromLabel = getTurnpointLabel(leg.fromTaskIndex);
       const toLabel = getTurnpointLabel(leg.toTaskIndex);
-      const fromName = fromTp?.waypoint.name ? `${fromTp.waypoint.name} <span class="text-xs text-muted-foreground">(${fromLabel})</span>` : fromLabel;
-      const toName = toTp?.waypoint.name ? `${toTp.waypoint.name} <span class="text-xs text-muted-foreground">(${toLabel})</span>` : toLabel;
+      const fromName = fromTp?.waypoint.name ? `${escapeHtml(fromTp.waypoint.name)} <span class="text-xs text-muted-foreground">(${fromLabel})</span>` : fromLabel;
+      const toName = toTp?.waypoint.name ? `${escapeHtml(toTp.waypoint.name)} <span class="text-xs text-muted-foreground">(${toLabel})</span>` : toLabel;
       const legDist = formatDistance(leg.distance).withUnit;
       const icon = leg.completed
         ? '<span class="text-green-600">&#10003;</span>'
@@ -960,7 +961,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
             <div class="flex items-baseline gap-2 text-sm">
               <span class="shrink-0 text-muted-foreground">${timeStr}</span>
               <span class="font-medium">${tpLabel}</span>
-              <span class="truncate text-muted-foreground">${tpName}</span>
+              <span class="truncate text-muted-foreground">${escapeHtml(tpName)}</span>
               <span class="ml-auto shrink-0 text-muted-foreground">${altStr}</span>
             </div>
             ${reasonStr ? `<div class="text-xs text-muted-foreground mt-0.5 pl-[4.5rem]">${reasonStr}</div>` : ''}
@@ -1076,7 +1077,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="font-medium truncate">${tp.waypoint.name}</span>
+                <span class="font-medium truncate">${escapeHtml(tp.waypoint.name)}</span>
                 <span class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs ${typeClass}">${typeLabel}</span>
               </div>
               <div class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -1310,7 +1311,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       const parts: string[] = [];
 
       if (info.pilot) {
-        parts.push(`<strong class="text-foreground">${info.pilot}</strong>`);
+        parts.push(`<strong class="text-foreground">${escapeHtml(info.pilot)}</strong>`);
       }
       if (info.date) {
         parts.push(info.date);

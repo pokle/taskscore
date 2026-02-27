@@ -224,10 +224,17 @@ function parseHRecord(line: string, header: IGCHeader): void {
   }
 }
 
+/** Maximum IGC file size in bytes (10 MB). Typical files are well under 1 MB. */
+const MAX_IGC_SIZE = 10 * 1024 * 1024;
+
 /**
  * Parse an IGC file content
  */
 export function parseIGC(content: string): IGCFile {
+  if (content.length > MAX_IGC_SIZE) {
+    throw new Error(`IGC file too large (${(content.length / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_IGC_SIZE / 1024 / 1024} MB.`);
+  }
+
   const lines = content.split(/\r?\n/);
   const header: IGCHeader = {};
   const fixes: IGCFix[] = [];

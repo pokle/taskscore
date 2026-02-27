@@ -123,8 +123,7 @@ export async function handleTrackRequest(
     return errorResponse(
       'Failed to fetch track',
       'INTERNAL_ERROR',
-      500,
-      error instanceof Error ? error.message : 'Unknown error'
+      500
     );
   }
 }

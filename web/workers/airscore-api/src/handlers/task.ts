@@ -78,12 +78,12 @@ export async function handleTaskRequest(
   const comPk = parseInt(comPkParam, 10);
   const tasPk = parseInt(tasPkParam, 10);
 
-  if (isNaN(comPk) || isNaN(tasPk)) {
+  if (isNaN(comPk) || isNaN(tasPk) || comPk < 0 || tasPk < 0 || comPk > 999999 || tasPk > 999999) {
     return errorResponse(
       'Invalid parameter format',
       'INVALID_PARAMS',
       400,
-      'comPk and tasPk must be integers'
+      'comPk and tasPk must be positive integers'
     );
   }
 
@@ -125,8 +125,7 @@ export async function handleTaskRequest(
     return errorResponse(
       'Failed to fetch task data',
       'INTERNAL_ERROR',
-      500,
-      error instanceof Error ? error.message : 'Unknown error'
+      500
     );
   }
 }
