@@ -73,32 +73,52 @@
         eventMarkers: L.CircleMarker[];
     }
 
+    const STORAGE_KEY = 'taskscore:igc';
+
     let flight: LoadedFlight | null = null;
 
-    function handleFile(e: CustomEvent<{ filename: string; text: string }>) {
-        const { filename, text } = e.detail;
+    function loadIGC(filename: string, text: string, fitBounds: boolean) {
+        clearMapLayers();
 
-        // Parse IGC
         const igc = parseIGC(text);
         if (!igc.fixes.length) return;
 
-        // Detect events
         const events = detectFlightEvents(igc);
-
-        // Render on map
         const trackLines = renderTrack(map, igc.fixes);
         const eventMarkers = renderEventMarkers(map, events);
 
-        // Zoom to track
-        const lats = igc.fixes.map(f => f.latitude);
-        const lngs = igc.fixes.map(f => f.longitude);
-        const bounds = new L.LatLngBounds(
-            { lat: Math.min(...lats), lng: Math.min(...lngs) },
-            { lat: Math.max(...lats), lng: Math.max(...lngs) },
-        );
-        map.fitBounds(bounds, { padding: [40, 40] });
+        if (fitBounds) {
+            const lats = igc.fixes.map(f => f.latitude);
+            const lngs = igc.fixes.map(f => f.longitude);
+            const bounds = new L.LatLngBounds(
+                { lat: Math.min(...lats), lng: Math.min(...lngs) },
+                { lat: Math.max(...lats), lng: Math.max(...lngs) },
+            );
+            map.fitBounds(bounds, { padding: [40, 40] });
+        }
 
         flight = { filename, igc, events, trackLines, eventMarkers };
+    }
+
+    function handleFile(e: CustomEvent<{ filename: string; text: string }>) {
+        const { filename, text } = e.detail;
+        loadIGC(filename, text, true);
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ filename, text }));
+        } catch {
+            // localStorage full or unavailable — continue without persistence
+        }
+    }
+
+    function restoreFromStorage() {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return;
+            const { filename, text } = JSON.parse(saved);
+            if (filename && text) loadIGC(filename, text, false);
+        } catch {
+            // corrupt or unavailable — ignore
+        }
     }
 
     function clearMapLayers() {
@@ -110,10 +130,11 @@
     function clearFlight() {
         clearMapLayers();
         flight = null;
+        try { localStorage.removeItem(STORAGE_KEY); } catch {}
     }
 
     export const onopen = () => {
-        // Plugin opened — nothing special needed.
+        if (!flight) restoreFromStorage();
     };
 
     onMount(() => {
