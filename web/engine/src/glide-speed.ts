@@ -130,8 +130,8 @@ export function calculateGlidePositions(
  * @param fixes - Array of IGC fixes for the glide segment
  * @returns Array of markers with positions, speeds, glide ratios, and altitude differences
  */
-export function calculateGlideMarkers(fixes: IGCFix[], contextResolver?: GlideContextResolver): GlideMarker[] {
-  const SEGMENT_LENGTH = 1000; // meters
+export function calculateGlideMarkers(fixes: IGCFix[], contextResolver?: GlideContextResolver, segmentLengthMeters: number = 1000): GlideMarker[] {
+  const SEGMENT_LENGTH = segmentLengthMeters;
   const LABEL_INTERVAL = SEGMENT_LENGTH / 2; // label at segment midpoint
 
   // Get positions at 500m intervals

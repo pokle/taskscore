@@ -146,6 +146,22 @@ export function formatRadius(meters: number, opts?: { prefs?: UnitPreferences })
 }
 
 /**
+ * Get the segment length in meters for a given distance unit.
+ * Returns the number of meters in one unit of the given distance type:
+ * - km → 1000
+ * - mi → 1609.344
+ * - nmi → 1852
+ */
+export function getSegmentLengthMeters(distanceUnit: DistanceUnit): number {
+  const lengths: Record<DistanceUnit, number> = {
+    km: 1000,
+    mi: 1609.344,
+    nmi: 1852,
+  };
+  return lengths[distanceUnit];
+}
+
+/**
  * Get the current unit label for a unit type
  */
 export function getUnitLabel(unitType: UnitType, prefs?: UnitPreferences): string {
