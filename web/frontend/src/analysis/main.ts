@@ -105,15 +105,19 @@ async function init(): Promise<void> {
   }
 
   // Determine map provider: URL param > saved preference > default
-  // Fall back to leaflet if no MapBox token is configured
-  const mapParam = new URLSearchParams(window.location.search).get('m');
-  const savedMapProvider = config.getPreferences().mapProvider;
+  // Force leaflet if no MapBox token is configured
   const hasMapboxToken = !!import.meta.env.VITE_MAPBOX_TOKEN;
-  const defaultProvider: MapProviderType = hasMapboxToken ? 'mapbox' : 'leaflet';
-  const providerType: MapProviderType =
-    mapParam === 'l' ? 'leaflet' :
-    mapParam === 'm' ? 'mapbox' :
-    savedMapProvider ?? defaultProvider;
+  let providerType: MapProviderType;
+  if (!hasMapboxToken) {
+    providerType = 'leaflet';
+  } else {
+    const mapParam = new URLSearchParams(window.location.search).get('m');
+    const savedMapProvider = config.getPreferences().mapProvider;
+    providerType =
+      mapParam === 'l' ? 'leaflet' :
+      mapParam === 'm' ? 'mapbox' :
+      savedMapProvider ?? 'mapbox';
+  }
 
   // Initialize map
   try {
@@ -125,9 +129,14 @@ async function init(): Promise<void> {
   }
 
   // Update provider label in command menu to show the target provider
+  // Hide the switch option entirely if no Mapbox token is available
   if (mapProviderLabel) {
-    const targetProvider = providerType === 'leaflet' ? 'MapBox' : 'Leaflet';
-    mapProviderLabel.textContent = `Switch Map Provider to ${targetProvider}`;
+    if (!hasMapboxToken) {
+      menuSwitchMap?.remove();
+    } else {
+      const targetProvider = providerType === 'leaflet' ? 'MapBox' : 'Leaflet';
+      mapProviderLabel.textContent = `Switch Map Provider to ${targetProvider}`;
+    }
   }
 
   // Load waypoint database for enriching IGC tasks
