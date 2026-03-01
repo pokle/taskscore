@@ -25,6 +25,10 @@ import {
 // Set MapBox access token from environment variable
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
+// Terrain exaggeration factor — applied to both the Mapbox terrain and
+// Threebox 3D track altitudes so the track stays above the terrain surface.
+const TERRAIN_EXAGGERATION = 1.5;
+
 // MapBox style options
 const MAPBOX_STYLES = [
   { id: 'outdoors', name: 'Outdoors', style: 'mapbox://styles/poklet/cmkceyuoc00ha01svg6lb767k' },
@@ -573,7 +577,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             maxzoom: 14,
           });
         }
-        map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+        map.setTerrain({ source: 'mapbox-dem', exaggeration: TERRAIN_EXAGGERATION });
 
         // Add sky layer for atmosphere effect
         if (!map.getLayer('sky')) {
@@ -604,10 +608,13 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       map.on('load', () => {
         isInitialLoad = false;
 
-        // Initialize Threebox for 3D rendering
+        // Initialize Threebox for 3D rendering.
+        // Mapbox GL JS v3 uses WebGL2; pass the matching context so Threebox
+        // shares it rather than relying on Three.js fallback behaviour.
+        const gl = map.getCanvas().getContext('webgl2') || map.getCanvas().getContext('webgl');
         tb = new Threebox(
           map,
-          map.getCanvas().getContext('webgl'),
+          gl,
           {
             defaultLights: true,
           }
@@ -745,6 +752,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
         // Create line segments for the track
         // We'll create the track as connected line segments with altitude
+        // Scale altitude by terrain exaggeration so the track stays above the
+        // visually exaggerated terrain surface (otherwise it clips into terrain
+        // when viewed from directly above).
         for (let i = 1; i < fixes.length; i++) {
           const prev = fixes[i - 1];
           const curr = fixes[i];
@@ -756,13 +766,17 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           // Threebox uses [longitude, latitude, altitude] format
           const lineSegment = tb.line({
             geometry: [
-              [prev.longitude, prev.latitude, prev.gnssAltitude],
-              [curr.longitude, curr.latitude, curr.gnssAltitude],
+              [prev.longitude, prev.latitude, prev.gnssAltitude * TERRAIN_EXAGGERATION],
+              [curr.longitude, curr.latitude, curr.gnssAltitude * TERRAIN_EXAGGERATION],
             ],
             color: getAltitudeColorNormalized(normalizedAlt),
             width: 3,
             opacity: 0.9,
           });
+          // Disable depth testing so the track renders on top of terrain
+          // (prevents z-fighting when viewed from directly above)
+          const lsMat = (lineSegment as { material?: { depthTest: boolean } }).material;
+          if (lsMat) lsMat.depthTest = false;
           tb.add(lineSegment);
           threeDObjects.push(lineSegment);
         }
@@ -773,13 +787,15 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           const fix = fixes[i];
           const dropLine = tb.line({
             geometry: [
-              [fix.longitude, fix.latitude, fix.gnssAltitude],
+              [fix.longitude, fix.latitude, fix.gnssAltitude * TERRAIN_EXAGGERATION],
               [fix.longitude, fix.latitude, 0],
             ],
             color: '#888888',
             width: 1,
             opacity: 0.3,
           });
+          const dlMat = (dropLine as { material?: { depthTest: boolean } }).material;
+          if (dlMat) dlMat.depthTest = false;
           tb.add(dropLine);
           threeDObjects.push(dropLine);
         }
