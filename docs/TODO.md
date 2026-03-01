@@ -6,8 +6,8 @@
   - Visualise task on the map
   - Calculate task score, and explain the scores on the map
 - [ ] Submit tracklogs
-  - email with IGC file attachment, and text containing pilot's thoughts
-  - IGC files via drag-and-drop
+  - IGC files via drag-and-drop (implemented)
+  - (Future) email with IGC file attachment, and text containing pilot's thoughts
 - [ ] View all previously submitted tracklogs
 
 ## Features for scorers

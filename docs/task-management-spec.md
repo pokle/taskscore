@@ -1,6 +1,6 @@
 # Task Management & Matching Feature Specification
 
-> **Status:** Pending - Waiting on authentication implementation
+> **Status:** Future Roadmap - Not yet implemented. Waiting on authentication, D1 database, and API Worker infrastructure.
 
 ## Overview
 

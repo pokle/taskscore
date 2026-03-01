@@ -6,19 +6,21 @@ TaskScore is a web application for analyzing hanggliding/paragliding competition
 
 ## Architecture
 
-Client-heavy serverless architecture on Cloudflare:
+Client-side application hosted on Cloudflare Pages. Currently **storage-free** — users load IGC track files and XCTask task files directly in the browser, with optional browser local storage for persistence.
 
 ```
-Pilots (email IGC) → Email Worker → R2 (storage) + D1 (database)
-                           ↓
-Frontend (Pages) ←→ API Worker ←→ R2 + D1
+Frontend (Cloudflare Pages) ← user loads IGC + task files via drag-and-drop or file picker
 ```
 
 **Design Principles:**
-- No flight data lost - store every valid IGC, sort out associations later
-- Email as interface - no user accounts for pilots
-- Client-side processing - IGC parsing happens in browser
+- Client-side processing - IGC parsing and analysis happens entirely in the browser
+- No server-side storage - all data lives in the user's browser (localStorage/IndexedDB)
 - Free tier focused - designed for Cloudflare free limits
+
+**Future Roadmap:**
+- Email-based IGC submission (Email Worker → R2 storage + D1 database)
+- Server-side API Worker for competition/task management
+- Pilot accounts and competition organization
 
 ## Build & Development
 

@@ -4,7 +4,69 @@
 
 TaskScore is a client-heavy web application for analyzing hang gliding and paragliding competition track logs (IGC files) against defined tasks. The architecture prioritizes simplicity, minimal operational overhead, and generous free-tier usage.
 
-## Architecture Diagram
+## Current Architecture
+
+TaskScore is currently a **storage-free, client-side application** hosted on Cloudflare Pages. Users load IGC track files and XCTask task files directly in the browser via drag-and-drop or file picker. Browser local storage (IndexedDB) provides optional persistence.
+
+```
+┌─────────────────────────────────────┐
+│         Cloudflare Pages            │
+│   Static frontend application       │
+│                                     │
+│   - Load IGC files (drag & drop)    │
+│   - Load task files (.xctsk)        │
+│   - Client-side IGC analysis        │
+│   - Map visualization               │
+│   - Browser local storage           │
+└─────────────────────────────────────┘
+       ▲
+       │
+   User loads files
+   via browser
+```
+
+### Cloudflare Pages (Frontend)
+
+Static web application hosting the user interface.
+
+**Features:**
+- Load IGC track files and XCTask task files via drag-and-drop or file picker
+- View competition tasks and turn points on a map
+- Analyze IGC files against tasks (client-side processing)
+- View flight analysis results (events, distances, scores)
+- Store loaded tracks and tasks in browser local storage (IndexedDB)
+
+### AirScore Caching Proxy (Worker)
+
+The only current Worker is a caching proxy for AirScore API requests (`web/workers/`).
+
+## Design Principles
+
+1. **Client-Heavy Processing** - IGC parsing and analysis runs entirely in the browser, reducing backend complexity and costs
+
+2. **Storage-Free** - No server-side storage; all data lives in the user's browser
+
+3. **Progressive Enhancement** - Start with static site, add Workers incrementally as needed
+
+4. **Single Vendor** - All infrastructure on Cloudflare for operational simplicity
+
+5. **Generous Free Tier** - Architecture designed to operate within free tier limits
+
+## Infrastructure Costs
+
+Currently minimal — only Cloudflare Pages (free tier).
+
+| Component | Free Tier Allowance | Current Usage |
+|-----------|---------------------|---------------|
+| Pages | Unlimited bandwidth | Static assets |
+
+---
+
+## Future Roadmap
+
+The following components are planned but **not yet implemented**.
+
+### Planned Architecture
 
 ```
                                  ┌─────────────────────────────────┐
@@ -30,29 +92,11 @@ TaskScore is a client-heavy web application for analyzing hang gliding and parag
    sends IGC
 ```
 
-## Components
+### Email Worker (Future)
 
-### Cloudflare Pages (Frontend)
+Will receive and process pilot track log submissions via email.
 
-Static web application hosting the user interface.
-
-**Public Features:**
-- View competition tasks and turn points on a map
-- Browse submitted flight track logs
-- Analyze IGC files against tasks (client-side processing)
-- View flight analysis results (events, distances, scores)
-
-**Admin Features:**
-- Create and manage competitions
-- Define tasks with turn points and parameters
-- Manage authorized pilot email list
-- View submission statistics
-
-### Email Worker
-
-Receives and processes pilot track log submissions via email.
-
-**Responsibilities:**
+**Planned Responsibilities:**
 - Receive incoming emails at `submit@{domain}`
 - Archive raw email to R2 (audit trail)
 - Validate sender against authorized pilot list (D1 lookup)
@@ -63,7 +107,7 @@ Receives and processes pilot track log submissions via email.
 - Send confirmation reply to pilot
 - Forward errors/failures to admin inbox for review
 
-**Email Processing Flow:**
+**Planned Email Processing Flow:**
 1. Pilot emails IGC attachment to submission address
 2. Email Worker receives the message
 3. **Archive raw email to R2** (always, before any processing)
@@ -89,7 +133,7 @@ Cloudflare Email Workers do not store emails after processing - they are discard
 2. **Forward failures to admin inbox** - Unauthorized senders, invalid attachments, and processing errors are forwarded to the admin's email for human review
 3. **Log metadata to D1** - Each submission record links to its raw email archive for later retrieval
 
-### API Worker
+### API Worker (Future)
 
 RESTful API for frontend operations and admin functions.
 
@@ -106,7 +150,7 @@ RESTful API for frontend operations and admin functions.
 - `POST /competitions/:id/pilots` - Add authorized pilots
 - `DELETE /pilots/:id` - Remove pilot authorization
 
-### R2 Storage
+### R2 Storage (Future)
 
 Object storage for IGC track log files and email archives.
 
@@ -137,7 +181,7 @@ Benefits:
 - Hash serves as unique identifier and integrity check
 - Storage costs minimized
 
-### D1 Database
+### D1 Database (Future)
 
 SQLite database for relational data.
 
@@ -178,18 +222,18 @@ When admin adds an email address to a pilot:
 4. If pilot is registered for competitions, check if submissions should be entered
 5. Notify pilot of any newly linked flights
 
-## Authentication Strategy
+### Authentication (Future)
 
-### Pilots (No Authentication Required)
+#### Pilots (No Authentication Required)
 
-Pilots are authorized via email whitelist, not traditional authentication.
+Pilots will be authorized via email whitelist, not traditional authentication.
 
 - Admin adds pilot email addresses to competition
 - Email Worker validates sender address against whitelist
 - No login, passwords, or tokens for pilots
 - Simple and friction-free for competition participants
 
-### Admin Authentication
+#### Admin Authentication
 
 Single admin user (competition organizer) with secure access to management features.
 
@@ -211,9 +255,9 @@ Single admin user (competition organizer) with secure access to management featu
    - Time-limited token sent to admin email
    - Click link to establish session
 
-## Infrastructure Costs
+### Planned Infrastructure Costs
 
-All components operate within Cloudflare's free tier for typical competition usage.
+All planned components would operate within Cloudflare's free tier for typical competition usage.
 
 | Component | Free Tier Allowance | Typical Usage |
 |-----------|---------------------|---------------|
@@ -224,21 +268,13 @@ All components operate within Cloudflare's free tier for typical competition usa
 | D1 | 5 GB storage, 5M reads/day | Metadata queries |
 | Access | 50 users | Admin auth (optional) |
 
-## Design Principles
+### Design Principles for Future Backend
 
 1. **No Flight Data Lost** - Every valid IGC file is stored, regardless of pilot registration status. Administrative issues (late registration, typos in email) must never cause flight data to be discarded. Sorting out associations can happen later.
 
-2. **Client-Heavy Processing** - IGC parsing and analysis runs in the browser, reducing backend complexity and costs
+2. **Email as Interface** - Pilots submit via email, eliminating the need for user accounts and login flows
 
-3. **Email as Interface** - Pilots submit via email, eliminating the need for user accounts and login flows
-
-4. **Progressive Enhancement** - Start with static site, add Workers incrementally as needed
-
-5. **Single Vendor** - All infrastructure on Cloudflare for operational simplicity
-
-6. **Generous Free Tier** - Architecture designed to operate within free tier limits for small to medium competitions
-
-## Future Considerations
+### Other Future Considerations
 
 - **Live Tracking** - Integration with live tracking services during competition
 - **Scoring Engine** - Server-side scoring for official results

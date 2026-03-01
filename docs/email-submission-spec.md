@@ -1,5 +1,7 @@
 # Email Submission Specification
 
+> **Status:** Future Roadmap - Not yet implemented. This spec describes planned functionality for email-based IGC submission.
+
 ## Overview
 
 Pilots submit track logs (IGC files) by emailing them to `submit@{domain}`. This specification defines the email processing workflow, security measures, and low-friction validation approach.

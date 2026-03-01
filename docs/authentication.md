@@ -1,5 +1,7 @@
 # Authentication
 
+> **Status:** Future Roadmap - Not yet implemented. TaskScore currently has no authentication; all features are public.
+
 # Roles
 
 - Admin - system administrators - me.
