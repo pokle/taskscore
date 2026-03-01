@@ -12,7 +12,7 @@ import {
   type LatLngExpression, type LeafletMouseEvent,
 } from 'leaflet';
 import {
-  getBoundingBox, getEventStyle, calculateGlideMarkers,
+  getBoundingBox, getEventStyle, calculateGlideMarkers, getSegmentLengthMeters,
   calculateOptimizedTaskLine, getOptimizedSegmentDistances,
   calculateBearing, haversineDistance, destinationPoint, calculateBearingRadians,
   type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult,
@@ -730,7 +730,7 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
 
             // Glide chevrons and speed labels
             if (isGlideEvent) {
-              const glideMarkers = calculateGlideMarkers(segmentFixes, getNextTurnpointContext);
+              const glideMarkers = calculateGlideMarkers(segmentFixes, getNextTurnpointContext, getSegmentLengthMeters(config.getUnits().distance));
 
               for (const gm of glideMarkers) {
                 if (gm.type === 'speed-label') {

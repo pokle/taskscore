@@ -271,6 +271,63 @@ describe('Glide Speed Calculations', () => {
     });
   });
 
+  describe('custom segment length', () => {
+    it('should space chevrons at 1609m for miles', () => {
+      // 3500m glide at 10 m/s with mile-based segments (1609m)
+      const fixes = createStraightGlide(3500, 10);
+      const markers = calculateGlideMarkers(fixes, undefined, 1609.344);
+
+      // SEGMENT_LENGTH = 1609m, LABEL_INTERVAL = 804.5m
+      // Positions at: 804.5m, 1609m, 2414m, 3218m
+      // Labels (even indices): 804.5m, 2414m → 2 speed-labels
+      // Chevrons (odd indices): 1609m, 3218m → 2 chevrons
+      const labels = markers.filter(m => m.type === 'speed-label');
+      const chevrons = markers.filter(m => m.type === 'chevron');
+
+      expect(labels.length).toBe(2);
+      expect(chevrons.length).toBe(2);
+    });
+
+    it('should space chevrons at 1852m for nautical miles', () => {
+      // 4000m glide at 10 m/s with nautical-mile-based segments (1852m)
+      const fixes = createStraightGlide(4000, 10);
+      const markers = calculateGlideMarkers(fixes, undefined, 1852);
+
+      // SEGMENT_LENGTH = 1852m, LABEL_INTERVAL = 926m
+      // Positions at: 926m, 1852m, 2778m, 3704m
+      // Labels (even indices): 926m, 2778m → 2 speed-labels
+      // Chevrons (odd indices): 1852m, 3704m → 2 chevrons
+      const labels = markers.filter(m => m.type === 'speed-label');
+      const chevrons = markers.filter(m => m.type === 'chevron');
+
+      expect(labels.length).toBe(2);
+      expect(chevrons.length).toBe(2);
+    });
+
+    it('should default to 1000m (km) when no segment length given', () => {
+      const fixes = createStraightGlide(2500, 10);
+      const defaultMarkers = calculateGlideMarkers(fixes);
+      const kmMarkers = calculateGlideMarkers(fixes, undefined, 1000);
+
+      expect(defaultMarkers.length).toBe(kmMarkers.length);
+      for (let i = 0; i < defaultMarkers.length; i++) {
+        expect(defaultMarkers[i].type).toBe(kmMarkers[i].type);
+        expect(defaultMarkers[i].lat).toBeCloseTo(kmMarkers[i].lat, 6);
+        expect(defaultMarkers[i].lon).toBeCloseTo(kmMarkers[i].lon, 6);
+      }
+    });
+
+    it('should produce fewer markers with larger segment length', () => {
+      const fixes = createStraightGlide(3000, 10);
+      const kmMarkers = calculateGlideMarkers(fixes, undefined, 1000);
+      const miMarkers = calculateGlideMarkers(fixes, undefined, 1609.344);
+
+      // 3000m with 1km segments: labels at 500, 1500, 2500 + chevrons at 1000, 2000 = 5 markers
+      // 3000m with 1mi segments: label at ~805 + chevron at ~1609 + label at ~2414 = 3 markers
+      expect(miMarkers.length).toBeLessThan(kmMarkers.length);
+    });
+  });
+
   describe('edge cases', () => {
     it('should handle empty fixes array', () => {
       const markers = calculateGlideMarkers([]);

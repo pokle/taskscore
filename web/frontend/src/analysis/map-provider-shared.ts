@@ -13,6 +13,8 @@ import {
   type GlideContext, type GlideMarker, type TurnpointSequenceResult,
 } from '@taskscore/engine';
 import { formatDistance, formatRadius, formatAltitude, formatSpeed, formatAltitudeChange } from './units-browser';
+import { config } from './config';
+import { getUnitLabel } from '@taskscore/engine';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -210,11 +212,12 @@ export function createCirclePolygon(
 export function createGlideLegend(container: HTMLElement): HTMLElement {
   const legend = document.createElement('div');
   legend.id = 'glide-legend';
+  const distLabel = getUnitLabel('distance', config.getUnits());
   legend.innerHTML = `
     <button class="glide-legend-btn" title="Glide metrics help">?</button>
     <div class="glide-legend-content">
       <div class="glide-legend-title">Glide Metrics</div>
-      <div class="glide-legend-item"><strong>Chevrons:</strong> 1km segment markers</div>
+      <div class="glide-legend-item"><strong>Chevrons:</strong> 1\u00A0${distLabel} segment markers</div>
       <div class="glide-legend-item"><strong>Speed:</strong> Average speed of segment</div>
       <div class="glide-legend-item"><strong>L/D:</strong> Glide ratio (distance &divide; altitude lost)</div>
       <div class="glide-legend-item"><strong>Alt:</strong> Altitude change from segment start to end</div>

@@ -8,7 +8,7 @@
 
 import mapboxgl from 'mapbox-gl';
 import { Threebox } from 'threebox-plugin';
-import { getBoundingBox, getEventStyle, calculateGlideMarkers, calculateOptimizedTaskLine, getOptimizedSegmentDistances, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@taskscore/engine';
+import { getBoundingBox, getEventStyle, calculateGlideMarkers, getSegmentLengthMeters, calculateOptimizedTaskLine, getOptimizedSegmentDistances, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@taskscore/engine';
 import type { MapProvider } from './map-provider';
 import { config } from './config';
 import {
@@ -1223,7 +1223,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
               // For glide events, add direction chevrons every ~1km with speed labels
               if (event.type === 'glide_start' || event.type === 'glide_end') {
-                const glideMarkers = calculateGlideMarkers(segmentFixes, getNextTurnpointContext);
+                const glideMarkers = calculateGlideMarkers(segmentFixes, getNextTurnpointContext, getSegmentLengthMeters(config.getUnits().distance));
 
                 for (const marker of glideMarkers) {
                   if (marker.type === 'speed-label') {
