@@ -52,6 +52,7 @@ let isAltitudeColorsEnabled = false;
 let is3DTrackEnabled = false;
 let isTaskVisible = true;
 let isTrackVisible = true;
+let isSpeedOverlayEnabled = false;
 
 /**
  * Initialize the application
@@ -76,10 +77,13 @@ async function init(): Promise<void> {
   const menu3DTrack = document.getElementById('menu-3d-track');
   const menuToggleTask = document.getElementById('menu-toggle-task');
   const menuToggleTrack = document.getElementById('menu-toggle-track');
+  const menuShowSpeed = document.getElementById('menu-show-speed');
   const altitudeColorsStatus = document.getElementById('altitude-colors-status');
   const threeDTrackStatus = document.getElementById('3d-track-status');
   const taskVisibilityStatus = document.getElementById('task-visibility-status');
   const trackVisibilityStatus = document.getElementById('track-visibility-status');
+  const showSpeedLabel = document.getElementById('show-speed-label');
+  const showSpeedStatus = document.getElementById('show-speed-status');
 
   // Units dialog
   const menuConfigureUnits = document.getElementById('menu-configure-units');
@@ -276,6 +280,36 @@ async function init(): Promise<void> {
     });
   }
 
+  // Set up speed overlay toggle
+  if (menuShowSpeed) {
+    isSpeedOverlayEnabled = params.get('speed') === '1';
+    updateFeatureStatus(showSpeedStatus, isSpeedOverlayEnabled);
+    if (isSpeedOverlayEnabled && showSpeedLabel) {
+      showSpeedLabel.textContent = 'Clear Speed';
+    }
+
+    if (isSpeedOverlayEnabled && mapRenderer?.setSpeedOverlay) {
+      mapRenderer.setSpeedOverlay(true);
+    }
+
+    menuShowSpeed.addEventListener('click', () => {
+      isSpeedOverlayEnabled = !isSpeedOverlayEnabled;
+      updateFeatureStatus(showSpeedStatus, isSpeedOverlayEnabled);
+
+      if (showSpeedLabel) {
+        showSpeedLabel.textContent = isSpeedOverlayEnabled ? 'Clear Speed' : 'Show Speed';
+      }
+
+      if (mapRenderer?.setSpeedOverlay) {
+        mapRenderer.setSpeedOverlay(isSpeedOverlayEnabled);
+        updateUrlParam('speed', isSpeedOverlayEnabled ? '1' : null);
+      }
+
+      // Close the command dialog
+      commandDialog?.close();
+    });
+  }
+
   // Switch Map Provider handler
   menuSwitchMap?.addEventListener('click', () => {
     const newProvider: MapProviderType = providerType === 'mapbox' ? 'leaflet' : 'mapbox';
@@ -319,6 +353,13 @@ async function init(): Promise<void> {
       mapRenderer.clearTask();
       mapRenderer.clearEvents();
     }
+
+    // Reset speed overlay state (must call setSpeedOverlay to clear provider flag)
+    isSpeedOverlayEnabled = false;
+    mapRenderer?.setSpeedOverlay?.(false);
+    updateFeatureStatus(showSpeedStatus, false);
+    if (showSpeedLabel) showSpeedLabel.textContent = 'Show Speed';
+    updateUrlParam('speed', null);
 
     // Clear analysis panel
     analysisPanel?.setEvents([]);

@@ -74,6 +74,12 @@ export interface MapProvider {
     /** Show/hide track visualization */
     setTrackVisibility?(visible: boolean): void;
 
+    /** Whether this provider supports the speed overlay (all-glide chevrons/labels) */
+    supportsSpeedOverlay?: boolean;
+
+    /** Enable/disable speed overlay for all glide segments */
+    setSpeedOverlay?(enabled: boolean): void;
+
     /** Register callback for when user clicks on the track */
     onTrackClick?(callback: (fixIndex: number) => void): void;
 
