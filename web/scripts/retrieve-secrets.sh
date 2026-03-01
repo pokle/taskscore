@@ -14,4 +14,4 @@ export AWS_SECRET_ACCESS_KEY=$TASKSCORE_AWS_SECRET_ACCESS_KEY
 export AWS_DEFAULT_REGION=ap-southeast-2
 EOF
 
-source $(dirname $0)/../.env
+source $(dirname $0)/../../.env
