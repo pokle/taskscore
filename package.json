@@ -1,9 +1,19 @@
 {
   "name": "taskscore",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "license": "MIT",
+  "author": "Tushar Pokle",
   "description": "Hanggliding/paragliding competition track log analysis",
+  "keywords": ["hanggliding", "paragliding", "igc", "competition", "scoring", "flight-analysis"],
+  "homepage": "https://taskscore.shonky.info",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pokle/taskscore.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pokle/taskscore/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "[ -d node_modules ] || bun install && bun run --filter '@taskscore/frontend' dev",
