@@ -514,6 +514,7 @@ async function init(): Promise<void> {
   document.addEventListener('drop', async (e) => {
     e.preventDefault();
     dropZone?.classList.remove('drag-over');
+    commandDialog?.close();
 
     const files = e.dataTransfer?.files;
     if (!files?.length) return;
