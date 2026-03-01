@@ -354,8 +354,9 @@ async function init(): Promise<void> {
       mapRenderer.clearEvents();
     }
 
-    // Reset speed overlay state
+    // Reset speed overlay state (must call setSpeedOverlay to clear provider flag)
     isSpeedOverlayEnabled = false;
+    mapRenderer?.setSpeedOverlay?.(false);
     updateFeatureStatus(showSpeedStatus, false);
     if (showSpeedLabel) showSpeedLabel.textContent = 'Show Speed';
     updateUrlParam('speed', null);

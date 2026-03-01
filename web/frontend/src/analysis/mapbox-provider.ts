@@ -8,7 +8,7 @@
 
 import mapboxgl from 'mapbox-gl';
 import { Threebox } from 'threebox-plugin';
-import { getBoundingBox, getEventStyle, calculateGlideMarkers, getSegmentLengthMeters, calculateOptimizedTaskLine, getOptimizedSegmentDistances, extractGlides, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@taskscore/engine';
+import { getBoundingBox, getEventStyle, calculateGlideMarkers, getSegmentLengthMeters, calculateOptimizedTaskLine, getOptimizedSegmentDistances, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@taskscore/engine';
 import type { MapProvider } from './map-provider';
 import { config } from './config';
 import {
@@ -157,71 +157,63 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         );
       }
 
-      /** Remove all speed overlay markers from the map */
+      /** Remove all speed overlay markers from the map (does not change isSpeedOverlayActive) */
       function clearSpeedOverlay(): void {
         for (const marker of speedOverlayMarkers) {
           marker.remove();
         }
         speedOverlayMarkers = [];
-        isSpeedOverlayActive = false;
       }
 
       /** Render speed overlay for all glide segments */
       function renderSpeedOverlay(): void {
         clearSpeedOverlay();
-        if (currentEvents.length === 0 || currentFixes.length === 0) return;
-
-        isSpeedOverlayActive = true;
-        const glides = extractGlides(currentEvents);
+        if (currentFixes.length < 2) return;
         const segLen = getSegmentLengthMeters(config.getUnits().distance);
 
-        for (const glide of glides) {
-          const segmentFixes = currentFixes.slice(glide.segment.startIndex, glide.segment.endIndex + 1);
-          if (segmentFixes.length < 2) continue;
+        // Treat the entire track as one continuous segment
+        const markers = calculateGlideMarkers(currentFixes, getNextTurnpointContext, segLen);
 
-          const glideMarkers = calculateGlideMarkers(segmentFixes, getNextTurnpointContext, segLen);
+        for (const gm of markers) {
+          if (gm.type === 'speed-label') {
+            const { speed, detailText, reqText } = formatGlideLabel(gm);
 
-          for (const gm of glideMarkers) {
-            if (gm.type === 'speed-label') {
-              const { speed, detailText, reqText } = formatGlideLabel(gm);
+            const labelEl = document.createElement('div');
+            labelEl.style.cssText = `
+              font-family: ${MAP_FONT_FAMILY};
+              font-size: 20px;
+              font-weight: 600;
+              color: #3b82f6;
+              white-space: nowrap;
+              text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
+              text-align: center;
+              line-height: 1.3;
+            `;
+            labelEl.innerHTML = reqText
+              ? `${speed}<br>${detailText}<br>${reqText}`
+              : `${speed}<br>${detailText}`;
+            labelEl.dataset.glideLabel = 'true';
+            labelEl.dataset.speedLabel = speed;
+            labelEl.dataset.detailLabel = detailText;
+            labelEl.dataset.reqLabel = reqText;
 
-              const labelEl = document.createElement('div');
-              labelEl.style.cssText = `
-                font-family: ${MAP_FONT_FAMILY};
-                font-size: 20px;
-                font-weight: 600;
-                color: #3b82f6;
-                white-space: nowrap;
-                text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
-                text-align: center;
-                line-height: 1.3;
-              `;
-              labelEl.innerHTML = reqText
-                ? `${speed}<br>${detailText}<br>${reqText}`
-                : `${speed}<br>${detailText}`;
-              labelEl.dataset.glideLabel = 'true';
-              labelEl.dataset.speedLabel = speed;
-              labelEl.dataset.detailLabel = detailText;
-              labelEl.dataset.reqLabel = reqText;
+            const labelMarker = new mapboxgl.Marker({ element: labelEl })
+              .setLngLat([gm.lon, gm.lat])
+              .addTo(map);
+            speedOverlayMarkers.push(labelMarker);
+          } else {
+            const chevronEl = document.createElement('div');
+            chevronEl.style.display = 'flex';
+            chevronEl.style.alignItems = 'center';
+            chevronEl.style.justifyContent = 'center';
+            chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12" style="transform: rotate(${gm.bearing}deg);">
+              <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>`;
 
-              const labelMarker = new mapboxgl.Marker({ element: labelEl })
-                .setLngLat([gm.lon, gm.lat])
-                .addTo(map);
-              speedOverlayMarkers.push(labelMarker);
-            } else {
-              const chevronEl = document.createElement('div');
-              chevronEl.style.display = 'flex';
-              chevronEl.style.alignItems = 'center';
-              chevronEl.style.justifyContent = 'center';
-              chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12" style="transform: rotate(${gm.bearing}deg);">
-                <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>`;
-
-              const chevronMarker = new mapboxgl.Marker({ element: chevronEl })
-                .setLngLat([gm.lon, gm.lat])
-                .addTo(map);
-              speedOverlayMarkers.push(chevronMarker);
-            }
+            const chevronMarker = new mapboxgl.Marker({ element: chevronEl })
+              .setLngLat([gm.lon, gm.lat])
+              .addTo(map);
+            speedOverlayMarkers.push(chevronMarker);
           }
         }
 
@@ -939,6 +931,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         supportsSpeedOverlay: true,
 
         setSpeedOverlay(enabled: boolean) {
+          isSpeedOverlayActive = enabled;
           if (enabled) {
             renderSpeedOverlay();
             showGlideLegend(true);

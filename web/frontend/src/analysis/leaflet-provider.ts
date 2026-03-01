@@ -15,7 +15,6 @@ import {
   getBoundingBox, getEventStyle, calculateGlideMarkers, getSegmentLengthMeters,
   calculateOptimizedTaskLine, getOptimizedSegmentDistances,
   calculateBearing, haversineDistance, destinationPoint, calculateBearingRadians,
-  extractGlides,
   type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult,
 } from '@taskscore/engine';
 import type { MapProvider } from './map-provider';
@@ -299,70 +298,62 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
       );
     }
 
-    /** Remove all speed overlay markers */
+    /** Remove all speed overlay markers (does not change isSpeedOverlayActive) */
     function clearSpeedOverlay(): void {
       speedOverlayGroup.clearLayers();
-      isSpeedOverlayActive = false;
     }
 
     /** Render speed overlay for all glide segments */
     function renderSpeedOverlay(): void {
       clearSpeedOverlay();
-      if (currentEvents.length === 0 || currentFixes.length === 0) return;
-
-      isSpeedOverlayActive = true;
-      const glides = extractGlides(currentEvents);
+      if (currentFixes.length < 2) return;
       const segLen = getSegmentLengthMeters(config.getUnits().distance);
 
-      for (const glide of glides) {
-        const segmentFixes = currentFixes.slice(glide.segment.startIndex, glide.segment.endIndex + 1);
-        if (segmentFixes.length < 2) continue;
+      // Treat the entire track as one continuous segment
+      const markers = calculateGlideMarkers(currentFixes, getNextTurnpointContext, segLen);
 
-        const glideMarkers = calculateGlideMarkers(segmentFixes, getNextTurnpointContext, segLen);
+      for (const gm of markers) {
+        if (gm.type === 'speed-label') {
+          const { speed, detailText, reqText } = formatGlideLabel(gm);
 
-        for (const gm of glideMarkers) {
-          if (gm.type === 'speed-label') {
-            const { speed, detailText, reqText } = formatGlideLabel(gm);
+          const labelEl = document.createElement('div');
+          labelEl.style.cssText = `
+            font-family: ${MAP_FONT_FAMILY};
+            font-size: 14px; font-weight: 600; color: #3b82f6;
+            white-space: nowrap; text-align: center; line-height: 1.3;
+            text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
+          `;
+          labelEl.innerHTML = reqText
+            ? `${speed}<br>${detailText}<br>${reqText}`
+            : `${speed}<br>${detailText}`;
+          labelEl.dataset.glideLabel = 'true';
+          labelEl.dataset.speedLabel = speed;
+          labelEl.dataset.detailLabel = detailText;
+          labelEl.dataset.reqLabel = reqText;
 
-            const labelEl = document.createElement('div');
-            labelEl.style.cssText = `
-              font-family: ${MAP_FONT_FAMILY};
-              font-size: 14px; font-weight: 600; color: #3b82f6;
-              white-space: nowrap; text-align: center; line-height: 1.3;
-              text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
-            `;
-            labelEl.innerHTML = reqText
-              ? `${speed}<br>${detailText}<br>${reqText}`
-              : `${speed}<br>${detailText}`;
-            labelEl.dataset.glideLabel = 'true';
-            labelEl.dataset.speedLabel = speed;
-            labelEl.dataset.detailLabel = detailText;
-            labelEl.dataset.reqLabel = reqText;
-
-            const icon = new DivIcon({
-              html: labelEl.outerHTML,
-              className: '',
-              iconSize: [0, 0],
-              iconAnchor: [0, 0],
-            });
-            speedOverlayGroup.addLayer(
-              new Marker([gm.lat, gm.lon], { icon })
-            );
-          } else {
-            const icon = new DivIcon({
-              html: `<div style="display:flex;align-items:center;justify-content:center;">
-                <svg width="20" height="12" viewBox="0 0 20 12" style="transform:rotate(${gm.bearing}deg);">
-                  <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </div>`,
-              className: '',
-              iconSize: [20, 12],
-              iconAnchor: [10, 6],
-            });
-            speedOverlayGroup.addLayer(
-              new Marker([gm.lat, gm.lon], { icon })
-            );
-          }
+          const icon = new DivIcon({
+            html: labelEl.outerHTML,
+            className: '',
+            iconSize: [0, 0],
+            iconAnchor: [0, 0],
+          });
+          speedOverlayGroup.addLayer(
+            new Marker([gm.lat, gm.lon], { icon })
+          );
+        } else {
+          const icon = new DivIcon({
+            html: `<div style="display:flex;align-items:center;justify-content:center;">
+              <svg width="20" height="12" viewBox="0 0 20 12" style="transform:rotate(${gm.bearing}deg);">
+                <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>`,
+            className: '',
+            iconSize: [20, 12],
+            iconAnchor: [10, 6],
+          });
+          speedOverlayGroup.addLayer(
+            new Marker([gm.lat, gm.lon], { icon })
+          );
         }
       }
 
@@ -467,6 +458,7 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
       supportsSpeedOverlay: true,
 
       setSpeedOverlay(enabled: boolean) {
+        isSpeedOverlayActive = enabled;
         if (enabled) {
           renderSpeedOverlay();
           if (!glideLegendElement) {
