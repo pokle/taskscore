@@ -15,6 +15,7 @@ import {
   getBoundingBox, getEventStyle, calculateGlideMarkers, getSegmentLengthMeters,
   calculateOptimizedTaskLine, getOptimizedSegmentDistances,
   calculateBearing, haversineDistance, destinationPoint, calculateBearingRadians,
+  extractGlides,
   type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult,
 } from '@taskscore/engine';
 import type { MapProvider } from './map-provider';
@@ -206,17 +207,20 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
     const taskGroup = new LayerGroup();
     const eventMarkersGroup = new LayerGroup();
     const highlightGroup = new LayerGroup();
+    const speedOverlayGroup = new LayerGroup();  // speed overlay (separate from highlight)
 
     // Add default groups to map
     trackGroup.addTo(map);
     taskGroup.addTo(map);
     eventMarkersGroup.addTo(map);
     highlightGroup.addTo(map);
+    speedOverlayGroup.addTo(map);
 
     // Feature state
     let isAltitudeColorsMode = false;
     let isTaskVisible = true;
     let isTrackVisible = true;
+    let isSpeedOverlayActive = false;
     let glideLegendElement: HTMLElement | null = null;
     let hudElement: HTMLElement | null = null;
 
@@ -260,6 +264,15 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
           }
         }
       });
+      // Also update speed overlay labels
+      speedOverlayGroup.eachLayer((layer) => {
+        if (layer instanceof Marker) {
+          const el = layer.getElement();
+          if (el?.dataset.glideLabel === 'true') {
+            updateGlideLabelElement(el, z);
+          }
+        }
+      });
     }
 
     map.on('zoomend', updateGlideLabelVisibility);
@@ -284,6 +297,76 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
         currentTask, currentFixes, cache.sequenceResult, cache.optimizedPath,
         glideStartTime, (_lat, _lon, alt) => alt ?? null,
       );
+    }
+
+    /** Remove all speed overlay markers */
+    function clearSpeedOverlay(): void {
+      speedOverlayGroup.clearLayers();
+      isSpeedOverlayActive = false;
+    }
+
+    /** Render speed overlay for all glide segments */
+    function renderSpeedOverlay(): void {
+      clearSpeedOverlay();
+      if (currentEvents.length === 0 || currentFixes.length === 0) return;
+
+      isSpeedOverlayActive = true;
+      const glides = extractGlides(currentEvents);
+      const segLen = getSegmentLengthMeters(config.getUnits().distance);
+
+      for (const glide of glides) {
+        const segmentFixes = currentFixes.slice(glide.segment.startIndex, glide.segment.endIndex + 1);
+        if (segmentFixes.length < 2) continue;
+
+        const glideMarkers = calculateGlideMarkers(segmentFixes, getNextTurnpointContext, segLen);
+
+        for (const gm of glideMarkers) {
+          if (gm.type === 'speed-label') {
+            const { speed, detailText, reqText } = formatGlideLabel(gm);
+
+            const labelEl = document.createElement('div');
+            labelEl.style.cssText = `
+              font-family: ${MAP_FONT_FAMILY};
+              font-size: 14px; font-weight: 600; color: #3b82f6;
+              white-space: nowrap; text-align: center; line-height: 1.3;
+              text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
+            `;
+            labelEl.innerHTML = reqText
+              ? `${speed}<br>${detailText}<br>${reqText}`
+              : `${speed}<br>${detailText}`;
+            labelEl.dataset.glideLabel = 'true';
+            labelEl.dataset.speedLabel = speed;
+            labelEl.dataset.detailLabel = detailText;
+            labelEl.dataset.reqLabel = reqText;
+
+            const icon = new DivIcon({
+              html: labelEl.outerHTML,
+              className: '',
+              iconSize: [0, 0],
+              iconAnchor: [0, 0],
+            });
+            speedOverlayGroup.addLayer(
+              new Marker([gm.lat, gm.lon], { icon })
+            );
+          } else {
+            const icon = new DivIcon({
+              html: `<div style="display:flex;align-items:center;justify-content:center;">
+                <svg width="20" height="12" viewBox="0 0 20 12" style="transform:rotate(${gm.bearing}deg);">
+                  <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>`,
+              className: '',
+              iconSize: [20, 12],
+              iconAnchor: [10, 6],
+            });
+            speedOverlayGroup.addLayer(
+              new Marker([gm.lat, gm.lon], { icon })
+            );
+          }
+        }
+      }
+
+      updateGlideLabelVisibility();
     }
 
     function clearEventHighlights(): void {
@@ -381,6 +464,21 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
     const renderer: MapProvider = {
       supports3D: false,
       supportsAltitudeColors: true,
+      supportsSpeedOverlay: true,
+
+      setSpeedOverlay(enabled: boolean) {
+        if (enabled) {
+          renderSpeedOverlay();
+          if (!glideLegendElement) {
+            glideLegendElement = createGlideLegend(container);
+            glideLegendElement.style.display = 'none';
+          }
+          showGlideLegend(glideLegendElement, true);
+        } else {
+          clearSpeedOverlay();
+          showGlideLegend(glideLegendElement, false);
+        }
+      },
 
       setAltitudeColors(enabled: boolean) {
         isAltitudeColorsMode = enabled;
@@ -494,6 +592,7 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
 
       clearTrack() {
         clearEventHighlights();
+        clearSpeedOverlay();
         currentFixes = [];
         cachedSequenceResult = null;
         cachedOptimizedPath = null;
@@ -690,26 +789,32 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
 
           eventMarkersGroup.addLayer(marker);
         }
+
+        // Re-render speed overlay if it was active
+        if (isSpeedOverlayActive) {
+          renderSpeedOverlay();
+        }
       },
 
       clearEvents() {
         currentEvents = [];
         eventMarkersGroup.clearLayers();
         clearEventHighlights();
+        clearSpeedOverlay();
       },
 
       panToEvent(event: FlightEvent, options?: { skipPan?: boolean }) {
         clearEventHighlights();
 
-        // Show/hide glide legend
+        // Show/hide glide legend (keep visible if speed overlay is active)
         const isGlideEvent = event.type === 'glide_start' || event.type === 'glide_end';
-        if (isGlideEvent) {
+        if (isGlideEvent || isSpeedOverlayActive) {
           if (!glideLegendElement) {
             glideLegendElement = createGlideLegend(container);
             glideLegendElement.style.display = 'none';
           }
         }
-        showGlideLegend(glideLegendElement, isGlideEvent);
+        showGlideLegend(glideLegendElement, isGlideEvent || isSpeedOverlayActive);
 
         // Highlight segment
         if (event.segment && currentFixes.length > 0) {

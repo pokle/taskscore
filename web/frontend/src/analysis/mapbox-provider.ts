@@ -8,7 +8,7 @@
 
 import mapboxgl from 'mapbox-gl';
 import { Threebox } from 'threebox-plugin';
-import { getBoundingBox, getEventStyle, calculateGlideMarkers, getSegmentLengthMeters, calculateOptimizedTaskLine, getOptimizedSegmentDistances, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@taskscore/engine';
+import { getBoundingBox, getEventStyle, calculateGlideMarkers, getSegmentLengthMeters, calculateOptimizedTaskLine, getOptimizedSegmentDistances, extractGlides, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@taskscore/engine';
 import type { MapProvider } from './map-provider';
 import { config } from './config';
 import {
@@ -86,6 +86,10 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       // Track visibility state
       let isTrackVisible = true;
 
+      // Speed overlay state (separate from activeMarkers so it persists across event selections)
+      let isSpeedOverlayActive = false;
+      let speedOverlayMarkers: mapboxgl.Marker[] = [];
+
       // Cached turnpoint sequence and optimized path (invalidated on track/task change)
       let cachedSequenceResult: TurnpointSequenceResult | null = null;
       let cachedOptimizedPath: { lat: number; lon: number }[] | null = null;
@@ -100,6 +104,13 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       function updateGlideLabelVisibility(): void {
         const zoom = map.getZoom();
         for (const marker of activeMarkers) {
+          const el = marker.getElement();
+          if (el.dataset.glideLabel === 'true') {
+            updateGlideLabelElement(el, zoom);
+          }
+        }
+        // Also update speed overlay labels
+        for (const marker of speedOverlayMarkers) {
           const el = marker.getElement();
           if (el.dataset.glideLabel === 'true') {
             updateGlideLabelElement(el, zoom);
@@ -144,6 +155,78 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           currentTask, currentFixes, cache.sequenceResult, cache.optimizedPath,
           glideStartTime, getElevationAtPoint,
         );
+      }
+
+      /** Remove all speed overlay markers from the map */
+      function clearSpeedOverlay(): void {
+        for (const marker of speedOverlayMarkers) {
+          marker.remove();
+        }
+        speedOverlayMarkers = [];
+        isSpeedOverlayActive = false;
+      }
+
+      /** Render speed overlay for all glide segments */
+      function renderSpeedOverlay(): void {
+        clearSpeedOverlay();
+        if (currentEvents.length === 0 || currentFixes.length === 0) return;
+
+        isSpeedOverlayActive = true;
+        const glides = extractGlides(currentEvents);
+        const segLen = getSegmentLengthMeters(config.getUnits().distance);
+
+        for (const glide of glides) {
+          const segmentFixes = currentFixes.slice(glide.segment.startIndex, glide.segment.endIndex + 1);
+          if (segmentFixes.length < 2) continue;
+
+          const glideMarkers = calculateGlideMarkers(segmentFixes, getNextTurnpointContext, segLen);
+
+          for (const gm of glideMarkers) {
+            if (gm.type === 'speed-label') {
+              const { speed, detailText, reqText } = formatGlideLabel(gm);
+
+              const labelEl = document.createElement('div');
+              labelEl.style.cssText = `
+                font-family: ${MAP_FONT_FAMILY};
+                font-size: 20px;
+                font-weight: 600;
+                color: #3b82f6;
+                white-space: nowrap;
+                text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
+                text-align: center;
+                line-height: 1.3;
+              `;
+              labelEl.innerHTML = reqText
+                ? `${speed}<br>${detailText}<br>${reqText}`
+                : `${speed}<br>${detailText}`;
+              labelEl.dataset.glideLabel = 'true';
+              labelEl.dataset.speedLabel = speed;
+              labelEl.dataset.detailLabel = detailText;
+              labelEl.dataset.reqLabel = reqText;
+
+              const labelMarker = new mapboxgl.Marker({ element: labelEl })
+                .setLngLat([gm.lon, gm.lat])
+                .addTo(map);
+              speedOverlayMarkers.push(labelMarker);
+            } else {
+              const chevronEl = document.createElement('div');
+              chevronEl.style.display = 'flex';
+              chevronEl.style.alignItems = 'center';
+              chevronEl.style.justifyContent = 'center';
+              chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12" style="transform: rotate(${gm.bearing}deg);">
+                <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>`;
+
+              const chevronMarker = new mapboxgl.Marker({ element: chevronEl })
+                .setLngLat([gm.lon, gm.lat])
+                .addTo(map);
+              speedOverlayMarkers.push(chevronMarker);
+            }
+          }
+        }
+
+        // Apply zoom-dependent label visibility
+        updateGlideLabelVisibility();
       }
 
       /**
@@ -853,6 +936,17 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       const renderer: MapProvider = {
         supports3D: true,
         supportsAltitudeColors: true,
+        supportsSpeedOverlay: true,
+
+        setSpeedOverlay(enabled: boolean) {
+          if (enabled) {
+            renderSpeedOverlay();
+            showGlideLegend(true);
+          } else {
+            clearSpeedOverlay();
+            showGlideLegend(false);
+          }
+        },
 
         set3DMode(enabled: boolean) {
           is3DMode = enabled;
@@ -990,6 +1084,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
         clearTrack() {
           clearEventHighlights();
+          clearSpeedOverlay();
           currentFixes = [];
           cachedSequenceResult = null;
           cachedOptimizedPath = null;
@@ -1174,6 +1269,11 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
             eventMarkers.push(marker);
           }
+
+          // Re-render speed overlay if it was active
+          if (isSpeedOverlayActive) {
+            renderSpeedOverlay();
+          }
         },
 
         clearEvents() {
@@ -1183,6 +1283,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           }
           eventMarkers.length = 0;
           clearEventHighlights();
+          clearSpeedOverlay();
         },
 
         panToEvent(event: FlightEvent, options?: { skipPan?: boolean }) {
@@ -1197,9 +1298,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           activeMarkers = [];
           sharedHideTrackPointHUD(hudElement);
 
-          // Show/hide glide legend based on event type
+          // Show/hide glide legend based on event type (keep visible if speed overlay is active)
           const isGlideEvent = event.type === 'glide_start' || event.type === 'glide_end';
-          showGlideLegend(isGlideEvent);
+          showGlideLegend(isGlideEvent || isSpeedOverlayActive);
 
           // Highlight segment if event has one
           if (event.segment && currentFixes.length > 0) {
