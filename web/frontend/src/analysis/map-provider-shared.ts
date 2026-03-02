@@ -19,6 +19,7 @@ import { getUnitLabel } from '@taskscore/engine';
 // ── Constants ───────────────────────────────────────────────────────────────
 
 export const MAP_FONT_FAMILY = "'Atkinson Hyperlegible Next', sans-serif";
+export const GLIDE_LABEL_SPARSE_MIN_ZOOM = 10;
 export const GLIDE_LABEL_SPEED_MIN_ZOOM = 11;
 export const GLIDE_LABEL_DETAILS_MIN_ZOOM = 13;
 
@@ -826,13 +827,22 @@ export function computeSegmentLabels(
 // ── updateGlideLabelElement ─────────────────────────────────────────────
 
 /** Apply zoom-dependent display logic to a single glide-label element. */
-export function updateGlideLabelElement(el: HTMLElement, zoom: number): void {
+export function updateGlideLabelElement(el: HTMLElement, zoom: number, labelIndex?: number): void {
   const speed = el.dataset.speedLabel || '';
   const details = el.dataset.detailLabel || '';
   const req = el.dataset.reqLabel || '';
 
-  if (zoom < GLIDE_LABEL_SPEED_MIN_ZOOM) {
+  if (zoom < GLIDE_LABEL_SPARSE_MIN_ZOOM) {
     el.style.display = 'none';
+    return;
+  }
+  if (zoom < GLIDE_LABEL_SPEED_MIN_ZOOM && labelIndex !== undefined && labelIndex % 3 !== 0 && !el.dataset.fastest) {
+    el.style.display = 'none';
+    return;
+  }
+  if (zoom < GLIDE_LABEL_SPEED_MIN_ZOOM) {
+    el.style.display = '';
+    el.innerHTML = speed;
     return;
   }
 

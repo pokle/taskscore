@@ -20,7 +20,7 @@ import {
 import type { MapProvider } from './map-provider';
 import { config } from './config';
 import {
-  MAP_FONT_FAMILY, GLIDE_LABEL_SPEED_MIN_ZOOM,
+  MAP_FONT_FAMILY, GLIDE_LABEL_SPARSE_MIN_ZOOM, GLIDE_LABEL_SPEED_MIN_ZOOM,
   TRACK_COLOR, TRACK_OUTLINE_COLOR, HIGHLIGHT_COLOR, TASK_COLOR,
   getTurnpointColor, KEY_EVENT_TYPES, getAltitudeColorNormalized,
   findNearestFixIndex, createGlideLegend, showGlideLegend,
@@ -255,7 +255,6 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
 
     function updateGlideLabelVisibility(): void {
       const z = map.getZoom();
-      const hideChevrons = z < GLIDE_LABEL_SPEED_MIN_ZOOM;
 
       function processMarker(el: HTMLElement | undefined): void {
         if (!el) return;
@@ -265,14 +264,22 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
           : (el.firstElementChild as HTMLElement | null)?.dataset.glideLabel ? el.firstElementChild as HTMLElement
           : null;
         if (target) {
-          updateGlideLabelElement(target, z);
+          const labelIndex = parseInt(target.dataset.labelIndex || '0', 10);
+          updateGlideLabelElement(target, z, labelIndex);
           return;
         }
-        const chevron = el.dataset.glideChevron ? el
-          : (el.firstElementChild as HTMLElement | null)?.dataset.glideChevron ? el
+        const chevronDataEl = el.dataset.glideChevron ? el
+          : (el.firstElementChild as HTMLElement | null)?.dataset.glideChevron ? el.firstElementChild as HTMLElement
           : null;
-        if (chevron) {
-          chevron.style.display = hideChevrons ? 'none' : '';
+        if (chevronDataEl) {
+          const chevronIndex = parseInt(chevronDataEl.dataset.chevronIndex || '0', 10);
+          if (z < GLIDE_LABEL_SPARSE_MIN_ZOOM) {
+            el.style.display = 'none';
+          } else if (z < GLIDE_LABEL_SPEED_MIN_ZOOM && chevronIndex % 3 !== 0) {
+            el.style.display = 'none';
+          } else {
+            el.style.display = '';
+          }
         }
       }
 
@@ -364,6 +371,7 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
 
       const distUnitLabel = getUnitLabel('distance', config.getUnits());
       let chevronCount = 0;
+      let labelIndex = 0;
 
       for (let i = 0; i < markers.length; i++) {
         const gm = markers[i];
@@ -390,6 +398,9 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
           labelEl.dataset.speedLabel = speedDisplay;
           labelEl.dataset.detailLabel = detailText;
           labelEl.dataset.reqLabel = reqText;
+          labelEl.dataset.labelIndex = String(labelIndex);
+          if (isFastest) labelEl.dataset.fastest = 'true';
+          labelIndex++;
 
           const icon = new DivIcon({
             html: labelEl.outerHTML,
@@ -401,9 +412,10 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
             new Marker([gm.lat, gm.lon], { icon })
           );
         } else {
+          const chevronIdx = chevronCount;
           chevronCount++;
           const icon = new DivIcon({
-            html: `<div data-glide-chevron="true" style="display:flex;flex-direction:column;align-items:center;">
+            html: `<div data-glide-chevron="true" data-chevron-index="${chevronIdx}" style="display:flex;flex-direction:column;align-items:center;">
               <svg width="20" height="12" viewBox="0 0 20 12" style="transform:rotate(${gm.bearing}deg);">
                 <path d="M2 10 L10 2 L18 10" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
@@ -893,6 +905,7 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
 
               const highlightDistLabel = getUnitLabel('distance', config.getUnits());
               let highlightChevronCount = 0;
+              let highlightLabelIndex = 0;
 
               for (const gm of glideMarkers) {
                 if (gm.type === 'speed-label') {
@@ -912,6 +925,8 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
                   labelEl.dataset.speedLabel = speed;
                   labelEl.dataset.detailLabel = detailText;
                   labelEl.dataset.reqLabel = reqText;
+                  labelEl.dataset.labelIndex = String(highlightLabelIndex);
+                  highlightLabelIndex++;
 
                   const icon = new DivIcon({
                     html: labelEl.outerHTML,
@@ -923,9 +938,10 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
                     new Marker([gm.lat, gm.lon], { icon })
                   );
                 } else {
+                  const chevronIdx = highlightChevronCount;
                   highlightChevronCount++;
                   const icon = new DivIcon({
-                    html: `<div data-glide-chevron="true" style="display:flex;flex-direction:column;align-items:center;">
+                    html: `<div data-glide-chevron="true" data-chevron-index="${chevronIdx}" style="display:flex;flex-direction:column;align-items:center;">
                       <svg width="20" height="12" viewBox="0 0 20 12" style="transform:rotate(${gm.bearing}deg);">
                         <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
                       </svg>
