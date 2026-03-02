@@ -20,7 +20,7 @@ import {
 import type { MapProvider } from './map-provider';
 import { config } from './config';
 import {
-  MAP_FONT_FAMILY,
+  MAP_FONT_FAMILY, GLIDE_LABEL_SPEED_MIN_ZOOM,
   TRACK_COLOR, TRACK_OUTLINE_COLOR, HIGHLIGHT_COLOR, TASK_COLOR,
   getTurnpointColor, KEY_EVENT_TYPES, getAltitudeColorNormalized,
   findNearestFixIndex, createGlideLegend, showGlideLegend,
@@ -255,22 +255,32 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
 
     function updateGlideLabelVisibility(): void {
       const z = map.getZoom();
+      const hideChevrons = z < GLIDE_LABEL_SPEED_MIN_ZOOM;
+
+      function processMarker(el: HTMLElement | undefined): void {
+        if (!el) return;
+        // Leaflet DivIcon wraps our HTML in a container div,
+        // so check both the wrapper and its first child for data attributes.
+        const target = el.dataset.glideLabel ? el
+          : (el.firstElementChild as HTMLElement | null)?.dataset.glideLabel ? el.firstElementChild as HTMLElement
+          : null;
+        if (target) {
+          updateGlideLabelElement(target, z);
+          return;
+        }
+        const chevron = el.dataset.glideChevron ? el
+          : (el.firstElementChild as HTMLElement | null)?.dataset.glideChevron ? el
+          : null;
+        if (chevron) {
+          chevron.style.display = hideChevrons ? 'none' : '';
+        }
+      }
+
       highlightGroup.eachLayer((layer) => {
-        if (layer instanceof Marker) {
-          const el = layer.getElement();
-          if (el?.dataset.glideLabel === 'true') {
-            updateGlideLabelElement(el, z);
-          }
-        }
+        if (layer instanceof Marker) processMarker(layer.getElement());
       });
-      // Also update speed overlay labels
       speedOverlayGroup.eachLayer((layer) => {
-        if (layer instanceof Marker) {
-          const el = layer.getElement();
-          if (el?.dataset.glideLabel === 'true') {
-            updateGlideLabelElement(el, z);
-          }
-        }
+        if (layer instanceof Marker) processMarker(layer.getElement());
       });
     }
 
@@ -393,7 +403,7 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
         } else {
           chevronCount++;
           const icon = new DivIcon({
-            html: `<div style="display:flex;flex-direction:column;align-items:center;">
+            html: `<div data-glide-chevron="true" style="display:flex;flex-direction:column;align-items:center;">
               <svg width="20" height="12" viewBox="0 0 20 12" style="transform:rotate(${gm.bearing}deg);">
                 <path d="M2 10 L10 2 L18 10" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
@@ -915,7 +925,7 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
                 } else {
                   highlightChevronCount++;
                   const icon = new DivIcon({
-                    html: `<div style="display:flex;flex-direction:column;align-items:center;">
+                    html: `<div data-glide-chevron="true" style="display:flex;flex-direction:column;align-items:center;">
                       <svg width="20" height="12" viewBox="0 0 20 12" style="transform:rotate(${gm.bearing}deg);">
                         <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
                       </svg>

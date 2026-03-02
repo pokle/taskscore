@@ -12,7 +12,7 @@ import { getBoundingBox, getEventStyle, calculateGlideMarkers, calculateGlidePos
 import type { MapProvider } from './map-provider';
 import { config } from './config';
 import {
-  MAP_FONT_FAMILY,
+  MAP_FONT_FAMILY, GLIDE_LABEL_SPEED_MIN_ZOOM,
   KEY_EVENT_TYPES, getAltitudeColorNormalized,
   findNearestFixIndex as sharedFindNearestFixIndex,
   createCirclePolygon, createGlideLegend, showGlideLegend as sharedShowGlideLegend,
@@ -100,20 +100,25 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       // Turnpoint click callback
       let turnpointClickCallback: ((turnpointIndex: number) => void) | null = null;
 
-      /** Hide glide speed labels when zoomed out to prevent overlap clutter. */
+      /** Hide glide speed labels and chevrons when zoomed out to prevent overlap clutter. */
       function updateGlideLabelVisibility(): void {
         const zoom = map.getZoom();
+        const hideChevrons = zoom < GLIDE_LABEL_SPEED_MIN_ZOOM;
         for (const marker of activeMarkers) {
           const el = marker.getElement();
           if (el.dataset.glideLabel === 'true') {
             updateGlideLabelElement(el, zoom);
+          } else if (el.dataset.glideChevron === 'true') {
+            el.style.display = hideChevrons ? 'none' : '';
           }
         }
-        // Also update speed overlay labels
+        // Also update speed overlay labels and chevrons
         for (const marker of speedOverlayMarkers) {
           const el = marker.getElement();
           if (el.dataset.glideLabel === 'true') {
             updateGlideLabelElement(el, zoom);
+          } else if (el.dataset.glideChevron === 'true') {
+            el.style.display = hideChevrons ? 'none' : '';
           }
         }
       }
@@ -260,6 +265,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           } else {
             chevronCount++;
             const chevronEl = document.createElement('div');
+            chevronEl.dataset.glideChevron = 'true';
             chevronEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
             chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12" style="transform: rotate(${gm.bearing}deg);">
               <path d="M2 10 L10 2 L18 10" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1431,6 +1437,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
                   } else {
                     highlightChevronCount++;
                     const chevronEl = document.createElement('div');
+                    chevronEl.dataset.glideChevron = 'true';
                     chevronEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
                     chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12" style="transform: rotate(${marker.bearing}deg);">
                       <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
