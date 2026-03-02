@@ -275,7 +275,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             chevronEl.dataset.chevronIndex = String(chevronCount);
             chevronCount++;
             chevronEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
-            chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12">
+            chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12" style="transform:rotate(${gm.bearing}deg);">
               <path d="M2 10 L10 2 L18 10" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
             </svg><span style="font-size:10px;color:black;font-family:${MAP_FONT_FAMILY};white-space:nowrap;text-shadow:${GLIDE_LABEL_TEXT_SHADOW};">${chevronCount}${distUnitLabel}</span>`;
 
@@ -283,7 +283,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
               element: chevronEl,
               rotationAlignment: 'map',
               pitchAlignment: 'map',
-              rotation: gm.bearing,
             })
               .setLngLat([gm.lon, gm.lat])
               .addTo(map);
@@ -1382,7 +1381,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
                     chevronEl.dataset.chevronIndex = String(highlightChevronCount);
                     highlightChevronCount++;
                     chevronEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
-                    chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12">
+                    chevronEl.innerHTML = `<svg width="20" height="12" viewBox="0 0 20 12" style="transform:rotate(${marker.bearing}deg);">
                       <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg><span style="font-size:10px;color:black;font-family:${MAP_FONT_FAMILY};white-space:nowrap;text-shadow:${GLIDE_LABEL_TEXT_SHADOW};">${highlightChevronCount}${highlightDistLabel}</span>`;
 
@@ -1390,7 +1389,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
                       element: chevronEl,
                       rotationAlignment: 'map',
                       pitchAlignment: 'map',
-                      rotation: marker.bearing,
                     })
                       .setLngLat([marker.lon, marker.lat])
                       .addTo(map);
