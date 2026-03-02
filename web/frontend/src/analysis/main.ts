@@ -176,15 +176,6 @@ async function init(): Promise<void> {
 
   const featureToggles: FeatureToggleConfig[] = [
     {
-      menuId: 'menu-altitude-colors',
-      statusId: 'altitude-colors-status',
-      urlParam: 'alt',
-      defaultOn: true,
-      supportsProp: 'supportsAltitudeColors',
-      providerMethod: 'setAltitudeColors',
-      onToggle: () => analysisPanel?.clearSelection(),
-    },
-    {
       menuId: 'menu-3d-track',
       statusId: '3d-track-status',
       urlParam: '3d',
@@ -245,11 +236,7 @@ async function init(): Promise<void> {
     // Apply initial state to provider
     const method = mapRenderer[toggle.providerMethod];
     if (typeof method === 'function') {
-      if (toggle.defaultOn && !enabled) {
-        (method as (v: boolean) => void).call(mapRenderer, false);
-      } else if (!toggle.defaultOn && enabled) {
-        (method as (v: boolean) => void).call(mapRenderer, true);
-      }
+      (method as (v: boolean) => void).call(mapRenderer, enabled);
     }
 
     // Apply initial side-effects (e.g. speed label text)

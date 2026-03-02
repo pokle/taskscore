@@ -24,7 +24,6 @@ export const GLIDE_LABEL_SPARSE_MIN_ZOOM = 10;
 export const GLIDE_LABEL_SPEED_MIN_ZOOM = 11;
 export const GLIDE_LABEL_DETAILS_MIN_ZOOM = 13;
 
-export const TRACK_COLOR = '#f97316';
 export const TRACK_OUTLINE_COLOR = '#000000';
 export const HIGHLIGHT_COLOR = '#00ffff';
 export const TASK_COLOR = '#6366f1';

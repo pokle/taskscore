@@ -21,7 +21,7 @@ import type { MapProvider } from './map-provider';
 import { config } from './config';
 import {
   MAP_FONT_FAMILY, GLIDE_LABEL_TEXT_SHADOW, GLIDE_LABEL_SPARSE_MIN_ZOOM, GLIDE_LABEL_SPEED_MIN_ZOOM,
-  TRACK_COLOR, TRACK_OUTLINE_COLOR, HIGHLIGHT_COLOR, TASK_COLOR,
+  TRACK_OUTLINE_COLOR, HIGHLIGHT_COLOR, TASK_COLOR,
   getTurnpointColor, KEY_EVENT_TYPES, getAltitudeColorNormalized,
   findNearestFixIndex, createGlideLegend, showGlideLegend,
   createCirclePolygonLatLng,
@@ -196,8 +196,7 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
     let currentEvents: FlightEvent[] = [];
 
     // Layer groups
-    const trackGroup = new LayerGroup();        // solid track (outline + colored line)
-    const trackGradientGroup = new LayerGroup(); // altitude-gradient segments
+    const trackGroup = new LayerGroup();        // altitude-gradient track
     const taskGroup = new LayerGroup();
     const eventMarkersGroup = new LayerGroup();
     const highlightGroup = new LayerGroup();
@@ -211,7 +210,6 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
     speedOverlayGroup.addTo(map);
 
     // Feature state
-    let isAltitudeColorsMode = false;
     let isTaskVisible = true;
     let isTrackVisible = true;
     let isSpeedOverlayActive = false;
@@ -429,67 +427,6 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
       sharedHideTrackPointHUD(hudElement);
     }
 
-    /** Build multi-segment altitude-gradient polylines */
-    function buildGradientTrack(fixes: IGCFix[]): void {
-      trackGradientGroup.clearLayers();
-      if (fixes.length < 2) return;
-
-      const { minAlt, altRange } = calculateAltitudeRange(fixes);
-
-      // Invisible hit area for click detection
-      const allLatLngs: LatLngExpression[] = fixes.map(f => [f.latitude, f.longitude]);
-      const hitArea = new Polyline(allLatLngs, {
-        color: '#000000',
-        weight: 16,
-        opacity: 0.01,
-      });
-      bindTrackClick(hitArea);
-      trackGradientGroup.addLayer(hitArea);
-
-      // Pre-compute segments with altitude data
-      const trackSegments = buildTrackSegments(fixes, altRange, minAlt, 500, 0);
-      const segments = trackSegments.map(seg => {
-        const latlngs: LatLngExpression[] = [];
-        for (let j = seg.startIndex; j < seg.endIndex; j++) {
-          latlngs.push([fixes[j].latitude, fixes[j].longitude]);
-        }
-        return { latlngs, normalizedAlt: seg.normalizedAlt };
-      });
-
-      // Outline segments (bottom layer) - wider at higher altitude
-      for (const seg of segments) {
-        trackGradientGroup.addLayer(new Polyline(seg.latlngs, {
-          color: TRACK_OUTLINE_COLOR,
-          weight: 4 + seg.normalizedAlt * 8,
-          opacity: 0.6,
-          interactive: false,
-        }));
-      }
-
-      // Altitude-colored segments (top layer) - wider at higher altitude
-      for (const seg of segments) {
-        trackGradientGroup.addLayer(new Polyline(seg.latlngs, {
-          color: getAltitudeColorNormalized(seg.normalizedAlt),
-          weight: 2 + seg.normalizedAlt * 4,
-          opacity: 0.95,
-          interactive: false,
-        }));
-      }
-    }
-
-    /** Update which track rendering is visible */
-    function updateTrackRendering(): void {
-      if (isAltitudeColorsMode) {
-        // Show gradient, hide solid
-        if (!map.hasLayer(trackGradientGroup)) trackGradientGroup.addTo(map);
-        if (map.hasLayer(trackGroup)) map.removeLayer(trackGroup);
-      } else {
-        // Show solid, hide gradient
-        if (!map.hasLayer(trackGroup)) trackGroup.addTo(map);
-        if (map.hasLayer(trackGradientGroup)) map.removeLayer(trackGradientGroup);
-      }
-    }
-
     /** Make a track polyline clickable */
     function bindTrackClick(polyline: Polyline): void {
       polyline.on('click', (e: LeafletMouseEvent) => {
@@ -503,7 +440,6 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
 
     const renderer: MapProvider = {
       supports3D: false,
-      supportsAltitudeColors: true,
       supportsSpeedOverlay: true,
 
       setSpeedOverlay(enabled: boolean) {
@@ -521,12 +457,6 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
         }
       },
 
-      setAltitudeColors(enabled: boolean) {
-        isAltitudeColorsMode = enabled;
-        clearEventHighlights();
-        updateTrackRendering();
-      },
-
       setTaskVisibility(visible: boolean) {
         isTaskVisible = visible;
         if (visible) {
@@ -539,11 +469,10 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
       setTrackVisibility(visible: boolean) {
         isTrackVisible = visible;
         if (visible) {
-          updateTrackRendering();
+          if (!map.hasLayer(trackGroup)) trackGroup.addTo(map);
           if (!map.hasLayer(eventMarkersGroup)) eventMarkersGroup.addTo(map);
         } else {
           if (map.hasLayer(trackGroup)) map.removeLayer(trackGroup);
-          if (map.hasLayer(trackGradientGroup)) map.removeLayer(trackGradientGroup);
           if (map.hasLayer(eventMarkersGroup)) map.removeLayer(eventMarkersGroup);
           clearEventHighlights();
         }
@@ -555,7 +484,6 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
         cachedSequenceResult = null;
         cachedOptimizedPath = null;
         trackGroup.clearLayers();
-        trackGradientGroup.clearLayers();
 
         if (fixes.length === 0) return;
 
@@ -594,21 +522,15 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
           }));
         }
 
-        // Track segments (top layer) - wider at higher altitude
+        // Altitude-colored segments (top layer) - wider at higher altitude
         for (const seg of segments) {
           trackGroup.addLayer(new Polyline(seg.latlngs, {
-            color: TRACK_COLOR,
+            color: getAltitudeColorNormalized(seg.normalizedAlt),
             weight: 2 + seg.normalizedAlt * 4,
             opacity: 0.95,
             interactive: false,
           }));
         }
-
-        // Build altitude gradient variant
-        buildGradientTrack(fixes);
-
-        // Show the right variant
-        updateTrackRendering();
 
         // Fit bounds
         const bbox = getBoundingBox(fixes);
@@ -625,7 +547,6 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
         cachedSequenceResult = null;
         cachedOptimizedPath = null;
         trackGroup.clearLayers();
-        trackGradientGroup.clearLayers();
       },
 
       async setTask(task: XCTask) {

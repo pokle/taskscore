@@ -90,9 +90,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       let is3DMode = false;
       let threeDObjects: unknown[] = [];
 
-      // Altitude colors state
-      let isAltitudeColorsMode = false;
-
       // Task visibility state
       let isTaskVisible = true;
 
@@ -330,7 +327,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           'task-points',
           'highlight-segment',
           'speed-fastest-segment',
-          'track-line-gradient',
           'track-line',
           'track-line-outline',
           'task-cylinders-stroke',
@@ -476,7 +472,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           },
         });
 
-        // 5. Track line - bright orange for visibility at all zoom levels
+        // 5. Track line with altitude-based colors and width
         map.addLayer({
           id: 'track-line',
           type: 'line',
@@ -484,29 +480,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           layout: {
             'line-join': 'round',
             'line-cap': 'round',
-          },
-          paint: {
-            'line-color': '#f97316', // Bright orange
-            // Altitude-adaptive width: wider at high altitude for depth effect
-            'line-width': [
-              'interpolate', ['linear'], ['zoom'],
-              3, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 2 * width_mul, 1, 6 * width_mul],
-              8, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 3 * width_mul, 1, 9 * width_mul],
-              12, ['interpolate', ['linear'], ['get', 'normalizedAlt'], 0, 3 * width_mul, 1, 9 * width_mul],
-            ],
-            'line-opacity': 0.95,
-          },
-        });
-
-        // 5a. Track line with altitude-based colors and width (hidden by default)
-        map.addLayer({
-          id: 'track-line-gradient',
-          type: 'line',
-          source: 'track',
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round',
-            'visibility': 'none', // Hidden by default
           },
           paint: {
             // Altitude-based coloring: brown (low) → green → cyan → sky blue (high)
@@ -798,7 +771,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         });
 
         // Track click and hover handlers
-        const trackLayers = ['track-line', 'track-line-outline', 'track-line-gradient'];
+        const trackLayers = ['track-line', 'track-line-outline'];
 
         // Click handler for track
         for (const layerId of trackLayers) {
@@ -972,34 +945,15 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           if (map.getLayer('track-line-outline')) {
             map.setLayoutProperty('track-line-outline', 'visibility', 'none');
           }
-          if (map.getLayer('track-line-gradient')) {
-            map.setLayoutProperty('track-line-gradient', 'visibility', 'none');
-          }
           // Show 3D track
           render3DTrack(currentFixes);
-        } else if (isAltitudeColorsMode) {
-          // Show gradient track, hide solid track
-          if (map.getLayer('track-line')) {
-            map.setLayoutProperty('track-line', 'visibility', 'none');
-          }
-          if (map.getLayer('track-line-outline')) {
-            map.setLayoutProperty('track-line-outline', 'visibility', 'visible');
-          }
-          if (map.getLayer('track-line-gradient')) {
-            map.setLayoutProperty('track-line-gradient', 'visibility', 'visible');
-          }
-          // Hide 3D track
-          clear3DTrack();
         } else {
-          // Show solid track, hide gradient track
+          // Show 2D track layers
           if (map.getLayer('track-line')) {
             map.setLayoutProperty('track-line', 'visibility', 'visible');
           }
           if (map.getLayer('track-line-outline')) {
             map.setLayoutProperty('track-line-outline', 'visibility', 'visible');
-          }
-          if (map.getLayer('track-line-gradient')) {
-            map.setLayoutProperty('track-line-gradient', 'visibility', 'none');
           }
           // Hide 3D track
           clear3DTrack();
@@ -1008,7 +962,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
       const renderer: MapProvider = {
         supports3D: true,
-        supportsAltitudeColors: true,
         supportsSpeedOverlay: true,
 
         setSpeedOverlay(enabled: boolean) {
@@ -1024,12 +977,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
         set3DMode(enabled: boolean) {
           is3DMode = enabled;
-          clearEventHighlights();
-          updateTrackRendering();
-        },
-
-        setAltitudeColors(enabled: boolean) {
-          isAltitudeColorsMode = enabled;
           clearEventHighlights();
           updateTrackRendering();
         },
@@ -1063,7 +1010,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             const trackLayers = [
               'track-line',
               'track-line-outline',
-              'track-line-gradient',
               'highlight-segment',
             ];
             for (const layerId of trackLayers) {
