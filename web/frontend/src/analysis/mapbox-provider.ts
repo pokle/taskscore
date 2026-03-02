@@ -260,6 +260,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             const labelMarker = new mapboxgl.Marker({ element: labelEl })
               .setLngLat([gm.lon, gm.lat])
               .addTo(map);
+            if (isFastest) labelMarker.getElement().style.zIndex = '1';
             speedOverlayMarkers.push(labelMarker);
           } else {
             const chevronEl = document.createElement('div');
