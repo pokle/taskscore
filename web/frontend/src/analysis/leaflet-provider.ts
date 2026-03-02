@@ -13,7 +13,7 @@ import {
 } from 'leaflet';
 import {
   getBoundingBox, getEventStyle, calculateGlideMarkers, calculateGlidePositions, getSegmentLengthMeters,
-  calculateOptimizedTaskLine, getOptimizedSegmentDistances,
+  calculateOptimizedTaskLine, getOptimizedSegmentDistances, getUnitLabel,
   calculateBearing, haversineDistance, destinationPoint, calculateBearingRadians,
   type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult,
 } from '@taskscore/engine';
@@ -352,6 +352,9 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
       const FASTEST_COLOR = '#ef4444';
       const NORMAL_COLOR = '#3b82f6';
 
+      const distUnitLabel = getUnitLabel('distance', config.getUnits());
+      let chevronCount = 0;
+
       for (let i = 0; i < markers.length; i++) {
         const gm = markers[i];
         const isFastest = i === fastestIdx ||
@@ -388,15 +391,17 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
             new Marker([gm.lat, gm.lon], { icon })
           );
         } else {
+          chevronCount++;
           const icon = new DivIcon({
-            html: `<div style="display:flex;align-items:center;justify-content:center;">
+            html: `<div style="display:flex;flex-direction:column;align-items:center;">
               <svg width="20" height="12" viewBox="0 0 20 12" style="transform:rotate(${gm.bearing}deg);">
                 <path d="M2 10 L10 2 L18 10" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
+              <span style="font-size:10px;color:black;font-family:${MAP_FONT_FAMILY};white-space:nowrap;text-shadow:-1px -1px 0 white,1px -1px 0 white,-1px 1px 0 white,1px 1px 0 white;">${chevronCount}${distUnitLabel}</span>
             </div>`,
             className: '',
-            iconSize: [20, 12],
-            iconAnchor: [10, 6],
+            iconSize: [40, 24],
+            iconAnchor: [20, 8],
           });
           speedOverlayGroup.addLayer(
             new Marker([gm.lat, gm.lon], { icon })
@@ -876,6 +881,9 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
             if (isGlideEvent) {
               const glideMarkers = calculateGlideMarkers(segmentFixes, getNextTurnpointContext, getSegmentLengthMeters(config.getUnits().distance));
 
+              const highlightDistLabel = getUnitLabel('distance', config.getUnits());
+              let highlightChevronCount = 0;
+
               for (const gm of glideMarkers) {
                 if (gm.type === 'speed-label') {
                   const { speed, detailText, reqText } = formatGlideLabel(gm);
@@ -905,16 +913,17 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
                     new Marker([gm.lat, gm.lon], { icon })
                   );
                 } else {
-                  // Chevron
+                  highlightChevronCount++;
                   const icon = new DivIcon({
-                    html: `<div style="display:flex;align-items:center;justify-content:center;">
+                    html: `<div style="display:flex;flex-direction:column;align-items:center;">
                       <svg width="20" height="12" viewBox="0 0 20 12" style="transform:rotate(${gm.bearing}deg);">
                         <path d="M2 10 L10 2 L18 10" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
                       </svg>
+                      <span style="font-size:10px;color:black;font-family:${MAP_FONT_FAMILY};white-space:nowrap;text-shadow:-1px -1px 0 white,1px -1px 0 white,-1px 1px 0 white,1px 1px 0 white;">${highlightChevronCount}${highlightDistLabel}</span>
                     </div>`,
                     className: '',
-                    iconSize: [20, 12],
-                    iconAnchor: [10, 6],
+                    iconSize: [40, 24],
+                    iconAnchor: [20, 8],
                   });
                   highlightGroup.addLayer(
                     new Marker([gm.lat, gm.lon], { icon })
