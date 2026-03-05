@@ -10,3 +10,4 @@ export { calculateGlidePositions, calculateGlideMarkers, calculateTotalGlideDist
 export { resolveTurnpointSequence, detectCylinderCrossings, type TurnpointSequenceResult, type CylinderCrossing, type TurnpointReaching, type BestProgress, type LegDistance } from './turnpoint-sequence';
 export { detectCircles, computeBearingRates, fitCircleLeastSquares, normalizeBearingDelta, type CircleSegment, type CirclingSegment, type FittedCircle, type WindEstimate, type CircleDetectionResult, type TurnDirection } from './circle-detector';
 export { extractGlides, extractClimbs, extractSinks, type GlideData, type ClimbData, type SinkData, type ClimbEventDetails } from './segment-extractors';
+export { maxBy, minBy } from './array-utils';
