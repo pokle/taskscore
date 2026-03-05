@@ -103,6 +103,13 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       // HUD crosshair marker (separate from activeMarkers so segment markers aren't cleared)
       let hudCrosshairMarker: mapboxgl.Marker | null = null;
 
+      function clearHudCrosshair(): void {
+        if (hudCrosshairMarker) {
+          hudCrosshairMarker.remove();
+          hudCrosshairMarker = null;
+        }
+      }
+
       // Cached turnpoint sequence and optimized path (invalidated on track/task change)
       let cachedSequenceResult: TurnpointSequenceResult | null = null;
       let cachedOptimizedPath: { lat: number; lon: number }[] | null = null;
@@ -311,11 +318,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         }
         activeMarkers = [];
 
-        // Remove HUD crosshair
-        if (hudCrosshairMarker) {
-          hudCrosshairMarker.remove();
-          hudCrosshairMarker = null;
-        }
+        clearHudCrosshair();
 
         // Clear highlight segment source
         updateGeoJSONSource(map, 'highlight-segment', []);
@@ -1271,10 +1274,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             marker.remove();
           }
           activeMarkers = [];
-          if (hudCrosshairMarker) {
-            hudCrosshairMarker.remove();
-            hudCrosshairMarker = null;
-          }
+          clearHudCrosshair();
           sharedHideTrackPointHUD(hudElement);
 
           // Show/hide glide legend based on event type (keep visible if speed overlay is active)
@@ -1503,10 +1503,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           if (!data) return;
 
           // Clear previous crosshair only (not segment markers)
-          if (hudCrosshairMarker) {
-            hudCrosshairMarker.remove();
-            hudCrosshairMarker = null;
-          }
+          clearHudCrosshair();
 
           // Hide glide legend (same position as HUD)
           showGlideLegend(false);
