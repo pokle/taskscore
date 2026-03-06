@@ -36,19 +36,19 @@
     "web/workers/*"
   ],
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260304.0",
-    "@types/bun": "^1.3.9",
-    "@types/node": "^25.3.3",
+    "@cloudflare/workers-types": "^4.20260305.1",
+    "@types/bun": "^1.3.10",
+    "@types/node": "^25.3.5",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "wrangler": "^4.69.0"
+    "wrangler": "^4.71.0"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "@fontsource/atkinson-hyperlegible-next": "^5.2.7",
-    "mapbox-gl": "^3.19.0",
+    "mapbox-gl": "^3.19.1",
     "threebox-plugin": "^2.2.7"
   }
 }
