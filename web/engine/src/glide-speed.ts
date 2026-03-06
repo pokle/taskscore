@@ -62,6 +62,10 @@ export function calculateGlidePositions(
       currFix.longitude
     );
 
+    if (segmentDistance === 0) {
+      continue;
+    }
+
     const prevTime = prevFix.time.getTime();
     const currTime = currFix.time.getTime();
 
