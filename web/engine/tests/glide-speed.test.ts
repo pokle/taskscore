@@ -348,6 +348,25 @@ describe('Glide Speed Calculations', () => {
       const markers = calculateGlideMarkers(fixes);
       expect(markers).toHaveLength(0);
     });
+
+    it('should handle consecutive fixes at the same position without NaN (BUG-09)', () => {
+      // Create a glide with duplicate GPS positions in the middle
+      const fixes = [
+        createFix(0, 47.0, 11.0),
+        createFix(1, 47.0, 11.0),    // same position as previous
+        createFix(2, 47.0, 11.0),    // same position again
+        createFix(3, 47.0, 11.001),
+        createFix(4, 47.0, 11.002),
+      ];
+      const positions = calculateGlidePositions(fixes, 10);
+      // No position should contain NaN
+      for (const pos of positions) {
+        expect(pos.lat).not.toBeNaN();
+        expect(pos.lon).not.toBeNaN();
+        expect(pos.time).not.toBeNaN();
+        expect(pos.altitude).not.toBeNaN();
+      }
+    });
   });
 
   describe('required glide ratio', () => {
