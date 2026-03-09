@@ -742,11 +742,13 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         addCustomLayers();
 
         // Recreate Threebox after style changes — setStyle() removes all layers
-        // and invalidates the internal Three.js renderer state.
+        // and may trigger a WebGL context loss/restore cycle.
+        // IMPORTANT: Do NOT call tb.dispose() — it crashes on a lost WebGL context
+        // and corrupts the shared GL state, breaking the entire map.
         // On initial load, tb is still null; it's created in the 'load' handler.
         if (tb) {
-          // Dispose old instance and clear stale scene objects
-          tb.dispose();
+          // Abandon old instance (GC will clean it up) and clear stale references
+          tb = null;
           threeDObjects = [];
 
           const gl = map.getCanvas().getContext('webgl2') || map.getCanvas().getContext('webgl');
@@ -760,8 +762,11 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
               // Layer added
             },
             render: function () {
-              if (tb) {
+              if (!tb) return;
+              try {
                 tb.update();
+              } catch {
+                // Ignore errors during WebGL context loss transitions
               }
             },
           });
@@ -803,8 +808,11 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             // Layer added
           },
           render: function () {
-            if (tb) {
+            if (!tb) return;
+            try {
               tb.update();
+            } catch {
+              // Ignore errors during WebGL context loss transitions
             }
           },
         });
