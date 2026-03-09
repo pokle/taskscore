@@ -8,7 +8,7 @@
 
 import mapboxgl from 'mapbox-gl';
 import { Threebox } from 'threebox-plugin';
-import { getBoundingBox, getEventStyle, calculateGlideMarkers, calculateGlidePositions, getSegmentLengthMeters, calculateOptimizedTaskLine, getOptimizedSegmentDistances, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@taskscore/engine';
+import { getBoundingBox, getEventStyle, calculateGlideMarkers, calculateGlidePositions, getSegmentLengthMeters, calculateOptimizedTaskLine, getOptimizedSegmentDistances, calculateBearing, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@taskscore/engine';
 import type { MapProvider } from './map-provider';
 import { config } from './config';
 import {
@@ -105,6 +105,11 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       let cameraSmoothAlt = 0;
       let cameraAnimFrameId: number | null = null;
       const CAMERA_LERP = 0.08;
+
+      // Camera preset state
+      type CameraPreset = 'side' | 'top' | 'behind' | 'front';
+      let activeCameraPreset: CameraPreset = 'side';
+      let cameraPresetControl: CameraPresetControl | null = null;
 
       // Task visibility state
       let isTaskVisible = true;
@@ -791,6 +796,68 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
       map.addControl(new MapBoxStyleControl(), 'top-left');
 
+      // Camera preset control (shown only in 3D mode)
+      const CAMERA_PRESETS: { id: CameraPreset; label: string; icon: string }[] = [
+        { id: 'side', label: 'Side', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>' },
+        { id: 'top', label: 'Top', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="10"/></svg>' },
+        { id: 'behind', label: 'Behind', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>' },
+        { id: 'front', label: 'Front', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>' },
+      ];
+
+      class CameraPresetControl {
+        private el: HTMLElement | null = null;
+        private buttons: Map<CameraPreset, HTMLButtonElement> = new Map();
+
+        create(): void {
+          if (this.el) return;
+          this.el = document.createElement('div');
+          this.el.style.cssText = 'position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:0;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.3);';
+
+          for (const preset of CAMERA_PRESETS) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.title = preset.label;
+            btn.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:3px;padding:6px 10px;border:none;cursor:pointer;font-size:11px;font-family:inherit;color:#1e293b;background:white;border-right:1px solid #e2e8f0;';
+            btn.innerHTML = `${preset.icon}<span>${preset.label}</span>`;
+            if (preset.id === activeCameraPreset) {
+              btn.style.background = '#e2e8f0';
+              btn.style.fontWeight = 'bold';
+            }
+            btn.addEventListener('click', () => {
+              applyCameraPreset(preset.id);
+              this.updateActive(preset.id);
+            });
+            this.buttons.set(preset.id, btn);
+            this.el.appendChild(btn);
+          }
+          // Remove border-right from last button
+          const lastBtn = this.el.lastElementChild as HTMLElement;
+          if (lastBtn) lastBtn.style.borderRight = 'none';
+
+          map.getContainer().appendChild(this.el);
+        }
+
+        updateActive(id: CameraPreset): void {
+          for (const [presetId, btn] of this.buttons) {
+            if (presetId === id) {
+              btn.style.background = '#e2e8f0';
+              btn.style.fontWeight = 'bold';
+            } else {
+              btn.style.background = 'white';
+              btn.style.fontWeight = '';
+            }
+          }
+        }
+
+        remove(): void {
+          this.el?.remove();
+          this.el = null;
+          this.buttons.clear();
+        }
+      }
+
+      cameraPresetControl = new CameraPresetControl();
+
       // Handle style changes
       let isInitialLoad = true;
       map.on('style.load', () => {
@@ -1120,6 +1187,68 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       }
 
       /**
+       * Get track bearing at the given fix index (degrees, clockwise from north)
+       */
+      function getTrackBearing(fixIndex: number): number {
+        const fixes = currentFixes;
+        const lookAhead = Math.min(20, fixes.length - 1 - fixIndex);
+        if (lookAhead > 0) {
+          return calculateBearing(
+            fixes[fixIndex].latitude, fixes[fixIndex].longitude,
+            fixes[fixIndex + lookAhead].latitude, fixes[fixIndex + lookAhead].longitude,
+          );
+        }
+        if (fixIndex > 0) {
+          return calculateBearing(
+            fixes[fixIndex - 1].latitude, fixes[fixIndex - 1].longitude,
+            fixes[fixIndex].latitude, fixes[fixIndex].longitude,
+          );
+        }
+        return 0;
+      }
+
+      /**
+       * Apply a camera preset (bearing/pitch) with animation
+       */
+      function applyCameraPreset(preset: CameraPreset): void {
+        activeCameraPreset = preset;
+        const trackBearing = getTrackBearing(currentFixIndex);
+
+        let bearing: number;
+        let pitch: number;
+        switch (preset) {
+          case 'side':
+            bearing = trackBearing - 90;
+            pitch = 75;
+            break;
+          case 'top':
+            bearing = map.getBearing(); // keep current bearing
+            pitch = 0;
+            break;
+          case 'behind':
+            bearing = trackBearing;
+            pitch = 75;
+            break;
+          case 'front':
+            bearing = trackBearing + 180;
+            pitch = 75;
+            break;
+        }
+        map.easeTo({ bearing, pitch, duration: 800 });
+      }
+
+      /**
+       * Update bearing for presets that track the flight direction.
+       * Called during scrubbing so behind/front stay aligned with the track.
+       */
+      function updatePresetBearing(): void {
+        if (activeCameraPreset === 'side' || activeCameraPreset === 'top') return;
+        const trackBearing = getTrackBearing(currentFixIndex);
+        const bearing = activeCameraPreset === 'behind' ? trackBearing : trackBearing + 180;
+        map.easeTo({ bearing, duration: 200 });
+      }
+
+      /**
        * Set the camera target for the momentum loop
        */
       function setCameraTarget(fixIndex: number): void {
@@ -1339,6 +1468,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           // Update glider marker and camera target (momentum loop handles animation)
           updateGliderMarker(fixIndex);
           setCameraTarget(fixIndex);
+          updatePresetBearing();
 
           // Update HUD for this fix
           updateScrubberHUD(fixIndex);
@@ -1470,9 +1600,14 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             // Create scrubber and set up drone follow camera
             scrubberElement = createAltitudeScrubber(currentFixes);
             currentFixIndex = 0;
+            activeCameraPreset = 'side';
             updateGliderMarker(0);
             updateScrubberHUD(0);
             setCameraTarget(0);
+
+            // Show camera preset control
+            cameraPresetControl?.create();
+            cameraPresetControl?.updateActive('side');
 
             // Fly camera to initial drone position, then start momentum loop
             const cam = computeDroneCamera(0, true);
@@ -1485,6 +1620,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             stopCameraLoop();
             removeAltitudeScrubber();
             clearGliderMarker();
+            cameraPresetControl?.remove();
           }
         },
 
