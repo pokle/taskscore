@@ -22,6 +22,7 @@ import {
   formatGlideLabel, formatTurnpointLabel, computeSegmentLabels, updateGlideLabelElement, computeOccludedLabels,
   calculateAltitudeRange, buildTrackSegments,
 } from './map-provider-shared';
+import { formatAltitude } from './units-browser';
 
 // Set MapBox access token from environment variable
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -1112,10 +1113,19 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
        * Create the altitude scrubber overlay
        */
       function createAltitudeScrubber(fixes: IGCFix[]): HTMLElement {
+        // Layout constants for axis padding
+        const Y_AXIS_WIDTH = 40; // px, left padding for altitude labels
+        const X_AXIS_HEIGHT = 16; // px, bottom padding for time labels
+
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'position:absolute;bottom:0;left:0;right:0;height:15%;z-index:10;background:rgba(0,0,0,0.65);cursor:crosshair;touch-action:none;';
 
         const { minAlt, altRange } = calculateAltitudeRange(fixes);
+        const maxAlt = minAlt + altRange;
+
+        // Chart area (inset from axes)
+        const chartArea = document.createElement('div');
+        chartArea.style.cssText = `position:absolute;top:0;left:${Y_AXIS_WIDTH}px;right:0;bottom:${X_AXIS_HEIGHT}px;`;
 
         // Create SVG altitude profile
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1123,13 +1133,12 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         svg.setAttribute('height', '100%');
         svg.setAttribute('preserveAspectRatio', 'none');
         svg.setAttribute('viewBox', `0 0 ${fixes.length} 100`);
-        svg.style.cssText = 'display:block;position:absolute;top:0;left:0;width:100%;height:100%;';
+        svg.style.cssText = 'display:block;width:100%;height:100%;';
 
-        // Build path with altitude-colored segments
-        // Create a filled area polygon
+        // Build filled area polygon
         let pathD = `M 0 100 `;
         for (let i = 0; i < fixes.length; i++) {
-          const y = altRange > 0 ? 100 - ((fixes[i].gnssAltitude - minAlt) / altRange) * 90 : 50;
+          const y = altRange > 0 ? 100 - ((fixes[i].gnssAltitude - minAlt) / altRange) * 95 : 50;
           pathD += `L ${i} ${y} `;
         }
         pathD += `L ${fixes.length - 1} 100 Z`;
@@ -1143,7 +1152,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         gradient.setAttribute('x2', '1');
         gradient.setAttribute('y2', '0');
 
-        // Sample gradient stops
         const numStops = Math.min(50, fixes.length);
         for (let i = 0; i < numStops; i++) {
           const idx = Math.round((i / (numStops - 1)) * (fixes.length - 1));
@@ -1165,7 +1173,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         // Altitude profile outline
         let outlineD = '';
         for (let i = 0; i < fixes.length; i++) {
-          const y = altRange > 0 ? 100 - ((fixes[i].gnssAltitude - minAlt) / altRange) * 90 : 50;
+          const y = altRange > 0 ? 100 - ((fixes[i].gnssAltitude - minAlt) / altRange) * 95 : 50;
           outlineD += (i === 0 ? 'M ' : 'L ') + `${i} ${y} `;
         }
         const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -1176,16 +1184,69 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         outline.setAttribute('vector-effect', 'non-scaling-stroke');
         svg.appendChild(outline);
 
-        wrapper.appendChild(svg);
+        chartArea.appendChild(svg);
 
-        // Position indicator line
+        // Position indicator line (within chart area)
         const indicator = document.createElement('div');
         indicator.style.cssText = 'position:absolute;top:0;bottom:0;width:2px;background:#ff8c00;pointer-events:none;left:0;';
-        wrapper.appendChild(indicator);
+        chartArea.appendChild(indicator);
 
-        // Scrub interaction
+        wrapper.appendChild(chartArea);
+
+        // ── Y-axis (altitude) labels ──
+        const yAxis = document.createElement('div');
+        yAxis.style.cssText = `position:absolute;top:0;left:0;width:${Y_AXIS_WIDTH}px;bottom:${X_AXIS_HEIGHT}px;pointer-events:none;`;
+
+        if (altRange > 0) {
+          const niceStep = niceAltitudeStep(altRange, 3);
+          const firstTick = Math.ceil(minAlt / niceStep) * niceStep;
+          for (let val = firstTick; val <= maxAlt; val += niceStep) {
+            const pct = ((val - minAlt) / altRange) * 100;
+            const label = document.createElement('div');
+            label.style.cssText = `position:absolute;right:2px;bottom:${pct}%;transform:translateY(50%);font-size:9px;line-height:1;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:1px;white-space:nowrap;`;
+            const fv = formatAltitude(val);
+            label.innerHTML = `<span>${fv.formatted}</span><span style="width:4px;height:1px;background:rgba(255,255,255,0.4);display:inline-block;flex-shrink:0;"></span>`;
+            yAxis.appendChild(label);
+          }
+        }
+        wrapper.appendChild(yAxis);
+
+        // ── X-axis (time) labels ──
+        const xAxis = document.createElement('div');
+        xAxis.style.cssText = `position:absolute;left:${Y_AXIS_WIDTH}px;right:0;bottom:0;height:${X_AXIS_HEIGHT}px;pointer-events:none;`;
+
+        if (fixes.length >= 2) {
+          const startMs = fixes[0].time.getTime();
+          const endMs = fixes[fixes.length - 1].time.getTime();
+          const durationMs = endMs - startMs;
+          if (durationMs > 0) {
+            const durationMin = durationMs / 60000;
+            const stepMin = niceTimeStep(durationMin, 5);
+            const stepMs = stepMin * 60000;
+
+            // Snap first tick to next multiple of stepMin
+            const startMinOfDay = fixes[0].time.getHours() * 60 + fixes[0].time.getMinutes();
+            const firstTickMin = Math.ceil(startMinOfDay / stepMin) * stepMin;
+            const firstTickMs = fixes[0].time.getTime() - startMinOfDay * 60000 + firstTickMin * 60000;
+
+            for (let tickMs = firstTickMs; tickMs <= endMs; tickMs += stepMs) {
+              if (tickMs < startMs) continue;
+              const pct = ((tickMs - startMs) / durationMs) * 100;
+              const label = document.createElement('div');
+              label.style.cssText = `position:absolute;left:${pct}%;top:0;transform:translateX(-50%);font-size:9px;line-height:1;color:rgba(255,255,255,0.7);display:flex;flex-direction:column;align-items:center;`;
+              const d = new Date(tickMs);
+              const h = d.getHours().toString().padStart(2, '0');
+              const m = d.getMinutes().toString().padStart(2, '0');
+              label.innerHTML = `<span style="width:1px;height:4px;background:rgba(255,255,255,0.4);display:block;"></span><span>${h}:${m}</span>`;
+              xAxis.appendChild(label);
+            }
+          }
+        }
+        wrapper.appendChild(xAxis);
+
+        // Scrub interaction — uses chartArea for position calculations
         function scrubToX(clientX: number): void {
-          const rect = wrapper.getBoundingClientRect();
+          const rect = chartArea.getBoundingClientRect();
           const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
           const fixIndex = Math.round(fraction * (fixes.length - 1));
           currentFixIndex = fixIndex;
@@ -1214,6 +1275,36 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
         container.appendChild(wrapper);
         return wrapper;
+      }
+
+      /**
+       * Compute a nice round step for altitude axis
+       */
+      function niceAltitudeStep(range: number, targetTicks: number): number {
+        const rough = range / targetTicks;
+        const fv = formatAltitude(rough);
+        const unitValue = fv.value;
+        const magnitude = Math.pow(10, Math.floor(Math.log10(unitValue)));
+        const residual = unitValue / magnitude;
+        let nice: number;
+        if (residual <= 1.5) nice = 1;
+        else if (residual <= 3.5) nice = 2;
+        else if (residual <= 7.5) nice = 5;
+        else nice = 10;
+        const niceUnitValue = nice * magnitude;
+        return (niceUnitValue / unitValue) * rough;
+      }
+
+      /**
+       * Compute a nice time step in minutes
+       */
+      function niceTimeStep(durationMinutes: number, targetTicks: number): number {
+        const rough = durationMinutes / targetTicks;
+        const steps = [5, 10, 15, 20, 30, 60, 120, 180, 240];
+        for (const s of steps) {
+          if (s >= rough) return s;
+        }
+        return 240;
       }
 
       /**
