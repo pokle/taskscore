@@ -1163,14 +1163,20 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           );
 
           // Translate camera by the delta (preserves zoom/bearing/pitch)
-          const cam = map.getFreeCameraOptions();
-          if (cam.position) {
-            cam.position = new mapboxgl.MercatorCoordinate(
-              cam.position.x + (newMerc.x - prevMerc.x),
-              cam.position.y + (newMerc.y - prevMerc.y),
-              cam.position.z + (newMerc.z - prevMerc.z),
-            );
-            map.setFreeCameraOptions(cam);
+          // Skip when delta is negligible so user can drag/rotate freely
+          const dx = newMerc.x - prevMerc.x;
+          const dy = newMerc.y - prevMerc.y;
+          const dz = newMerc.z - prevMerc.z;
+          if (Math.abs(dx) > 1e-12 || Math.abs(dy) > 1e-12 || Math.abs(dz) > 1e-12) {
+            const cam = map.getFreeCameraOptions();
+            if (cam.position) {
+              cam.position = new mapboxgl.MercatorCoordinate(
+                cam.position.x + dx,
+                cam.position.y + dy,
+                cam.position.z + dz,
+              );
+              map.setFreeCameraOptions(cam);
+            }
           }
 
           cameraAnimFrameId = requestAnimationFrame(tick);
