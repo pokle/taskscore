@@ -1197,6 +1197,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           updateGliderMarker(fixIndex);
           const cam = computeDroneCamera(fixIndex);
           map.easeTo({ ...cam, duration: 200 });
+
+          // Update HUD for this fix
+          updateScrubberHUD(fixIndex);
         }
 
         wrapper.addEventListener('pointerdown', (e: PointerEvent) => {
@@ -1214,12 +1217,29 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       }
 
       /**
+       * Show/update the HUD for the current scrubber position
+       */
+      function updateScrubberHUD(fixIndex: number): void {
+        const data = buildTrackPointHUDData(currentFixes, currentEvents, fixIndex, getNextTurnpointContext);
+        if (!data) return;
+        if (!hudElement) {
+          hudElement = createTrackPointHUD(container);
+        }
+        hudElement.style.bottom = 'calc(15% + 8px)';
+        updateTrackPointHUD(hudElement, data);
+      }
+
+      /**
        * Remove the altitude scrubber overlay
        */
       function removeAltitudeScrubber(): void {
         if (scrubberElement) {
           scrubberElement.remove();
           scrubberElement = null;
+        }
+        // Reset HUD position back to default
+        if (hudElement) {
+          hudElement.style.bottom = '32px';
         }
       }
 
@@ -1279,6 +1299,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             scrubberElement = createAltitudeScrubber(currentFixes);
             currentFixIndex = 0;
             updateGliderMarker(0);
+            updateScrubberHUD(0);
 
             // Fly camera to initial drone position
             const cam = computeDroneCamera(0, true);
