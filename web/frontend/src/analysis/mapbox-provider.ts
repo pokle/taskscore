@@ -96,6 +96,16 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       let currentFixIndex = 0;
       let scrubberElement: HTMLElement | null = null;
 
+      // Camera momentum state
+      let cameraTargetLng = 0;
+      let cameraTargetLat = 0;
+      let cameraTargetAlt = 0;
+      let cameraSmoothLng = 0;
+      let cameraSmoothLat = 0;
+      let cameraSmoothAlt = 0;
+      let cameraAnimFrameId: number | null = null;
+      const CAMERA_LERP = 0.08;
+
       // Task visibility state
       let isTaskVisible = true;
 
@@ -1110,6 +1120,72 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       }
 
       /**
+       * Set the camera target for the momentum loop
+       */
+      function setCameraTarget(fixIndex: number): void {
+        const fix = currentFixes[fixIndex];
+        cameraTargetLng = fix.longitude;
+        cameraTargetLat = fix.latitude;
+        cameraTargetAlt = fix.gnssAltitude * TERRAIN_EXAGGERATION;
+      }
+
+      /**
+       * Start the camera momentum animation loop.
+       * Translates the camera each frame by a lerped delta in mercator space,
+       * preserving user zoom/bearing/pitch while smoothly tracking altitude.
+       */
+      function startCameraLoop(): void {
+        if (cameraAnimFrameId !== null) return;
+        // Initialize smooth values so first frame has zero delta
+        cameraSmoothLng = cameraTargetLng;
+        cameraSmoothLat = cameraTargetLat;
+        cameraSmoothAlt = cameraTargetAlt;
+
+        function tick(): void {
+          if (!is3DMode) {
+            cameraAnimFrameId = null;
+            return;
+          }
+
+          // Capture previous smoothed position in mercator space
+          const prevMerc = mapboxgl.MercatorCoordinate.fromLngLat(
+            { lng: cameraSmoothLng, lat: cameraSmoothLat }, cameraSmoothAlt
+          );
+
+          // Lerp toward target
+          cameraSmoothLng += (cameraTargetLng - cameraSmoothLng) * CAMERA_LERP;
+          cameraSmoothLat += (cameraTargetLat - cameraSmoothLat) * CAMERA_LERP;
+          cameraSmoothAlt += (cameraTargetAlt - cameraSmoothAlt) * CAMERA_LERP;
+
+          // New smoothed position in mercator space
+          const newMerc = mapboxgl.MercatorCoordinate.fromLngLat(
+            { lng: cameraSmoothLng, lat: cameraSmoothLat }, cameraSmoothAlt
+          );
+
+          // Translate camera by the delta (preserves zoom/bearing/pitch)
+          const cam = map.getFreeCameraOptions();
+          if (cam.position) {
+            cam.position = new mapboxgl.MercatorCoordinate(
+              cam.position.x + (newMerc.x - prevMerc.x),
+              cam.position.y + (newMerc.y - prevMerc.y),
+              cam.position.z + (newMerc.z - prevMerc.z),
+            );
+            map.setFreeCameraOptions(cam);
+          }
+
+          cameraAnimFrameId = requestAnimationFrame(tick);
+        }
+        cameraAnimFrameId = requestAnimationFrame(tick);
+      }
+
+      function stopCameraLoop(): void {
+        if (cameraAnimFrameId !== null) {
+          cancelAnimationFrame(cameraAnimFrameId);
+          cameraAnimFrameId = null;
+        }
+      }
+
+      /**
        * Create the altitude scrubber overlay
        */
       function createAltitudeScrubber(fixes: IGCFix[]): HTMLElement {
@@ -1254,10 +1330,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           // Update indicator position
           indicator.style.left = `${fraction * 100}%`;
 
-          // Update glider marker and camera
+          // Update glider marker and camera target (momentum loop handles animation)
           updateGliderMarker(fixIndex);
-          const cam = computeDroneCamera(fixIndex);
-          map.easeTo({ ...cam, duration: 200 });
+          setCameraTarget(fixIndex);
 
           // Update HUD for this fix
           updateScrubberHUD(fixIndex);
@@ -1391,12 +1466,17 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             currentFixIndex = 0;
             updateGliderMarker(0);
             updateScrubberHUD(0);
+            setCameraTarget(0);
 
-            // Fly camera to initial drone position
+            // Fly camera to initial drone position, then start momentum loop
             const cam = computeDroneCamera(0, true);
             map.flyTo({ ...cam, duration: 2000 });
+            map.once('moveend', () => {
+              if (is3DMode) startCameraLoop();
+            });
           } else {
             // Clean up drone follow state
+            stopCameraLoop();
             removeAltitudeScrubber();
             clearGliderMarker();
           }
@@ -1513,8 +1593,13 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             scrubberElement = createAltitudeScrubber(fixes);
             currentFixIndex = 0;
             updateGliderMarker(0);
+            setCameraTarget(0);
+            stopCameraLoop();
             const cam = computeDroneCamera(0, true);
             map.flyTo({ ...cam, duration: 2000 });
+            map.once('moveend', () => {
+              if (is3DMode) startCameraLoop();
+            });
           }
         },
 
@@ -1527,6 +1612,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           updateGeoJSONSource(map, 'track', []);
           // Clear 3D track and drone follow state if present
           clear3DTrack();
+          stopCameraLoop();
           removeAltitudeScrubber();
           clearGliderMarker();
         },
