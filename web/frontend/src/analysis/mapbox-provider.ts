@@ -733,6 +733,38 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         }
 
         addCustomLayers();
+
+        // Recreate Threebox after style changes — setStyle() removes all layers
+        // and may trigger a WebGL context loss/restore cycle.
+        // IMPORTANT: Do NOT call tb.dispose() — it crashes on a lost WebGL context
+        // and corrupts the shared GL state, breaking the entire map.
+        // On initial load, tb is still null; it's created in the 'load' handler.
+        if (tb) {
+          // Abandon old instance (GC will clean it up) and clear stale references
+          tb = null;
+          threeDObjects = [];
+
+          const gl = map.getCanvas().getContext('webgl2') || map.getCanvas().getContext('webgl');
+          tb = new Threebox(map, gl, { defaultLights: true });
+
+          map.addLayer({
+            id: 'threebox-layer',
+            type: 'custom',
+            renderingMode: '3d',
+            onAdd: function () {
+              // Layer added
+            },
+            render: function () {
+              if (!tb) return;
+              try {
+                tb.update();
+              } catch {
+                // Ignore errors during WebGL context loss transitions
+              }
+            },
+          });
+        }
+
         if (!isInitialLoad) {
           restoreData();
         }
@@ -769,8 +801,11 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             // Layer added
           },
           render: function () {
-            if (tb) {
+            if (!tb) return;
+            try {
               tb.update();
+            } catch {
+              // Ignore errors during WebGL context loss transitions
             }
           },
         });
@@ -933,6 +968,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           tb.add(dropLine);
           threeDObjects.push(dropLine);
         }
+
+        // Trigger a repaint so the threebox-layer render callback fires
+        map.triggerRepaint();
       }
 
       // Altitude color functions and gradient calculation are imported from map-provider-shared
@@ -1103,9 +1141,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           cachedOptimizedPath = null;
           updateGeoJSONSource(map, 'track', []);
           // Clear 3D track if present
-          if (map.getLayer('track-3d')) {
-            map.setLayoutProperty('track-3d', 'visibility', 'none');
-          }
+          clear3DTrack();
         },
 
         async setTask(task: XCTask) {
