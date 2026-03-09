@@ -294,7 +294,7 @@ async function init(): Promise<void> {
           <button id="ts-preset-heavy" style="padding:2px 6px;cursor:pointer;">heavy</button>
           <button id="ts-preset-none" style="padding:2px 6px;cursor:pointer;">none</button>
         </div>
-        <div id="ts-output" style="margin-top:8px;padding:4px;background:#333;border-radius:4px;word-break:break-all;font-size:11px;user-select:all;"></div>
+        <textarea id="ts-output" readonly style="margin-top:8px;padding:4px;background:#333;color:#eee;border:none;border-radius:4px;font-size:11px;font-family:monospace;width:240px;height:48px;resize:none;overflow:auto;word-wrap:break-word;"></textarea>
       </div>`;
     document.body.appendChild(panel);
 
@@ -308,13 +308,13 @@ async function init(): Promise<void> {
       blur: panel.querySelector('#ts-blur-v') as HTMLElement,
       spread: panel.querySelector('#ts-spread-v') as HTMLElement,
       opacity: panel.querySelector('#ts-opacity-v') as HTMLElement,
-      output: panel.querySelector('#ts-output') as HTMLElement,
+      output: panel.querySelector('#ts-output') as HTMLTextAreaElement,
     };
 
     function applyShadow(shadow: string): void {
       document.querySelectorAll<HTMLElement>('[data-glide-label]').forEach(el => el.style.textShadow = shadow);
       document.querySelectorAll<HTMLElement>('[data-glide-chevron] span').forEach(el => el.style.textShadow = shadow);
-      displays.output.textContent = `text-shadow: ${shadow}`;
+      displays.output.value = `text-shadow: ${shadow}`;
     }
 
     function apply(): void {
