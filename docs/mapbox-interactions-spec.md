@@ -21,27 +21,22 @@ Extracted from `web/frontend/src/analysis/mapbox-provider.ts` and `map-provider-
 
 Track is rendered as individual per-segment LineString features (one per consecutive fix pair), each carrying a `normalizedAlt` property (0–1) based on the average altitude of the segment relative to the flight's min/max altitude. This enables per-segment altitude-driven styling.
 
-- **Flat-color mode** (default)
-  - Solid line: `#f97316` (bright orange), opacity 0.95
+- **Track line** (always altitude-colored)
+  - Data-driven color via per-feature `normalizedAlt` property with `interpolate` expression
+  - Colour ramp (normalizedAlt 0→1): earthy brown `#8B5A2B` → green `#43A047` → cyan `#039BE5` → sky blue `#29B6F6` → light sky `#4FC3F7`
   - Black outline behind: `#000000`, opacity 0.6
   - Both lines zoom- and altitude-adaptive width (width_mul 0.7):
-    - Inner line: zoom 3 → 1.4–4.2 px, zoom 8 → 2.1–6.3 px, zoom 12 → 2.1–6.3 px (low–high altitude)
-    - Outline: zoom 3 → 2.8–8.4 px, zoom 8 → 4.2–12.6 px, zoom 12 → 3.5–11.2 px (low–high altitude)
+    - Inner line: zoom 3 → 2–6 px, zoom 8 → 3–9 px, zoom 12 → 3–9 px (low–high altitude)
+    - Outline: zoom 3 → 4–12 px, zoom 8 → 6–18 px, zoom 12 → 5–16 px (low–high altitude)
   - Higher altitude segments render wider, creating a depth/perspective effect in top-down view
-  - Line join/cap: round
-  - Source tolerance 0.1 (minimal simplification)
-
-- **Altitude-color mode**
-  - Data-driven color via per-feature `normalizedAlt` property with `interpolate` expression, replaces flat-color line (outline remains)
-  - Same zoom- and altitude-adaptive width as flat mode
-  - Colour ramp (normalizedAlt 0→1): earthy brown `#8B5A2B` → green `#43A047` → cyan `#039BE5` → sky blue `#29B6F6` → light sky `#4FC3F7`
+  - Line join/cap: round, opacity 0.95
   - Note: `calculateAltitudeGradient()` exists in shared utils for line-progress gradient but is unused by MapBox; the per-feature approach is used instead
 
 - **3D mode** (Threebox)
   - 2D track layers hidden; track rendered as connected 3D line segments with per-segment altitude color (same ramp as altitude mode)
   - Segment width: 3, opacity: 0.9
   - Vertical drop-lines every 1km of track distance: from track altitude to ground, color `#888888`, width 1, opacity 0.3, depth-tested (toggleable via `SHOW_DROP_LINES` constant)
-  - Camera preset buttons (Side/Top/Behind/Front) created when entering 3D with a track loaded, or when a track is loaded while already in 3D; removed on `clearTrack()`
+  - Camera preset buttons (Side/Top/Behind/Front) created when entering 3D with a track loaded, or when a track is loaded while already in 3D; removed on `clearTrack()` — see "3D Drone Follow Camera" section below for details
 
 - **Interactions**
   - Click/tap on track → fires `onTrackClick` callback with nearest fix index
@@ -152,6 +147,11 @@ Track is rendered as individual per-segment LineString features (one per consecu
       - Zoom 11–13: speed only
       - Zoom 13+: speed + glide ratio + altitude change + required GR (if applicable)
   - Glide legend `?` button appears (bottom of map container)
+  - **Screen-space collision detection** — labels are projected to screen coordinates and hidden if they overlap higher-priority labels:
+    - Priority: fastest glide first, then by original index (earlier in flight = higher priority)
+    - Label bounding boxes are zoom-dependent: 160×30px compact (zoom <15), 180×65px detail (zoom ≥15), with 10px horizontal / 6px vertical padding
+    - Paired chevron markers are also hidden when their label is hidden
+    - Recalculated on every viewport change (zoom, pan, rotate)
 
 - **Pan** — `flyTo` event location, maintains current zoom, 1s duration (skippable via `skipPan` option)
 
@@ -180,10 +180,17 @@ Displayed when user clicks on a non-glide track point. Combines a map marker wit
   - Falls back to drift wind
   - Circular mean averaging for direction
 
+## Speed Overlay (Track Metrics)
+
+When enabled via the "Show Track Metrics" command palette option, displays glide chevrons and speed labels for **all** glide segments simultaneously (unlike event highlight which shows one glide at a time).
+
+- **Fastest segment** — highlighted with a red overlay line (`speed-fastest-segment` layer, `#ef4444`, width 6, opacity 0.9)
+- **All glide labels** — same chevron and speed label styling as event highlight glide extras, with screen-space collision detection to prevent overlap
+
 ## Visibility Toggles
 
 - **Task visibility** — toggles 7 task layers (cylinder fill/stroke, points, labels, segment labels, line, line arrows)
-- **Track visibility** — toggles all track layers (`track-line`, `track-line-outline`, `track-line-gradient`, `highlight-segment`) + 3D objects + event markers (markers hidden via `display: none`); clears highlights when hiding
+- **Track visibility** — toggles all track layers (`track-line`, `track-line-outline`, `highlight-segment`) + 3D objects + event markers (markers hidden via `display: none`); clears highlights when hiding
 
 ## Layer Ordering (bottom to top)
 
@@ -192,13 +199,34 @@ Displayed when user clicks on a non-glide track point. Combines a map marker wit
 3. `task-cylinders-fill` — turnpoint cylinder fills
 4. `task-cylinders-stroke` — turnpoint cylinder strokes
 5. `track-line-outline` — black track shadow
-6. `track-line` — orange track (flat mode)
-7. `track-line-gradient` — altitude-colored track (altitude mode, hidden by default)
-8. `highlight-segment` — cyan highlight for selected events
+6. `track-line` — altitude-colored track
+7. `highlight-segment` — cyan highlight for selected events
+8. `speed-fastest-segment` — red overlay for fastest speed segment
 9. `task-points` — turnpoint dots
 10. `task-labels` — turnpoint name labels
 11. `task-segment-labels` — leg distance labels
 12. `threebox-layer` — 3D custom rendering layer (Threebox)
+
+## 3D Drone Follow Camera
+
+Activated when 3D track mode is enabled. Provides a cinematic perspective that follows the flight.
+
+- **Camera behaviour** — fixed-altitude 3D perspective (75° pitch) tracking the glider position, with momentum-based smooth animation (lerped each frame)
+- **Camera presets** — four dynamic angles that track flight direction:
+  - "side" (default): 90° perpendicular to flight path
+  - "behind": follow directly behind the glider
+  - "front": look from ahead toward the glider
+  - "top": orthographic overhead view
+- **Altitude scrubber** — SVG-based interactive timeline overlay at the bottom of the 3D view:
+  - Filled area graph with gradient coloring (altitude-based color ramp)
+  - Y-axis: nicely-rounded altitude labels with grid ticks
+  - X-axis: time labels snapped to round minute intervals (5, 10, 15, 30, 60 min steps)
+  - Vertical orange indicator line showing current position
+- **Scrubbing interaction** — click/drag horizontally on the scrubber to move along the flight:
+  - Updates HUD with current fix info (altitude, speed, bearing)
+  - Updates glider marker position on the 3D map
+  - Re-targets camera with smooth momentum-based animation
+  - Camera preset bearing stays aligned with flight direction
 
 ## Style Reload Behaviour
 

@@ -33,11 +33,11 @@ This provides an alternative to browsing the event panel - pilots can click dire
 Quick access menu for display options and actions.
 
 **Display Options:**
-- **Light/Dark/System Theme** - Switch color theme
-- **Toggle Altitude Colors** - Show/hide altitude-based track coloring (on/off indicator)
-- **Toggle 3D Track** - Show/hide 3D track rendering (on/off indicator)
+- **Toggle 3D Track** - Show/hide 3D track rendering with drone follow camera (on/off indicator)
 - **Toggle Task** - Show/hide task visualization (cylinders, route lines, labels) - persisted via `?task-visible=0` URL param
 - **Toggle Track** - Show/hide flight track and event markers - persisted via `?track-visible=0` URL param
+- **Show Track Metrics** - Show/hide speed overlay with glide chevrons and labels for all glide segments (on/off indicator)
+- **Switch Map Provider** - Toggle between MapBox GL and Leaflet
 
 **File Operations:**
 - **Open IGC file** - File picker for IGC upload
@@ -88,7 +88,7 @@ Sidebar panel with tabbed interface for viewing flight data. The main tabs appea
 **Header Tabs (always visible):**
 - **Track** - Flight track analysis with sub-tabs for events, glides, climbs, and sinks
 - **Task** - Task turnpoints with optimized distances, radii, and altitudes
-- **Terrain** - Flying area information (planned feature - currently placeholder)
+- **Score** - Scoring breakdown (when a scored task is loaded)
 - **>>** (Hide) - Collapses the sidebar to show full map; clicking any other tab reopens it
 
 **Track Tab Sub-tabs:**
@@ -106,10 +106,6 @@ Sidebar panel with tabbed interface for viewing flight data. The main tabs appea
   - Leg distance (from previous turnpoint)
   - Cumulative distance from start
 - Updates automatically when a task is loaded
-
-**Terrain Tab:**
-- Placeholder for future flying area features
-- Will include: common waypoints, danger zones, lift generators, thermal hotspots, competition links
 
 **Events Tab Features:**
 - Click on an event: Pan to event location and highlight on map
@@ -157,7 +153,6 @@ When an event is selected from the panel, the map highlights the event location 
 **Selection Clearing**: Event selection and all associated visualizations (segment highlight, markers, legend) are automatically cleared when:
 - Loading a new IGC file
 - Toggling 3D track mode
-- Toggling altitude colors mode
 - Anything else that results in the visualisation or information presented being unrelated to the track or task being shown.
 
 ## Technical Architecture
@@ -167,9 +162,15 @@ When an event is selected from the panel, the map highlights the event location 
 ├── igc-parser.ts                # IGC file format parser
 ├── xctsk-parser.ts              # XContest task format parser
 ├── event-detector.ts            # Flight event detection algorithms
+├── circle-detector.ts           # Circling flight detection and wind estimation
+├── turnpoint-sequence.ts        # Turnpoint sequencing and best-progress scoring
+├── task-optimizer.ts            # Optimized task line calculation (golden section search)
+├── segment-extractors.ts        # Data extraction for glides, climbs, sinks
+├── event-styles.ts              # Event type colors and visual styles
 ├── geo.ts                       # Geographic calculations (Turf.js wrapper)
 ├── glide-speed.ts               # Glide segment speed calculations
 ├── units.ts                     # Unit conversion
+├── sanitize.ts                  # Text sanitization (HTML escaping)
 ├── waypoints.ts                 # Waypoint handling
 └── index.ts                     # Library exports
 
@@ -178,10 +179,11 @@ When an event is selected from the panel, the map highlights the event location 
 ├── styles.css                   # Global styles (Tailwind, Basecoat, MapBox CSS)
 └── analysis/
     ├── main.ts                  # Application entry point and orchestration
-    ├── analysis-panel.ts        # Tabbed panel UI (Track/Task/Terrain tabs)
-    ├── event-panel.ts           # Legacy event list component (deprecated)
+    ├── analysis-panel.ts        # Tabbed panel UI (Track/Task/Score tabs)
     ├── map-provider.ts          # Map provider interface
+    ├── map-provider-shared.ts   # Shared map utilities (HUD, glide markers, collision detection)
     ├── mapbox-provider.ts       # MapBox GL JS implementation
+    ├── leaflet-provider.ts      # Leaflet 2.0 implementation (alternative provider)
     ├── airscore-client.ts       # AirScore API client
     ├── config.ts                # Configuration storage abstraction
     ├── units-browser.ts         # Browser-side unit formatting
@@ -207,8 +209,10 @@ Supports both v1 (full JSON) and v2 (compact QR code) formats:
 - See https://tools.xcontest.org/xctsk for api documentation
 
 ### Event Detection Algorithms
-- **Thermals**: Rolling window analysis of vertical speed, minimum duration threshold (see `events/thermal-detection-spec.md` for detailed algorithm documentation)
-- **Glides**: Segments between thermals with calculated L/D ratio (see `events/glide-detection-spec.md` for detailed algorithm documentation)
+- **Thermals**: Rolling window analysis of vertical speed, minimum duration threshold (see `event-detection/thermal-detection-spec.md` for detailed algorithm documentation)
+- **Glides**: Segments between thermals with calculated L/D ratio (see `event-detection/glide-detection-spec.md` for detailed algorithm documentation)
+- **Circle detection**: Cumulative heading change to detect individual thermal circles, with wind estimation from circle drift (see `event-detection/circling-flight-and-thermal-analysis-research.md`)
+- **Turnpoint sequencing**: Cylinder crossing detection and CIVL GAP-compliant turnpoint sequence resolution, including SSS direction validation and best-progress scoring
 - **Cylinder crossings**: Haversine distance checks against turnpoint radii
 - **Vario extremes**: Smoothed vertical speed analysis
 
@@ -257,7 +261,7 @@ ext     - Optional extensions
 - **mapbox-gl**: Map rendering with 3D terrain and sky atmosphere
 - **threebox-plugin**: 3D track rendering on MapBox
 - **tailwindcss**: Utility-first CSS framework
-- **basecoat-css**: Lightweight UI component library
+- **@pokle/basecoat**: Lightweight UI component library (fork of basecoat-css, see `basecoat-fork.md`)
 - **@turf/***: Geographic calculations (distance, bearing, etc.)
 - **vite**: TypeScript bundling and dev server with HMR
 
@@ -267,16 +271,15 @@ Available at `/analysis.html`
 
 ## Future Enhancements
 
-- [ ] Altitude profile chart
+- [x] Altitude sparkline (see `sparkline-spec.md`)
 - [ ] Speed/vario charts
 - [ ] Task validation and scoring
 - [ ] Multiple flight comparison
 - [ ] Export analysis report
 - [ ] Thermal map aggregation
-- [ ] **Terrain tab features** - Flying area information:
+- [ ] **Flying area features** (planned):
   - Common waypoints used in tasks
   - Map polygons for danger/no-landing areas
   - Lift generators (hot rocks, ridges, etc.)
   - Historical thermal hotspots
   - Links to competitions flown in the area
-  - Community announcements/message board
