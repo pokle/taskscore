@@ -8,7 +8,7 @@
 
 import mapboxgl from 'mapbox-gl';
 import { Threebox } from 'threebox-plugin';
-import { getBoundingBox, getEventStyle, calculateGlideMarkers, calculateGlidePositions, getSegmentLengthMeters, calculateOptimizedTaskLine, getOptimizedSegmentDistances, calculateBearing, haversineDistance, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@taskscore/engine';
+import { getBoundingBox, getEventStyle, calculateGlideMarkers, calculateGlidePositions, getSegmentLengthMeters, calculateOptimizedTaskLine, getOptimizedSegmentDistances, calculateBearing, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@taskscore/engine';
 import type { MapProvider } from './map-provider';
 import { config } from './config';
 import {
@@ -1108,13 +1108,16 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         // Add vertical "drop lines" once per km for depth perception
         if (SHOW_DROP_LINES) {
           const DROP_LINE_INTERVAL_M = 1000;
+          const DEG_TO_RAD = Math.PI / 180;
+          const R = 6371000; // Earth radius in meters
           let distAccum = 0;
           for (let i = 0; i < fixes.length; i++) {
             if (i > 0) {
-              distAccum += haversineDistance(
-                fixes[i - 1].latitude, fixes[i - 1].longitude,
-                fixes[i].latitude, fixes[i].longitude
-              );
+              // Fast equirectangular approximation — accurate enough for 1km spacing
+              const dLat = (fixes[i].latitude - fixes[i - 1].latitude) * DEG_TO_RAD;
+              const dLon = (fixes[i].longitude - fixes[i - 1].longitude) * DEG_TO_RAD;
+              const cosLat = Math.cos((fixes[i - 1].latitude + fixes[i].latitude) * 0.5 * DEG_TO_RAD);
+              distAccum += R * Math.sqrt(dLat * dLat + (dLon * cosLat) * (dLon * cosLat));
             }
             if (i === 0 || distAccum >= DROP_LINE_INTERVAL_M) {
               distAccum = 0;
@@ -1589,7 +1592,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             activeCameraPreset = 'side';
             updateGliderMarker(0);
             updateScrubberHUD(0);
-            setCameraTarget(0);
 
             // Show camera preset control
             cameraPresetControl?.create();
@@ -1722,7 +1724,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             scrubberElement = createAltitudeScrubber(fixes);
             currentFixIndex = 0;
             updateGliderMarker(0);
-            setCameraTarget(0);
             const cam = computeDroneCamera(0, true);
             map.flyTo({ ...cam, duration: 2000 });
             map.once('moveend', () => {
