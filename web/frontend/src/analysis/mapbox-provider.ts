@@ -734,6 +734,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
       // Custom menu button control (top-left, added first so it's topmost)
       let menuButtonCallback: (() => void) | null = null;
+      let mapClickModeEnabled = false;
       class MenuButtonControl implements mapboxgl.IControl {
         private container: HTMLElement | null = null;
         onAdd(): HTMLElement {
@@ -2171,6 +2172,19 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
         onPanelToggleClick(callback: () => void) {
           panelToggleCallback = callback;
+        },
+
+        onMapClick(callback: (lat: number, lon: number) => void) {
+          map.on('click', (e: mapboxgl.MapMouseEvent) => {
+            if (mapClickModeEnabled) {
+              callback(e.lngLat.lat, e.lngLat.lng);
+            }
+          });
+        },
+
+        setMapClickMode(enabled: boolean) {
+          mapClickModeEnabled = enabled;
+          map.getCanvas().style.cursor = enabled ? 'crosshair' : '';
         },
       };
 

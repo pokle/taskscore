@@ -94,6 +94,12 @@ export interface MapProvider {
 
     /** Register callback for panel toggle button click (native map control) */
     onPanelToggleClick?(callback: () => void): void;
+
+    /** Register callback for map click (used by task editor to add waypoints) */
+    onMapClick?(callback: (lat: number, lon: number) => void): void;
+
+    /** Enable/disable map click mode (crosshair cursor, click-to-add) */
+    setMapClickMode?(enabled: boolean): void;
 }
 
 /**
