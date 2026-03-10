@@ -33,11 +33,11 @@ This provides an alternative to browsing the event panel - pilots can click dire
 Quick access menu for display options and actions.
 
 **Display Options:**
-- **Light/Dark/System Theme** - Switch color theme
-- **Toggle Altitude Colors** - Show/hide altitude-based track coloring (on/off indicator)
-- **Toggle 3D Track** - Show/hide 3D track rendering (on/off indicator)
+- **Toggle 3D Track** - Show/hide 3D track rendering with drone follow camera (on/off indicator)
 - **Toggle Task** - Show/hide task visualization (cylinders, route lines, labels) - persisted via `?task-visible=0` URL param
 - **Toggle Track** - Show/hide flight track and event markers - persisted via `?track-visible=0` URL param
+- **Show Track Metrics** - Show/hide speed overlay with glide chevrons and labels for all glide segments (on/off indicator)
+- **Switch Map Provider** - Toggle between MapBox GL and Leaflet
 
 **File Operations:**
 - **Open IGC file** - File picker for IGC upload
@@ -153,7 +153,6 @@ When an event is selected from the panel, the map highlights the event location 
 **Selection Clearing**: Event selection and all associated visualizations (segment highlight, markers, legend) are automatically cleared when:
 - Loading a new IGC file
 - Toggling 3D track mode
-- Toggling altitude colors mode
 - Anything else that results in the visualisation or information presented being unrelated to the track or task being shown.
 
 ## Technical Architecture
@@ -167,9 +166,11 @@ When an event is selected from the panel, the map highlights the event location 
 ├── turnpoint-sequence.ts        # Turnpoint sequencing and best-progress scoring
 ├── task-optimizer.ts            # Optimized task line calculation (golden section search)
 ├── segment-extractors.ts        # Data extraction for glides, climbs, sinks
+├── event-styles.ts              # Event type colors and visual styles
 ├── geo.ts                       # Geographic calculations (Turf.js wrapper)
 ├── glide-speed.ts               # Glide segment speed calculations
 ├── units.ts                     # Unit conversion
+├── sanitize.ts                  # Text sanitization (HTML escaping)
 ├── waypoints.ts                 # Waypoint handling
 └── index.ts                     # Library exports
 
@@ -182,6 +183,7 @@ When an event is selected from the panel, the map highlights the event location 
     ├── map-provider.ts          # Map provider interface
     ├── map-provider-shared.ts   # Shared map utilities (HUD, glide markers, collision detection)
     ├── mapbox-provider.ts       # MapBox GL JS implementation
+    ├── leaflet-provider.ts      # Leaflet 2.0 implementation (alternative provider)
     ├── airscore-client.ts       # AirScore API client
     ├── config.ts                # Configuration storage abstraction
     ├── units-browser.ts         # Browser-side unit formatting
