@@ -96,15 +96,10 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       let currentFixIndex = 0;
       let scrubberElement: HTMLElement | null = null;
 
-      // Camera momentum state
-      let cameraTargetLng = 0;
-      let cameraTargetLat = 0;
-      let cameraTargetAlt = 0;
-      let cameraSmoothLng = 0;
-      let cameraSmoothLat = 0;
-      let cameraSmoothAlt = 0;
-      let cameraAnimFrameId: number | null = null;
-      const CAMERA_LERP = 0.08;
+      // Camera follow state — tracks previous target to compute translation delta
+      let cameraPrevLng = 0;
+      let cameraPrevLat = 0;
+      let cameraPrevAlt = 0;
 
       // Camera preset state
       type CameraPreset = 'side' | 'top' | 'behind' | 'front';
@@ -1249,75 +1244,53 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       }
 
       /**
-       * Set the camera target for the momentum loop
+       * Translate the free camera by the delta between the previous and new
+       * target positions in mercator space. This preserves user zoom/bearing/pitch
+       * without needing a continuous rAF loop.
        */
       function setCameraTarget(fixIndex: number): void {
+        if (!is3DMode) return;
         const fix = currentFixes[fixIndex];
-        cameraTargetLng = fix.longitude;
-        cameraTargetLat = fix.latitude;
-        cameraTargetAlt = fix.gnssAltitude * TERRAIN_EXAGGERATION;
+        const newLng = fix.longitude;
+        const newLat = fix.latitude;
+        const newAlt = fix.gnssAltitude * TERRAIN_EXAGGERATION;
+
+        const prevMerc = mapboxgl.MercatorCoordinate.fromLngLat(
+          { lng: cameraPrevLng, lat: cameraPrevLat }, cameraPrevAlt
+        );
+        const newMerc = mapboxgl.MercatorCoordinate.fromLngLat(
+          { lng: newLng, lat: newLat }, newAlt
+        );
+
+        const dx = newMerc.x - prevMerc.x;
+        const dy = newMerc.y - prevMerc.y;
+        const dz = newMerc.z - prevMerc.z;
+        if (Math.abs(dx) > 1e-12 || Math.abs(dy) > 1e-12 || Math.abs(dz) > 1e-12) {
+          const cam = map.getFreeCameraOptions();
+          if (cam.position) {
+            cam.position = new mapboxgl.MercatorCoordinate(
+              cam.position.x + dx,
+              cam.position.y + dy,
+              cam.position.z + dz,
+            );
+            map.setFreeCameraOptions(cam);
+          }
+        }
+
+        cameraPrevLng = newLng;
+        cameraPrevLat = newLat;
+        cameraPrevAlt = newAlt;
       }
 
       /**
-       * Start the camera momentum animation loop.
-       * Translates the camera each frame by a lerped delta in mercator space,
-       * preserving user zoom/bearing/pitch while smoothly tracking altitude.
+       * Snapshot the current target so the first setCameraTarget() call
+       * produces zero delta.
        */
-      function startCameraLoop(): void {
-        if (cameraAnimFrameId !== null) return;
-        // Initialize smooth values so first frame has zero delta
-        cameraSmoothLng = cameraTargetLng;
-        cameraSmoothLat = cameraTargetLat;
-        cameraSmoothAlt = cameraTargetAlt;
-
-        function tick(): void {
-          if (!is3DMode) {
-            cameraAnimFrameId = null;
-            return;
-          }
-
-          // Capture previous smoothed position in mercator space
-          const prevMerc = mapboxgl.MercatorCoordinate.fromLngLat(
-            { lng: cameraSmoothLng, lat: cameraSmoothLat }, cameraSmoothAlt
-          );
-
-          // Lerp toward target
-          cameraSmoothLng += (cameraTargetLng - cameraSmoothLng) * CAMERA_LERP;
-          cameraSmoothLat += (cameraTargetLat - cameraSmoothLat) * CAMERA_LERP;
-          cameraSmoothAlt += (cameraTargetAlt - cameraSmoothAlt) * CAMERA_LERP;
-
-          // New smoothed position in mercator space
-          const newMerc = mapboxgl.MercatorCoordinate.fromLngLat(
-            { lng: cameraSmoothLng, lat: cameraSmoothLat }, cameraSmoothAlt
-          );
-
-          // Translate camera by the delta (preserves zoom/bearing/pitch)
-          // Skip when delta is negligible so user can drag/rotate freely
-          const dx = newMerc.x - prevMerc.x;
-          const dy = newMerc.y - prevMerc.y;
-          const dz = newMerc.z - prevMerc.z;
-          if (Math.abs(dx) > 1e-12 || Math.abs(dy) > 1e-12 || Math.abs(dz) > 1e-12) {
-            const cam = map.getFreeCameraOptions();
-            if (cam.position) {
-              cam.position = new mapboxgl.MercatorCoordinate(
-                cam.position.x + dx,
-                cam.position.y + dy,
-                cam.position.z + dz,
-              );
-              map.setFreeCameraOptions(cam);
-            }
-          }
-
-          cameraAnimFrameId = requestAnimationFrame(tick);
-        }
-        cameraAnimFrameId = requestAnimationFrame(tick);
-      }
-
-      function stopCameraLoop(): void {
-        if (cameraAnimFrameId !== null) {
-          cancelAnimationFrame(cameraAnimFrameId);
-          cameraAnimFrameId = null;
-        }
+      function initCameraFollow(): void {
+        const fix = currentFixes[currentFixIndex];
+        cameraPrevLng = fix.longitude;
+        cameraPrevLat = fix.latitude;
+        cameraPrevAlt = fix.gnssAltitude * TERRAIN_EXAGGERATION;
       }
 
       /**
@@ -1613,11 +1586,10 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             const cam = computeDroneCamera(0, true);
             map.flyTo({ ...cam, duration: 2000 });
             map.once('moveend', () => {
-              if (is3DMode) startCameraLoop();
+              if (is3DMode) initCameraFollow();
             });
           } else {
             // Clean up drone follow state
-            stopCameraLoop();
             removeAltitudeScrubber();
             clearGliderMarker();
             cameraPresetControl?.remove();
@@ -1736,11 +1708,10 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             currentFixIndex = 0;
             updateGliderMarker(0);
             setCameraTarget(0);
-            stopCameraLoop();
             const cam = computeDroneCamera(0, true);
             map.flyTo({ ...cam, duration: 2000 });
             map.once('moveend', () => {
-              if (is3DMode) startCameraLoop();
+              if (is3DMode) initCameraFollow();
             });
           }
         },
@@ -1754,7 +1725,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           updateGeoJSONSource(map, 'track', []);
           // Clear 3D track and drone follow state if present
           clear3DTrack();
-          stopCameraLoop();
           removeAltitudeScrubber();
           clearGliderMarker();
         },
