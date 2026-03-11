@@ -347,7 +347,7 @@ export function createTaskEditor(options: TaskEditorOptions): TaskEditor {
       if (target.closest('[data-drag-handle]') || target.closest('.te-delete-btn')) return;
       expandedIndex = isExpanded ? null : index;
       render();
-      onTurnpointClick?.(index);
+      if (!isExpanded) onTurnpointClick?.(index);
     });
 
     // Delete handler

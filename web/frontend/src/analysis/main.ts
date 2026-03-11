@@ -504,7 +504,7 @@ async function init(): Promise<void> {
 
   // Handle map click mode request from the task editor
   const handleMapClickModeRequest = (enabled: boolean) => {
-    mapRenderer?.setMapClickMode?.(enabled);
+    mapRenderer?.setInteractionMode?.(enabled ? 'add-waypoint' : 'view');
   };
 
   // Initialize analysis panel with hide/show callbacks for sidebar visibility
