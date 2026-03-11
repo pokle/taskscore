@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+
+    <path d="M 110 80 Q 140 50 190 40" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round" />
+    <path d="M 90 110 Q 110 70 160 55" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" />
+    <path d="M 290 320 Q 260 350 210 360" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round" />
+    <path d="M 310 290 Q 290 330 240 345" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" />
+
+    <circle cx="200" cy="200" r="140" fill="none" stroke="#1a1a1a" stroke-width="5" />
+    <circle cx="200" cy="200" r="122" fill="none" stroke="#1a1a1a" stroke-width="2" />
+
+    <g font-family="'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', sans-serif" font-weight="900" font-size="24" fill="white" text-anchor="middle" dominant-baseline="middle" stroke="black" stroke-width="5" paint-order="stroke fill">
+        <text x="200" y="100" transform="rotate(-4, 200, 100)" fill="red">N</text>
+        <text x="200" y="300" transform="rotate(5, 200, 300)">S</text>
+        <text x="300" y="200" transform="rotate(8, 300, 200)">E</text>
+        <text x="100" y="200" transform="rotate(-6, 100, 200)">W</text>
+
+        <path d="M 270 130 l -4 10 l 8 0 z" transform="rotate(45, 270, 130)" stroke-width="4" />
+        <path d="M 270 270 l -4 10 l 8 0 z" transform="rotate(135, 270, 270)" stroke-width="4" />
+        <path d="M 130 270 l -4 10 l 8 0 z" transform="rotate(225, 130, 270)" stroke-width="4" />
+        <path d="M 130 130 l -4 10 l 8 0 z" transform="rotate(315, 130, 130)" stroke-width="4" />
+    </g>
+
+    <!-- Arrow Outline -->
+    <path d="M 200 200 C 175 170, 200 150, 200 130" fill="none" stroke="white" stroke-width="18" stroke-linecap="round" />
+    <path d="M 200 200 C 225 230, 200 250, 200 270" fill="none" stroke="white" stroke-width="15" stroke-linecap="round" />
+
+    <!-- Arrow Body and Head -->
+    <path d="M 185 135 L 200 105 L 215 135 Z" fill="#1a1a1a" stroke="white" stroke-width="6" paint-order="stroke fill" stroke-linejoin="round"/>
+    <path d="M 200 200 C 175 170, 200 150, 200 130" fill="none" stroke="#1a1a1a" stroke-width="12" stroke-linecap="round" />
+    <path d="M 200 200 C 225 230, 200 250, 200 270" fill="none" stroke="#1a1a1a" stroke-width="9" stroke-linecap="round" />
+
+    <circle cx="200" cy="200" r="12" fill="#1a1a1a" stroke="white" stroke-width="6" paint-order="stroke fill" />
+    <circle cx="200" cy="200" r="5" fill="#ffffff" />
+</svg>

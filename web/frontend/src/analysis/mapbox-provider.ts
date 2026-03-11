@@ -96,6 +96,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       let gliderMarker: unknown = null;
       let currentFixIndex = 0;
       let scrubberElement: HTMLElement | null = null;
+      let compassElement: HTMLElement | null = null;
 
       // Camera follow state — tracks previous target to compute translation delta
       let cameraPrevLng = 0;
@@ -1032,6 +1033,9 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         console.error('MapBox error:', e.error);
       });
 
+      // Keep compass in sync with camera bearing/pitch
+      map.on('move', updateCompassTransform);
+
       // Track bounds changes and persist map location
       let saveLocationTimer: ReturnType<typeof setTimeout> | null = null;
       map.on('moveend', () => {
@@ -1534,6 +1538,48 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         }
       }
 
+      function createCompass(): void {
+        if (compassElement) return;
+        const wrapper = document.createElement('div');
+        Object.assign(wrapper.style, {
+          position: 'absolute',
+          bottom: 'calc(15% + 8px)',
+          right: '8px',
+          width: '160px',
+          height: '160px',
+          pointerEvents: 'none',
+          perspective: '300px',
+          zIndex: '10',
+        });
+        const img = document.createElement('img');
+        img.src = '/compass.svg';
+        Object.assign(img.style, {
+          width: '100%',
+          height: '100%',
+          transformOrigin: 'center center',
+        });
+        wrapper.appendChild(img);
+        map.getContainer().appendChild(wrapper);
+        compassElement = wrapper;
+        updateCompassTransform();
+      }
+
+      function updateCompassTransform(): void {
+        if (!compassElement) return;
+        const img = compassElement.querySelector('img') as HTMLImageElement;
+        if (!img) return;
+        const bearing = map.getBearing();
+        const pitch = map.getPitch();
+        img.style.transform = `rotateX(${pitch * 0.8}deg) rotateZ(${-bearing}deg)`;
+      }
+
+      function removeCompass(): void {
+        if (compassElement) {
+          compassElement.remove();
+          compassElement = null;
+        }
+      }
+
       // Altitude color functions and gradient calculation are imported from map-provider-shared
 
 
@@ -1593,9 +1639,10 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             updateGliderMarker(0);
             updateScrubberHUD(0);
 
-            // Show camera preset control
+            // Show camera preset control and compass
             cameraPresetControl?.create();
             cameraPresetControl?.updateActive('side');
+            createCompass();
 
             // Fly camera to initial drone position, then start momentum loop
             const cam = computeDroneCamera(0, true);
@@ -1606,6 +1653,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           } else {
             // Clean up drone follow state
             removeAltitudeScrubber();
+            removeCompass();
             clearGliderMarker();
             cameraPresetControl?.remove();
           }
@@ -1718,10 +1766,12 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             render3DTrack(fixes);
             cameraPresetControl?.create();
             cameraPresetControl?.updateActive(activeCameraPreset);
-            // Recreate drone follow scrubber/marker for the new track
+            // Recreate drone follow scrubber/marker/compass for the new track
             removeAltitudeScrubber();
+            removeCompass();
             clearGliderMarker();
             scrubberElement = createAltitudeScrubber(fixes);
+            createCompass();
             currentFixIndex = 0;
             updateGliderMarker(0);
             const cam = computeDroneCamera(0, true);
@@ -1743,6 +1793,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           clear3DTrack();
           cameraPresetControl?.remove();
           removeAltitudeScrubber();
+          removeCompass();
           clearGliderMarker();
         },
 
