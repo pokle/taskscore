@@ -781,7 +781,7 @@ async function init(): Promise<void> {
    * Load and parse an XCTask file
    */
   async function loadXCTaskFile(file: File): Promise<void> {
-    showStatus('Loading task file...', 'info');
+
     try {
       const rawJson = await file.text();
       const task = parseXCTask(rawJson);
@@ -796,7 +796,7 @@ async function init(): Promise<void> {
    * Load and parse an IGC file
    */
   async function loadIGCFile(file: File): Promise<void> {
-    showStatus('Loading IGC file...', 'info');
+
 
     try {
       const content = await file.text();
@@ -838,7 +838,7 @@ async function init(): Promise<void> {
    * Load a stored track by ID
    */
   async function loadStoredTrack(id: string): Promise<void> {
-    showStatus('Loading stored track...', 'info');
+
 
     try {
       const stored = await storage.getTrack(id);
@@ -859,7 +859,7 @@ async function init(): Promise<void> {
    * Load task by code
    */
   async function loadTask(code: string): Promise<void> {
-    showStatus(`Loading task ${code}...`, 'info');
+
 
     try {
       // Check storage first
@@ -894,7 +894,7 @@ async function init(): Promise<void> {
    * Load a stored task by ID (code)
    */
   async function loadStoredTask(code: string): Promise<void> {
-    showStatus(`Loading stored task ${code}...`, 'info');
+
 
     try {
       const stored = await storage.getTask(code);
@@ -949,7 +949,7 @@ async function init(): Promise<void> {
       return;
     }
 
-    showStatus('Loading from AirScore...', 'info');
+
 
     try {
       // Fetch task data first
