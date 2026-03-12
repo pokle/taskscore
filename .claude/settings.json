@@ -8,7 +8,8 @@
       "Glob",
       "Grep",
       "WebFetch",
-      "WebSearch"
+      "WebSearch",
+      "mcp__plugin_playwright_playwright"
     ]
   },
   "enabledPlugins": {
