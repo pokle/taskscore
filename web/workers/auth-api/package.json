@@ -1,0 +1,23 @@
+{
+  "name": "auth-api",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-auth": "^1.2.8",
+    "hono": "^4.7.7",
+    "kysely": "^0.28.11",
+    "kysely-d1": "^0.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260304.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.69.0"
+  }
+}

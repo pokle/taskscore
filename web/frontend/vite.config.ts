@@ -40,6 +40,9 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'src/index.html'),
         analysis: resolve(__dirname, 'src/analysis.html'),
+        login: resolve(__dirname, 'src/login.html'),
+        onboarding: resolve(__dirname, 'src/onboarding.html'),
+        dashboard: resolve(__dirname, 'src/dashboard.html'),
       },
     },
   },
@@ -49,6 +52,12 @@ export default defineConfig({
       allow: [
         searchForWorkspaceRoot(process.cwd()),
       ],
+    },
+    proxy: {
+      '/api/auth': {
+        target: 'http://localhost:8788',
+        changeOrigin: true,
+      },
     },
   },
 });
