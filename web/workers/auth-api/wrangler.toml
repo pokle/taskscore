@@ -1,0 +1,23 @@
+name = "auth-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[[d1_databases]]
+binding = "taskscore_auth"
+database_name = "taskscore-auth"
+database_id = "aa8b644f-368e-493a-8b49-1af0d756aff4"
+
+[vars]
+BETTER_AUTH_URL = "https://taskscore.shonky.info"
+
+# Secrets (set via `wrangler secret put` or .dev.vars):
+# GOOGLE_CLIENT_ID
+# GOOGLE_CLIENT_SECRET
+# BETTER_AUTH_SECRET
+
+[dev]
+port = 8788
+
+[[routes]]
+pattern = "taskscore.shonky.info/api/auth/*"
+zone_name = "shonky.info"
