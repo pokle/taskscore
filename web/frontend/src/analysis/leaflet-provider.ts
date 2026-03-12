@@ -1023,12 +1023,14 @@ export function createLeafletProvider(container: HTMLElement): Promise<MapProvid
       },
 
       highlightPanelToggle() {
-        if (panelToggleBtn) {
-          panelToggleBtn.classList.remove('pulse-attention');
-          void panelToggleBtn.offsetWidth;
-          panelToggleBtn.classList.add('pulse-attention');
-          panelToggleBtn.addEventListener('animationend', () => {
-            panelToggleBtn?.classList.remove('pulse-attention');
+        // Animate the leaflet-bar container so the whole button shape throbs
+        const target = panelToggleBtn?.parentElement ?? panelToggleBtn;
+        if (target) {
+          target.classList.remove('pulse-attention');
+          void target.offsetWidth;
+          target.classList.add('pulse-attention');
+          target.addEventListener('animationend', () => {
+            target.classList.remove('pulse-attention');
           }, { once: true });
         }
       },

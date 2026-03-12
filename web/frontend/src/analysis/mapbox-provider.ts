@@ -2244,13 +2244,14 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         },
 
         highlightPanelToggle() {
-          if (panelToggleBtn) {
-            panelToggleBtn.classList.remove('pulse-attention');
-            // Force reflow to restart animation
-            void panelToggleBtn.offsetWidth;
-            panelToggleBtn.classList.add('pulse-attention');
-            panelToggleBtn.addEventListener('animationend', () => {
-              panelToggleBtn?.classList.remove('pulse-attention');
+          // Animate the ctrl-group container so the whole button shape throbs
+          const target = panelToggleBtn?.parentElement ?? panelToggleBtn;
+          if (target) {
+            target.classList.remove('pulse-attention');
+            void target.offsetWidth;
+            target.classList.add('pulse-attention');
+            target.addEventListener('animationend', () => {
+              target.classList.remove('pulse-attention');
             }, { once: true });
           }
         },

@@ -279,6 +279,12 @@
     animation: throb-attention 0.4s ease-in-out 3;
   }
 
+  /* Allow throb to scale beyond the control group boundary */
+  .mapboxgl-ctrl-group:has(.pulse-attention),
+  .leaflet-bar:has(.pulse-attention) {
+    overflow: visible !important;
+  }
+
   /* Allow labeled map control buttons to expand beyond default fixed width */
   .mapboxgl-ctrl-group button:has(.mapctl-label) {
     width: auto !important;
