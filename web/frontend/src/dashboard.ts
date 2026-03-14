@@ -1,4 +1,4 @@
-import { getCurrentUser, signOut } from "./auth/client";
+import { getCurrentUser, signOut, deleteAccount } from "./auth/client";
 import { storage, type StoredTask, type StoredTrack } from "./analysis/storage";
 import { parseIGC, parseXCTask, sanitizeText } from "@taskscore/engine";
 
@@ -236,7 +236,7 @@ async function init() {
     }
   });
 
-  // ── Delete handlers (event delegation) ────────────────────────────────
+  // ── Delete item handlers (event delegation) ───────────────────────────
 
   tracksList.addEventListener("click", async (e) => {
     const deleteBtn = (e.target as HTMLElement).closest(".delete-btn") as HTMLElement | null;
@@ -261,6 +261,35 @@ async function init() {
         await storage.deleteTask(taskId);
         await refreshLists();
       }
+    }
+  });
+
+  // ── Delete account ────────────────────────────────────────────────────
+
+  const deleteDialog = document.getElementById("delete-account-dialog") as HTMLDialogElement;
+
+  document.getElementById("delete-account-btn")?.addEventListener("click", () => {
+    deleteDialog.showModal();
+  });
+
+  document.getElementById("delete-cancel-btn")?.addEventListener("click", () => {
+    deleteDialog.close();
+  });
+
+  document.getElementById("delete-confirm-btn")?.addEventListener("click", async (e) => {
+    const btn = e.target as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = "Deleting...";
+
+    const result = await deleteAccount();
+    if (result.success) {
+      localStorage.clear();
+      indexedDB.deleteDatabase("taskscore");
+      window.location.href = "/";
+    } else {
+      btn.disabled = false;
+      btn.textContent = "Delete my account";
+      alert(result.error || "Failed to delete account. Please try again.");
     }
   });
 }
