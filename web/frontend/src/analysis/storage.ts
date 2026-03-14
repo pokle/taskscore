@@ -376,6 +376,42 @@ class StorageService {
     });
   }
 
+  // === Delete Operations ===
+
+  /**
+   * Delete a single task by code.
+   */
+  async deleteTask(code: string): Promise<void> {
+    await this.init();
+    if (!this.db) return;
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db!.transaction(TASKS_STORE, 'readwrite');
+      const store = tx.objectStore(TASKS_STORE);
+      store.delete(code.toLowerCase());
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  /**
+   * Delete a single track by ID.
+   */
+  async deleteTrack(id: string): Promise<void> {
+    await this.init();
+    if (!this.db) return;
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db!.transaction(TRACKS_STORE, 'readwrite');
+      const store = tx.objectStore(TRACKS_STORE);
+      store.delete(id);
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
   // === Clear Operations ===
 
   /**
