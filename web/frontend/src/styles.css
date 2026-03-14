@@ -30,6 +30,101 @@
 }
 
 @layer components {
+  /* ── Dashboard ────────────────────────────────────────────────── */
+
+  /* Topographic contour background */
+  .dashboard-topo {
+    background-color: var(--color-background);
+    background-image:
+      repeating-radial-gradient(circle at 20% 30%, transparent 0, transparent 48px, rgba(148, 163, 184, 0.025) 48px, rgba(148, 163, 184, 0.025) 49px),
+      repeating-radial-gradient(circle at 80% 70%, transparent 0, transparent 38px, rgba(148, 163, 184, 0.025) 38px, rgba(148, 163, 184, 0.025) 39px),
+      repeating-radial-gradient(circle at 55% 15%, transparent 0, transparent 58px, rgba(148, 163, 184, 0.025) 58px, rgba(148, 163, 184, 0.025) 59px),
+      repeating-radial-gradient(circle at 35% 85%, transparent 0, transparent 42px, rgba(148, 163, 184, 0.02) 42px, rgba(148, 163, 184, 0.02) 43px);
+  }
+
+  /* Dashboard tab buttons */
+  .tab-btn {
+    @apply px-4 py-1.5 rounded-md text-sm font-medium transition-colors duration-150;
+    @apply text-muted-foreground cursor-pointer;
+    @apply inline-flex items-center gap-1.5;
+  }
+
+  .tab-btn:hover {
+    @apply text-foreground;
+  }
+
+  .tab-btn-active {
+    @apply bg-background text-foreground shadow-sm;
+  }
+
+  .tab-count {
+    @apply text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0 leading-5 min-w-5 text-center;
+  }
+
+  .tab-btn-active .tab-count {
+    @apply bg-primary/15 text-primary;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    @apply flex items-center gap-3 p-4 rounded-lg cursor-pointer;
+    @apply border-2 border-dashed border-border/60 transition-all duration-200;
+  }
+
+  .upload-zone:hover {
+    @apply border-primary/40 bg-primary/5;
+  }
+
+  /* File cards */
+  .file-card {
+    @apply flex items-center gap-3 p-3 rounded-lg border border-border/50;
+    @apply bg-card/50 transition-all duration-150 no-underline;
+    border-left-width: 3px;
+  }
+
+  .file-card:hover {
+    @apply bg-accent border-border shadow-sm;
+  }
+
+  .file-card-track {
+    @apply border-l-blue-500/60;
+  }
+
+  .file-card-track:hover {
+    @apply border-l-blue-500;
+  }
+
+  .file-card-task {
+    @apply border-l-amber-500/60;
+  }
+
+  .file-card-task:hover {
+    @apply border-l-amber-500;
+  }
+
+  /* Delete button on cards */
+  .delete-btn {
+    @apply p-1 rounded text-muted-foreground/0 transition-all duration-150 cursor-pointer;
+    @apply hover:text-destructive hover:bg-destructive/10;
+    background: none;
+    border: none;
+  }
+
+  .file-card:hover .delete-btn {
+    @apply text-muted-foreground/40;
+  }
+
+  /* Card enter animation */
+  @keyframes card-enter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-enter {
+    animation: card-enter 0.25s ease-out forwards;
+    opacity: 0;
+  }
+
   /* Drop zone overlay */
   .drop-zone {
     @apply absolute inset-0 z-50 flex items-center justify-center;
