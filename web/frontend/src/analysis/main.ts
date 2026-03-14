@@ -1133,7 +1133,7 @@ async function init(): Promise<void> {
   });
 
   // Load from query params if present (e.g., ?task=buje&track=sample.igc)
-  await loadFromQueryParams(loadTask, loadLocalTask, loadIGCFile);
+  await loadFromQueryParams(loadTask, loadLocalTask, loadIGCFile, loadStoredTrack, loadStoredTask);
 
   // Handle files received via Web Share Target (mobile share button)
   if (params.get('shared') === '1') {
@@ -1147,7 +1147,7 @@ async function init(): Promise<void> {
   }
 
   // If no task or track was loaded, open the command menu to guide users
-  if (!params.get('task') && !params.get('track') && params.get('shared') !== '1' && !state.igcFile && !state.task) {
+  if (!params.get('task') && !params.get('track') && !params.get('storedTrack') && !params.get('storedTask') && params.get('shared') !== '1' && !state.igcFile && !state.task) {
     commandDialog?.showModal();
   }
 
@@ -1194,15 +1194,23 @@ async function init(): Promise<void> {
 async function loadFromQueryParams(
   loadTask: (code: string) => Promise<void>,
   loadLocalTask: (taskFile: string) => Promise<void>,
-  loadIGCFile: (file: File) => Promise<void>
+  loadIGCFile: (file: File) => Promise<void>,
+  loadStoredTrack: (id: string) => Promise<void>,
+  loadStoredTask: (code: string) => Promise<void>
 ): Promise<void> {
   const params = new URLSearchParams(window.location.search);
 
   const taskCode = params.get('task');
   const trackFile = params.get('track');
+  const storedTrackId = params.get('storedTrack');
+  const storedTaskCode = params.get('storedTask');
 
-  // Load task first if specified - try local file first, then remote
-  if (taskCode) {
+  // Load stored task from IndexedDB (e.g. from dashboard link)
+  if (storedTaskCode) {
+    await loadStoredTask(storedTaskCode);
+  }
+  // Load task by code - try local file first, then remote
+  else if (taskCode) {
     try {
       await loadLocalTask(taskCode);
     } catch {
@@ -1210,8 +1218,12 @@ async function loadFromQueryParams(
     }
   }
 
+  // Load stored track from IndexedDB (e.g. from dashboard link)
+  if (storedTrackId) {
+    await loadStoredTrack(storedTrackId);
+  }
   // Load track from samples folder if specified
-  if (trackFile) {
+  else if (trackFile) {
     // Security: validate filename to prevent directory traversal
     const safeFilenamePattern = /^[a-zA-Z0-9_\-\.]+\.igc$/i;
 

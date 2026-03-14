@@ -17,20 +17,145 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 
-<body class="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-6 text-center">
-  <div id="dashboard" class="max-w-md w-full hidden">
-    <h1 class="text-3xl font-bold mb-2">Welcome, <span id="display-name"></span>!</h1>
-    <p class="text-muted-foreground mb-8">Your TaskScore dashboard</p>
+<body class="min-h-screen bg-background text-foreground dashboard-topo">
+  <div id="dashboard" class="hidden min-h-screen flex flex-col">
 
-    <div class="space-y-3">
-      <a href="/analysis.html" class="btn btn-primary btn-lg w-full inline-flex items-center justify-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
-          <path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/>
-        </svg>
-        Open Analysis
-      </a>
-      <button id="signout-btn" class="btn btn-secondary w-full">Sign out</button>
+    <!-- Header -->
+    <header class="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-10">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+        <a href="/" class="text-lg font-bold tracking-tight text-foreground hover:text-primary transition-colors">TaskScore</a>
+        <div class="flex items-center gap-3">
+          <span id="user-name" class="text-sm text-muted-foreground hidden sm:inline"></span>
+          <a href="/analysis.html" class="btn btn-ghost btn-sm text-xs">Open Analysis</a>
+          <button id="signout-btn" class="btn btn-ghost btn-sm text-xs text-muted-foreground">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-8">
+
+      <!-- Page title -->
+      <div class="mb-8">
+        <h1 class="text-2xl font-bold tracking-tight">Flight Log</h1>
+        <p class="text-sm text-muted-foreground mt-1">Your tracks and competition tasks</p>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-1 mb-6 bg-muted/50 rounded-lg p-1 w-fit" role="tablist">
+        <button id="tab-tracks" role="tab" aria-selected="true" aria-controls="panel-tracks"
+          class="tab-btn tab-btn-active">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
+          </svg>
+          Tracks
+          <span id="tracks-count" class="tab-count hidden">0</span>
+        </button>
+        <button id="tab-tasks" role="tab" aria-selected="false" aria-controls="panel-tasks"
+          class="tab-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+            <path d="M2 12h20"/>
+          </svg>
+          Tasks
+          <span id="tasks-count" class="tab-count hidden">0</span>
+        </button>
+      </div>
+
+      <!-- Tracks panel -->
+      <div id="panel-tracks" role="tabpanel">
+        <!-- Upload zone -->
+        <label id="upload-tracks-zone" class="upload-zone group" tabindex="0">
+          <input type="file" id="igc-file-input" accept=".igc" multiple class="hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground group-hover:text-primary transition-colors">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <span class="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+            Drop <strong>.igc</strong> files here or click to browse
+          </span>
+        </label>
+
+        <!-- Track list -->
+        <div id="tracks-list" class="space-y-2 mt-4"></div>
+
+        <!-- Empty state -->
+        <div id="tracks-empty" class="hidden text-center py-12">
+          <div class="text-muted-foreground/40 mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto">
+              <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
+            </svg>
+          </div>
+          <p class="text-sm text-muted-foreground">No flight tracks yet</p>
+          <p class="text-xs text-muted-foreground/60 mt-1">Upload IGC files or open tracks in the analysis page</p>
+        </div>
+      </div>
+
+      <!-- Tasks panel -->
+      <div id="panel-tasks" role="tabpanel" class="hidden">
+        <!-- Upload zone -->
+        <label id="upload-tasks-zone" class="upload-zone group" tabindex="0">
+          <input type="file" id="task-file-input" accept=".xctsk" multiple class="hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground group-hover:text-primary transition-colors">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <span class="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+            Drop <strong>.xctsk</strong> files here or click to browse
+          </span>
+        </label>
+
+        <!-- Task list -->
+        <div id="tasks-list" class="space-y-2 mt-4"></div>
+
+        <!-- Empty state -->
+        <div id="tasks-empty" class="hidden text-center py-12">
+          <div class="text-muted-foreground/40 mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+              <path d="M2 12h20"/>
+            </svg>
+          </div>
+          <p class="text-sm text-muted-foreground">No competition tasks yet</p>
+          <p class="text-xs text-muted-foreground/60 mt-1">Upload XCTSK files or load tasks in the analysis page</p>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-border/30 py-6">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 flex items-center justify-between text-xs text-muted-foreground/60">
+        <span>TaskScore</span>
+        <div class="flex items-center gap-4">
+          <a href="https://github.com/pokle/taskscore" target="_blank" rel="noopener noreferrer" class="hover:text-foreground transition-colors inline-flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+            GitHub
+          </a>
+          <a href="https://www.youtube.com/@poklet" target="_blank" rel="noopener noreferrer" class="hover:text-foreground transition-colors inline-flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            YouTube
+          </a>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Full-page drop zone overlay -->
+  <div id="drop-zone" class="drop-zone">
+    <div class="flex flex-col items-center gap-3 text-white">
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <span class="text-lg font-medium">Drop files to upload</span>
+      <span class="text-sm text-white/60">.igc and .xctsk files</span>
     </div>
   </div>
 
