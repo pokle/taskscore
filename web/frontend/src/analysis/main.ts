@@ -472,6 +472,15 @@ async function init(): Promise<void> {
     });
   });
 
+  // Handle units reset button
+  document.getElementById('units-reset-btn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (unitSpeedSelect) unitSpeedSelect.value = 'km/h';
+    if (unitAltitudeSelect) unitAltitudeSelect.value = 'm';
+    if (unitDistanceSelect) unitDistanceSelect.value = 'km';
+    if (unitClimbRateSelect) unitClimbRateSelect.value = 'm/s';
+  });
+
   // Select all on focus for threshold inputs
   settingsForm?.addEventListener('focus', (e) => {
     const input = e.target as HTMLInputElement;
@@ -871,6 +880,12 @@ async function init(): Promise<void> {
       } else {
         commandDialog?.showModal();
       }
+    }
+    // Cmd+, (or Ctrl+,) opens settings
+    if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+      e.preventDefault();
+      populateSettingsDialog();
+      settingsDialog?.showModal();
     }
   });
 
