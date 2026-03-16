@@ -967,8 +967,10 @@ async function init(): Promise<void> {
     // Store for future use
     if (shouldStore) {
       try {
-        await storage.storeTrack(filename, content, igcFile);
+        const id = await storage.storeTrack(filename, content, igcFile);
         await storageMenu?.refresh();
+        updateUrlParam('storedTrack', id);
+        updateUrlParam('track', null);
       } catch (err) {
         console.warn('Failed to store track:', err);
       }
@@ -991,6 +993,8 @@ async function init(): Promise<void> {
 
       await storage.touchTrack(id);
       await loadIGCContent(stored.content, stored.filename, false);
+      updateUrlParam('storedTrack', id);
+      updateUrlParam('track', null);
     } catch (err) {
       console.error('Failed to load stored track:', err);
       showStatus(`Failed to load stored track: ${err}`, 'error');
@@ -1026,6 +1030,8 @@ async function init(): Promise<void> {
       }
 
       applyTask(task);
+      updateUrlParam('task', code);
+      updateUrlParam('storedTask', null);
     } catch (err) {
       console.error('Failed to load task:', err);
       showStatus(`Failed to load task: ${err}`, 'error');
@@ -1047,6 +1053,8 @@ async function init(): Promise<void> {
 
       await storage.touchTask(code);
       applyTask(stored.task);
+      updateUrlParam('storedTask', code);
+      updateUrlParam('task', null);
     } catch (err) {
       console.error('Failed to load stored task:', err);
       showStatus(`Failed to load stored task: ${err}`, 'error');
@@ -1241,6 +1249,8 @@ async function init(): Promise<void> {
       const rawJson = await response.text();
       const task = parseXCTask(rawJson);
       applyTask(task);
+      updateUrlParam('task', taskFile);
+      updateUrlParam('storedTask', null);
     } catch (err) {
       console.warn('Failed to load local task:', err);
       throw err;
@@ -1252,10 +1262,13 @@ async function init(): Promise<void> {
     const taskFile = sampleTaskMap[filename];
     if (taskFile) {
       params.set('task', taskFile);
+      params.delete('storedTask');
     } else {
       params.delete('task');
+      params.delete('storedTask');
     }
     params.set('track', filename);
+    params.delete('storedTrack');
     window.location.search = params.toString();
   };
 
