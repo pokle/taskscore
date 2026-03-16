@@ -83,6 +83,10 @@ bun run typecheck        # Type check root project
 bun run typecheck:all    # Type check everything (frontend + engine + workers)
 ```
 
+### Chrome MCP server set up
+
+Read https://developer.chrome.com/blog/chrome-devtools-mcp-debug-your-browser-session
+
 ### Deployment
 
 - Push to `master` → deploys to production
