@@ -228,6 +228,47 @@ Activated when 3D track mode is enabled. Provides a cinematic perspective that f
   - Re-targets camera with smooth momentum-based animation
   - Camera preset bearing stays aligned with flight direction
 
+## Annotation Overlay
+
+Freehand drawing overlay for scrawling on the map. Strokes are geo-anchored (persist through pan/zoom/pitch/bearing) and stored in IndexedDB. Uses **roughjs** for an Excalidraw-style sketchy appearance.
+
+- **Canvas overlay** — HTML `<canvas>` positioned absolutely over the map container, `z-index: 10`
+  - `pointer-events: none` by default; `auto` when annotation mode is active
+  - High-DPI aware via `devicePixelRatio`
+  - Resized via `ResizeObserver`
+
+- **Drawing model**
+  - Draw phase: freehand input captured in screen coordinates
+  - Commit phase: screen points simplified via Ramer-Douglas-Peucker (2px tolerance), then converted to `[lng, lat]` via `map.unproject()`
+  - Render phase: on every `map.render` event, all stored geo-strokes projected to screen via `map.project()` and drawn with roughjs `curve()`
+
+- **Rough.js options** — `roughness: 1.5`, `strokeWidth: 2.5`, `stroke: #e03131` (red), `bowing: 1`, per-stroke deterministic `seed` (from UUID hash) for stable rendering across redraws
+
+- **Modes**
+  - **Draw** (default): crosshair cursor, freehand strokes
+  - **Erase**: pointer cursor, strokes within 12px of eraser path are removed
+
+- **Toolbar** — floating bar (bottom-left, above scale bar, `z-index: 11`), white semi-transparent background, 8px border-radius
+  - Buttons: Draw (P), Erase (E), Undo, Redo, Clear All (red trash icon)
+  - Active tool highlighted with `#e8e8e8` background
+  - Appears/disappears with annotation mode toggle
+
+- **Map interaction** — when annotation mode is active, `dragPan`, `scrollZoom`, `doubleClickZoom`, `dragRotate`, `touchZoomRotate`, and `keyboard` are disabled; re-enabled on deactivation
+
+- **Keyboard shortcuts** (Excalidraw-compatible)
+  | Action | Shortcut |
+  |--------|----------|
+  | Toggle annotation mode | `P` |
+  | Switch to eraser | `E` |
+  | Exit annotation mode | `Escape` or `V` |
+  | Undo | `Cmd/Ctrl+Z` (annotation mode only) |
+  | Redo | `Cmd/Ctrl+Shift+Z` or `Cmd/Ctrl+Y` (annotation mode only) |
+  | Clear all | `Cmd/Ctrl+Shift+Delete` (annotation mode only) |
+
+- **Persistence** — strokes stored in IndexedDB `annotations` store, independent of tracks/tasks; loaded on map initialization
+
+- **Command palette** — "Annotate Map" item in Display Options group, toggles annotation mode, shows `(on)/(off) P` status
+
 ## Style Reload Behaviour
 
 On style change, all custom sources/layers are re-added and current track/task/event data is restored via `restoreData()`. Terrain and sky layer are also re-added on every `style.load` event.
