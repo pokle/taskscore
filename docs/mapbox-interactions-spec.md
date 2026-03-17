@@ -205,7 +205,9 @@ When enabled via the "Show Track Metrics" command palette option, displays glide
 9. `task-points` — turnpoint dots
 10. `task-labels` — turnpoint name labels
 11. `task-segment-labels` — leg distance labels
-12. `threebox-layer` — 3D custom rendering layer (Threebox)
+12. `annotation-strokes-layer` — committed annotation strokes
+13. `annotation-live-layer` — in-progress annotation stroke preview
+14. `threebox-layer` — 3D custom rendering layer (Threebox)
 
 ## 3D Drone Follow Camera
 
