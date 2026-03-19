@@ -36,6 +36,10 @@ export interface GAPParameters {
   minimumDistance: number;
   /** Sport type — affects arrival points and some weight calculations */
   scoring: 'PG' | 'HG';
+  /** Whether to compute leading (departure) points (default true) */
+  useLeading: boolean;
+  /** Whether to compute arrival points (default true for HG, ignored for PG) */
+  useArrival: boolean;
 }
 
 /** Default parameters — reasonable for a typical PG competition. */
@@ -46,6 +50,8 @@ export const DEFAULT_GAP_PARAMETERS: GAPParameters = {
   nominalTime: 5400,
   minimumDistance: 5000,
   scoring: 'PG',
+  useLeading: true,
+  useArrival: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -252,12 +258,17 @@ export function calculateTaskValidity(
 
 /**
  * Calculate weight fractions for the four scoring components.
+ *
+ * @param useLeading - Whether leading (departure) points are enabled
+ * @param useArrival - Whether arrival points are enabled (HG only)
  */
 export function calculateWeights(
   goalRatio: number,
   bestDistance: number,
   taskDistance: number,
   scoring: 'PG' | 'HG',
+  useLeading = true,
+  useArrival = true,
 ): WeightFractions {
   const gr = goalRatio;
 
@@ -270,15 +281,19 @@ export function calculateWeights(
   if (scoring === 'PG') {
     // Paragliding: no arrival points, doubled leading weight
     aw = 0;
-    if (gr === 0) {
+    if (!useLeading) {
+      lw = 0;
+    } else if (gr === 0) {
       lw = taskDistance > 0 ? (bestDistance / taskDistance) * 0.1 : 0;
     } else {
       lw = ((1 - dw) / 8) * 1.4 * 2;
     }
   } else {
     // Hang gliding: arrival points, normal leading weight
-    aw = (1 - dw) / 8;
-    if (gr === 0) {
+    aw = useArrival ? (1 - dw) / 8 : 0;
+    if (!useLeading) {
+      lw = 0;
+    } else if (gr === 0) {
       lw = taskDistance > 0 ? (bestDistance / taskDistance) * 0.1 : 0;
     } else {
       lw = ((1 - dw) / 8) * 1.4;
@@ -295,8 +310,12 @@ export function calculateWeights(
 // ---------------------------------------------------------------------------
 
 /**
- * Calculate distance points for a single pilot (PG formula).
+ * Calculate distance points for a single pilot (PG/linear formula).
  * Uses linear distance fraction: distance / bestDistance.
+ *
+ * @param pilotDistance - Pilot's scored distance (already clamped to minimumDistance)
+ * @param bestDistance - Best distance among all pilots
+ * @param availableDistancePoints - Total available distance points
  */
 export function calculateDistancePoints(
   pilotDistance: number,
@@ -305,6 +324,18 @@ export function calculateDistancePoints(
 ): number {
   if (bestDistance <= 0) return 0;
   return (pilotDistance / bestDistance) * availableDistancePoints;
+}
+
+/**
+ * Apply minimum distance floor and clamp to non-negative.
+ * Per CIVL GAP, pilots who flew less than minimumDistance are scored
+ * as if they flew minimumDistance.
+ */
+export function applyMinimumDistance(
+  flownDistance: number,
+  minimumDistance: number,
+): number {
+  return Math.max(minimumDistance, Math.max(0, flownDistance));
 }
 
 // ---------------------------------------------------------------------------
@@ -515,8 +546,11 @@ export function scoreTask(
   }));
 
   // Step 2: Gather aggregate statistics
-  const distances = pilotResults.map(pr => pr.result.flownDistance);
-  const bestDistance = distances.length > 0 ? Math.max(...distances) : 0;
+  // Apply minimum distance floor and clamp negative distances
+  const scoredDistances = pilotResults.map(pr =>
+    applyMinimumDistance(pr.result.flownDistance, fullParams.minimumDistance)
+  );
+  const bestDistance = scoredDistances.length > 0 ? Math.max(...scoredDistances) : 0;
 
   const goalPilots = pilotResults.filter(pr => pr.result.madeGoal);
   const essPilots = pilotResults.filter(pr => pr.result.essReaching !== null);
@@ -550,11 +584,14 @@ export function scoreTask(
 
   // Step 3: Calculate task validity
   const taskValidity = calculateTaskValidity(
-    fullParams, distances, bestDistance, bestTime, actualNumPresent,
+    fullParams, scoredDistances, bestDistance, bestTime, actualNumPresent,
   );
 
   // Step 4: Calculate weights and available points
-  const weights = calculateWeights(goalRatio, bestDistance, taskDistance, fullParams.scoring);
+  const weights = calculateWeights(
+    goalRatio, bestDistance, taskDistance, fullParams.scoring,
+    fullParams.useLeading, fullParams.useArrival,
+  );
   const totalAvailable = 1000 * taskValidity.task;
   const availablePoints: AvailablePoints = {
     distance: totalAvailable * weights.distance,
@@ -606,9 +643,10 @@ export function scoreTask(
   const pilotScores: PilotScore[] = pilotResults.map((pr, idx) => {
     const { result } = pr;
     const { pilot } = pr;
+    const pilotScoredDistance = scoredDistances[idx];
 
     const distPts = calculateDistancePoints(
-      result.flownDistance, bestDistance, availablePoints.distance,
+      pilotScoredDistance, bestDistance, availablePoints.distance,
     );
 
     const timePts = calculateTimePoints(
@@ -617,12 +655,12 @@ export function scoreTask(
       availablePoints.time, fullParams.scoring,
     );
 
-    const leadPts = calculateLeadingPoints(
-      leadingCoefficients[idx], minLC, availablePoints.leading,
-    );
+    const leadPts = fullParams.useLeading
+      ? calculateLeadingPoints(leadingCoefficients[idx], minLC, availablePoints.leading)
+      : 0;
 
     let arrPts = 0;
-    if (fullParams.scoring === 'HG') {
+    if (fullParams.scoring === 'HG' && fullParams.useArrival) {
       const position = essPositionMap.get(idx) ?? 0;
       arrPts = calculateArrivalPoints(
         position, numReachedESS, availablePoints.arrival,
@@ -634,7 +672,7 @@ export function scoreTask(
     return {
       pilotName: pilot.pilotName,
       trackFile: pilot.trackFile,
-      flownDistance: result.flownDistance,
+      flownDistance: pilotScoredDistance,
       speedSectionTime: result.speedSectionTime,
       madeGoal: result.madeGoal,
       reachedESS: result.essReaching !== null,

@@ -11,6 +11,7 @@ import {
   calculateLeadingCoefficient,
   calculateLeadingPoints,
   calculateArrivalPoints,
+  applyMinimumDistance,
   scoreTask,
   DEFAULT_GAP_PARAMETERS,
   type GAPParameters,
@@ -468,5 +469,155 @@ describe('scoreTask', () => {
     expect(result.parameters.scoring).toBe('PG');
     expect(result.weights.arrival).toBe(0);
     expect(result.pilotScores[0].arrivalPoints).toBe(0);
+  });
+
+  it('applies minimum distance floor for short flights', () => {
+    // One goal pilot + one short pilot to keep task validity > 0
+    const goalFixes = createTrackThroughCylinders(standardWaypoints);
+    const shortFixes = [
+      createFix(0, 47.0 - 0.05, 11.0),
+      createFix(5, 47.0 - 0.04, 11.0),
+      createFix(10, 47.0 - 0.03, 11.0),
+    ];
+    const pilots: PilotFlight[] = [
+      { pilotName: 'Goal', trackFile: 'goal.igc', fixes: goalFixes },
+      { pilotName: 'Short', trackFile: 'short.igc', fixes: shortFixes },
+    ];
+
+    const result = scoreTask(standardTask, pilots, {
+      nominalDistance: 10000,
+      nominalTime: 600,
+      minimumDistance: 5000,
+    });
+
+    const shortPilot = result.pilotScores.find(p => p.pilotName === 'Short')!;
+    // Flown distance should be at least minimumDistance
+    expect(shortPilot.flownDistance).toBeGreaterThanOrEqual(5000);
+    expect(shortPilot.distancePoints).toBeGreaterThan(0);
+    expect(shortPilot.totalScore).toBeGreaterThanOrEqual(0);
+  });
+
+  it('never produces negative scores', () => {
+    // Pilot who doesn't move at all
+    const fixes = [
+      createFix(0, 47.0, 11.5),
+      createFix(5, 47.0, 11.5),
+    ];
+    const pilots: PilotFlight[] = [
+      { pilotName: 'Static', trackFile: 'static.igc', fixes },
+    ];
+
+    const result = scoreTask(standardTask, pilots, { nominalDistance: 10000, nominalTime: 600 });
+    expect(result.pilotScores[0].totalScore).toBeGreaterThanOrEqual(0);
+    expect(result.pilotScores[0].flownDistance).toBeGreaterThanOrEqual(0);
+  });
+
+  it('disables leading points when useLeading=false', () => {
+    const fixes = createTrackThroughCylinders(standardWaypoints);
+    const pilots: PilotFlight[] = [
+      { pilotName: 'Alice', trackFile: 'alice.igc', fixes },
+    ];
+
+    const result = scoreTask(standardTask, pilots, {
+      nominalDistance: 10000,
+      nominalTime: 600,
+      useLeading: false,
+    });
+
+    expect(result.weights.leading).toBe(0);
+    expect(result.availablePoints.leading).toBe(0);
+    expect(result.pilotScores[0].leadingPoints).toBe(0);
+    // Time weight should absorb the leading weight
+    expect(result.weights.time).toBeGreaterThan(0);
+  });
+
+  it('disables arrival points when useArrival=false for HG', () => {
+    const fixes = createTrackThroughCylinders(standardWaypoints);
+    const pilots: PilotFlight[] = [
+      { pilotName: 'Alice', trackFile: 'alice.igc', fixes },
+    ];
+
+    const result = scoreTask(standardTask, pilots, {
+      nominalDistance: 10000,
+      nominalTime: 600,
+      scoring: 'HG',
+      useArrival: false,
+    });
+
+    expect(result.weights.arrival).toBe(0);
+    expect(result.availablePoints.arrival).toBe(0);
+    expect(result.pilotScores[0].arrivalPoints).toBe(0);
+  });
+
+  it('all non-distance points go to speed when leading+arrival disabled for HG', () => {
+    const fixes = createTrackThroughCylinders(standardWaypoints);
+    const pilots: PilotFlight[] = [
+      { pilotName: 'Alice', trackFile: 'alice.igc', fixes },
+    ];
+
+    const result = scoreTask(standardTask, pilots, {
+      nominalDistance: 10000,
+      nominalTime: 600,
+      scoring: 'HG',
+      useLeading: false,
+      useArrival: false,
+    });
+
+    expect(result.weights.leading).toBe(0);
+    expect(result.weights.arrival).toBe(0);
+    // distance + time should equal 1
+    expect(result.weights.distance + result.weights.time).toBeCloseTo(1, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Minimum Distance
+// ---------------------------------------------------------------------------
+
+describe('applyMinimumDistance', () => {
+  it('returns minimumDistance for zero distance', () => {
+    expect(applyMinimumDistance(0, 5000)).toBe(5000);
+  });
+
+  it('returns minimumDistance for negative distance', () => {
+    expect(applyMinimumDistance(-1000, 5000)).toBe(5000);
+  });
+
+  it('returns minimumDistance for distance below minimum', () => {
+    expect(applyMinimumDistance(3000, 5000)).toBe(5000);
+  });
+
+  it('returns actual distance when above minimum', () => {
+    expect(applyMinimumDistance(10000, 5000)).toBe(10000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Weight Distribution with useLeading/useArrival flags
+// ---------------------------------------------------------------------------
+
+describe('calculateWeights with flags', () => {
+  it('disabling leading gives all remainder to time', () => {
+    const wWith = calculateWeights(0.3, 80000, 100000, 'PG', true, true);
+    const wWithout = calculateWeights(0.3, 80000, 100000, 'PG', false, true);
+    expect(wWithout.leading).toBe(0);
+    expect(wWithout.time).toBeGreaterThan(wWith.time);
+    expect(wWithout.distance + wWithout.time).toBeCloseTo(1, 5);
+  });
+
+  it('disabling arrival for HG gives remainder to time', () => {
+    const wWith = calculateWeights(0.3, 80000, 100000, 'HG', true, true);
+    const wWithout = calculateWeights(0.3, 80000, 100000, 'HG', true, false);
+    expect(wWithout.arrival).toBe(0);
+    expect(wWithout.time).toBeGreaterThan(wWith.time);
+    const sum = wWithout.distance + wWithout.time + wWithout.leading;
+    expect(sum).toBeCloseTo(1, 5);
+  });
+
+  it('disabling both for HG: dist + time = 1', () => {
+    const w = calculateWeights(0.3, 80000, 100000, 'HG', false, false);
+    expect(w.leading).toBe(0);
+    expect(w.arrival).toBe(0);
+    expect(w.distance + w.time).toBeCloseTo(1, 5);
   });
 });

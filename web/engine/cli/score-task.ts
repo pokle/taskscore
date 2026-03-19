@@ -41,6 +41,8 @@ function usage(): never {
     '  --nominal-launch <ratio>  Nominal launch ratio 0-1 (default: 0.96)\n' +
     '  --min-distance <m>        Minimum distance in meters (default: 5000)\n' +
     '  --scoring <PG|HG>         Sport type (default: PG)\n' +
+    '  --no-leading              Disable leading (departure) points\n' +
+    '  --no-arrival              Disable arrival points\n' +
     '  --json                    Output as JSON\n'
   );
   process.exit(1);
@@ -74,6 +76,12 @@ for (let i = 0; i < args.length; i++) {
       break;
     case '--scoring':
       params.scoring = args[++i] as 'PG' | 'HG';
+      break;
+    case '--no-leading':
+      params.useLeading = false;
+      break;
+    case '--no-arrival':
+      params.useArrival = false;
       break;
     case '--json':
       jsonOutput = true;
