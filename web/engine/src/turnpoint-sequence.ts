@@ -15,7 +15,7 @@
 
 import type { XCTask } from './xctsk-parser';
 import type { IGCFix } from './igc-parser';
-import { isInsideCylinder, haversineDistance } from './geo';
+import { isInsideCylinder, andoyerDistance } from './geo';
 import { getSSSIndex, getESSIndex, getGoalIndex } from './xctsk-parser';
 import { calculateOptimizedTaskDistance, getOptimizedSegmentDistances } from './task-optimizer';
 
@@ -243,11 +243,15 @@ export function detectCylinderCrossings(
 
   const crossings: CylinderCrossing[] = [];
 
+  // CIVL GAP cylinder tolerance: expand radius for crossing detection.
+  // Default 0.5% (Cat 2 maximum) to compensate for distance calculation differences.
+  const tolerance = task.cylinderTolerance ?? 0.005;
+
   for (let tpIdx = 0; tpIdx < task.turnpoints.length; tpIdx++) {
     const tp = task.turnpoints[tpIdx];
     const centerLat = tp.waypoint.lat;
     const centerLon = tp.waypoint.lon;
-    const radius = tp.radius;
+    const radius = tp.radius * (1 + tolerance);
 
     let prevInside = isInsideCylinder(
       fixes[0].latitude, fixes[0].longitude,
@@ -266,15 +270,16 @@ export function detectCylinderCrossings(
         const direction: 'enter' | 'exit' = currInside ? 'enter' : 'exit';
 
         // Interpolate crossing point between the two fixes
-        const prevDist = haversineDistance(
+        const prevDist = andoyerDistance(
           prevFix.latitude, prevFix.longitude, centerLat, centerLon
         );
-        const currDist = haversineDistance(
+        const currDist = andoyerDistance(
           currFix.latitude, currFix.longitude, centerLat, centerLon
         );
 
-        // Linear interpolation factor: where along the segment does distance = radius
-        let t = (prevDist - radius) / (prevDist - currDist);
+        // Interpolate to the nominal radius (without tolerance)
+        const nominalRadius = tp.radius;
+        let t = (prevDist - nominalRadius) / (prevDist - currDist);
         t = Math.max(0, Math.min(1, t));
 
         const crossingLat = prevFix.latitude + t * (currFix.latitude - prevFix.latitude);
@@ -285,7 +290,7 @@ export function detectCylinderCrossings(
         const currTime = currFix.time.getTime();
         const crossingTime = new Date(prevTime + t * (currTime - prevTime));
 
-        const distanceToCenter = haversineDistance(
+        const distanceToCenter = andoyerDistance(
           crossingLat, crossingLon, centerLat, centerLon
         );
 
@@ -436,7 +441,7 @@ function computeBestProgress(
     // Distance from pilot to the nearest point on the next un-reached TP cylinder
     const distToNextTP = Math.max(
       0,
-      haversineDistance(fix.latitude, fix.longitude, nextTP.lat, nextTP.lon) - nextTP.radius
+      andoyerDistance(fix.latitude, fix.longitude, nextTP.lat, nextTP.lon) - nextTP.radius
     );
     // Total remaining = distance to next TP + optimized path from there to goal
     const distToGoal = distToNextTP + interTPDistance;

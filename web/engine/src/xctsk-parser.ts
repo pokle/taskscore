@@ -5,7 +5,7 @@
  * Reference: http://xctrack.org/Competition_Interfaces.html
  */
 
-import { haversineDistance } from './geo';
+import { andoyerDistance } from './geo';
 import { sanitizeText } from './sanitize';
 import type { IGCTask, IGCTaskPoint } from './igc-parser';
 import { findWaypoint, type WaypointRecord } from './waypoints';
@@ -48,6 +48,14 @@ export interface XCTask {
   };
   sss?: SSSConfig;
   goal?: GoalConfig;
+
+  /**
+   * Cylinder tolerance as a fraction (e.g. 0.005 = 0.5%).
+   * Applied to turnpoint radii when checking cylinder crossings.
+   * CIVL GAP: 0.001 (0.1%) for Cat 1, up to 0.005 (0.5%) for Cat 2.
+   * Default: 0.005 (0.5%) — the Cat 2 maximum.
+   */
+  cylinderTolerance?: number;
 }
 
 /**
@@ -490,7 +498,7 @@ export function calculateNominalTaskDistance(task: XCTask): number {
   for (let i = 1; i < tps.length; i++) {
     const p1 = tps[i - 1].waypoint;
     const p2 = tps[i].waypoint;
-    distance += haversineDistance(p1.lat, p1.lon, p2.lat, p2.lon);
+    distance += andoyerDistance(p1.lat, p1.lon, p2.lat, p2.lon);
   }
 
   return distance;

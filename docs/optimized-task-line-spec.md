@@ -34,85 +34,59 @@ Each turnpoint cylinder is tagged at **one optimal point** on its perimeter that
 
 ### Implementation
 
-The algorithm treats different positions differently:
+The algorithm has two layers: a per-cylinder optimizer and an outer iterative loop.
 
-#### 1. First Turnpoint (Start)
-```
-Point is on the circle along the bearing toward the next turnpoint
-Angle = bearing(center₁ → center₂)
-```
+#### Per-Cylinder Optimization (Golden Section Search)
 
-This assumes the pilot is approaching from outside the start cylinder.
-
-#### 2. Last Turnpoint (Goal)
+For each intermediate turnpoint, find the angle θ ∈ [0, 2π] that minimizes:
 ```
-Point is on the circle along the bearing from the previous turnpoint
-Angle = bearing(centerₙ₋₁ → centerₙ)
+cost(θ) = distance(prevPoint, pointOnCircle(θ)) + distance(pointOnCircle(θ), nextPoint)
 ```
 
-This represents the entry point into the goal cylinder.
+This cost function is unimodal, so golden section search converges in ~30 iterations (tolerance 1e-5 radians).
 
-#### 3. Intermediate Turnpoints
-For turnpoint i (where 1 < i < n), find the point that minimizes:
+**First turnpoint (Start):** Point on circle along bearing toward next point.
+**Last turnpoint (Goal):** Point on circle along bearing from previous point (entry side).
+
+#### Iterative Convergence
+
+A single forward pass uses the next turnpoint's *center* as the target, which is suboptimal — the actual touching point on the next cylinder may be far from its center, especially for large cylinders. The algorithm therefore iterates:
+
+1. **First pass:** Optimize each cylinder using the previous optimized point and the next turnpoint *center*
+2. **Subsequent passes:** Re-optimize each cylinder using the previous optimized point and the next *optimized point from the previous iteration*
+3. **Converge:** Stop when total path distance changes by < 1 meter
+
+This matches the CIVL GAP specification (Section 7F, Annex A) approach. On real tasks with large cylinders (e.g. `face.xctsk` with a 7 km cylinder), iteration shortens the task distance by ~200 m vs a single pass.
+
 ```
-cost(θ) = distance(pointᵢ₋₁, pointᵢ(θ)) + distance(pointᵢ(θ), centerᵢ₊₁)
-```
-
-Where:
-- `pointᵢ(θ)` is a point on circle i at angle θ
-- `pointᵢ₋₁` is the already-optimized point from the previous cylinder
-- `centerᵢ₊₁` is the center of the next turnpoint
-
-**Optimization Method**: Golden section search over θ ∈ [0, 2π]
-
-### Golden Section Search
-
-The golden section search is an efficient algorithm for finding the minimum of a unimodal function (one with a single minimum).
-
-```typescript
-function findOptimalCirclePoint(prev, center, radius, next):
-  phi = (1 + √5) / 2
-  resphi = 2 - phi
-
-  a = 0
-  b = 2π
-  tolerance = 1e-5
-
-  x1 = a + resphi * (b - a)
-  x2 = b - resphi * (b - a)
-  f1 = cost(x1)
-  f2 = cost(x2)
-
-  while |b - a| > tolerance:
-    if f1 < f2:
-      b = x2; x2 = x1; f2 = f1
-      x1 = a + resphi * (b - a)
-      f1 = cost(x1)
-    else:
-      a = x1; x1 = x2; f1 = f2
-      x2 = b - resphi * (b - a)
-      f2 = cost(x2)
-
-  return point at angle (a + b) / 2
+max_iterations = num_turnpoints × 10
+convergence_tolerance = 1.0  // meters
 ```
 
-**Convergence**: Golden section search has linear convergence and is guaranteed to find the minimum of a unimodal function.
+### Cylinder Tolerance
+
+CIVL GAP specifies a tolerance band on cylinder radii to compensate for differences between distance calculation methods:
+
+- **Cat 1 (World/Continental championships):** 0.1%
+- **Cat 2 (other FAI competitions):** up to 0.5%
+
+This is applied in `detectCylinderCrossings()` via `XCTask.cylinderTolerance` (default 0.5%). The effective radius for crossing detection is `radius × (1 + tolerance)`, but the crossing point is interpolated to the nominal radius.
 
 ## Geometry Functions
 
-All geographic calculations use **Turf.js** via the centralized `geo.ts` module:
+All geographic calculations use the centralized `geo.ts` module, which implements WGS84 ellipsoid formulas for CIVL-accurate scoring:
 
 ```typescript
-import { haversineDistance, calculateBearingRadians, destinationPoint } from './geo';
+import { andoyerDistance, calculateBearingRadians, destinationPoint } from './geo';
 ```
 
 ### Available Functions
 
-- `haversineDistance(lat1, lon1, lat2, lon2)` - Great circle distance in meters
+- `andoyerDistance(lat1, lon1, lat2, lon2)` - WGS84 ellipsoid distance in meters (Andoyer-Lambert formula, ~2 ppm vs Vincenty)
 - `calculateBearingRadians(lat1, lon1, lat2, lon2)` - Initial bearing in radians
-- `destinationPoint(lat, lon, distanceMeters, bearingRadians)` - Destination point calculation
+- `destinationPoint(lat, lon, distanceMeters, bearingRadians)` - Destination point on WGS84 ellipsoid (Vincenty direct formula)
 
-**Note**: Never implement inline geo math. Always use the `geo.ts` module which wraps Turf.js.
+**Note**: Never implement inline geo math. Always use the `geo.ts` module.
 
 ## Visual Representation
 
@@ -174,11 +148,11 @@ When a task is set:
 
 ### Computational Complexity
 - **Two turnpoints**: O(1) - simple bearing calculation
-- **N turnpoints**: O(N · log(1/ε)) where ε is the tolerance (1e-5)
-  - Golden section search: O(log(1/ε)) per turnpoint
-  - Distance calculations: O(1) per iteration
+- **N turnpoints**: O(I · N · log(1/ε)) where I = iterations to converge, ε = angle tolerance (1e-5)
+  - Golden section search: O(log(1/ε)) per turnpoint per iteration (~30 evaluations)
+  - Convergence iterations: typically 3-5 for most tasks
 
-For typical tasks (5-10 turnpoints), optimization completes in < 10ms.
+For typical tasks (5-10 turnpoints), optimization completes in < 10ms even with iteration.
 
 ### Caching
 The optimized path is calculated on-demand when:
@@ -194,45 +168,29 @@ Results are not cached as task changes are infrequent.
 
 2. **No turn direction constraints**: Doesn't account for sectors (e.g., "must turn left around turnpoint"). All turnpoints are treated as full cylinders.
 
-3. **Local optimization**: Each point is optimized considering only adjacent points. This is a greedy approach that may not find the global optimum for complex task geometries.
-
-4. **Great circle approximation**: Uses spherical geometry (haversine) rather than WGS84 ellipsoid. Error is < 0.5% for distances typical in paragliding tasks.
-
 ### Potential Enhancements
-1. **Global optimization**: Implement true global optimization (e.g., simulated annealing, genetic algorithms) to find the absolute shortest path
+1. **Sector support**: Handle sector turnpoints (entry/exit sectors with specific angles)
 
-2. **Sector support**: Handle sector turnpoints (entry/exit sectors with specific angles)
-
-3. **Start cylinder types**: Distinguish between SSS (Start of Speed Section) types:
+2. **Start cylinder types**: Distinguish between SSS (Start of Speed Section) types:
    - Exit start: Pilot starts inside, optimization begins at cylinder edge
    - Enter start: Pilot starts outside, must enter cylinder
 
-4. **FAI triangle detection**: Detect and optimize FAI triangle tasks with their specific constraints
-
-5. **Ellipsoid geometry**: Use Vincenty's formulae for higher precision on very long tasks
+3. **FAI triangle detection**: Detect and optimize FAI triangle tasks with their specific constraints
 
 ## Testing
 
-### Unit Tests
-The implementation should be tested with:
+Tests are in `web/engine/tests/task-optimizer.test.ts`.
 
-1. **Two turnpoints**: Verify simple bearing-based approach
-2. **Three turnpoints (collinear)**: Should produce straight-line path
-3. **Three turnpoints (triangle)**: Verify optimization finds reasonable points
-4. **Equal radius cylinders**: Test perpendicular tangent cases
-5. **Different radius cylinders**: Test geometric offset calculations
-6. **Edge cases**:
-   - Single turnpoint
-   - Zero-radius turnpoints (treat as points)
-   - Overlapping cylinders
+### Unit Tests
+1. **Two turnpoints**: Simple bearing-based approach
+2. **Collinear turnpoints**: Produces straight-line path
+3. **Complex task with large cylinders**: Iterative produces shorter distance
+4. **Segment distances sum to total**: Consistency check
+5. **Points on cylinders**: Each optimized point lies within 1m of its turnpoint cylinder
 
 ### Integration Tests
-1. Load real XContest tasks and verify:
-   - Optimized distance < center-to-center distance
-   - Path is continuous (no gaps)
-   - Labels render correctly
-
-2. Compare with XContest published distances (should match within 1-2%)
+1. **face.xctsk**: Iterative distance < 77.5 km (vs 77.5 km single-pass) — validates that iteration matters on real tasks with large cylinders
+2. **Corryong Cup T1 scoring**: Full pipeline test (IGC parsing → turnpoint sequence → GAP scoring) in `gap-scoring-integration.test.ts`
 
 ## References
 
@@ -242,9 +200,16 @@ The implementation should be tested with:
 - **LK8000 Task Optimization**: https://github.com/LK8000/LK8000/pull/286
 - **Touring n Circles**: https://www.matec-conferences.org/articles/matecconf/pdf/2018/91/matecconf_eitce2018_03027.pdf
 - **Golden Section Search**: https://en.wikipedia.org/wiki/Golden-section_search
-- **Haversine Formula**: https://en.wikipedia.org/wiki/Haversine_formula
+- **Andoyer-Lambert Formula**: WGS84 ellipsoid distance approximation (~2 ppm accuracy vs Vincenty)
 
 ## Change Log
+
+### 2026-03-20: CIVL-Accurate Scoring
+- Added iterative convergence — re-runs until < 1m change, matching CIVL GAP Annex A
+- Added cylinder tolerance (`XCTask.cylinderTolerance`) — default 0.5% (Cat 2), configurable to 0.1% (Cat 1)
+- Replaced haversine (spherical) with Andoyer-Lambert distance formula (WGS84 ellipsoid)
+- Replaced Turf.js destination with Vincenty direct formula (WGS84 ellipsoid)
+- Removed `@turf/distance` and `@turf/destination` dependencies
 
 ### 2026-01-20: Simplified to MapBox Only
 - Removed Google Maps and MapLibre providers
