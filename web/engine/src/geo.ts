@@ -1,21 +1,21 @@
 /**
  * Centralized Geographic Math Module
  *
- * Provides geographic calculations using Turf.js as the underlying implementation.
- * All functions maintain the same signatures as the original implementations for
- * drop-in replacement compatibility.
+ * All distance and destination calculations use the WGS84 ellipsoid
+ * (Andoyer-Lambert for inverse, Vincenty direct for forward).
+ * Bearing and bounding box still use Turf.js (spherical, sufficient accuracy).
  *
  * Note: Turf.js uses [longitude, latitude] (GeoJSON standard) while this codebase
  * uses (latitude, longitude). These wrapper functions handle the coordinate swap.
  */
 
 import { bearing } from '@turf/bearing';
-import { destination } from '@turf/destination';
 import { bbox } from '@turf/bbox';
 import { point, lineString } from '@turf/helpers';
 
 // WGS84 ellipsoid constants
 const WGS84_A = 6378137.0; // semi-major axis (meters)
+const WGS84_B = 6356752.314245; // semi-minor axis (meters)
 const WGS84_F = 1 / 298.257223563; // flattening
 
 // Define minimal interface to avoid circular dependency with igc-parser
@@ -107,10 +107,12 @@ export function calculateBearingRadians(
 /**
  * Calculate a destination point given distance and bearing from start point.
  *
+ * Uses the Vincenty direct formula on the WGS84 ellipsoid.
+ *
  * @param lat - Starting latitude in degrees
  * @param lon - Starting longitude in degrees
  * @param distanceMeters - Distance in meters
- * @param bearingRadians - Bearing in radians
+ * @param bearingRadians - Bearing in radians (clockwise from north)
  * @returns Destination point {lat, lon} in degrees
  */
 export function destinationPoint(
@@ -119,17 +121,66 @@ export function destinationPoint(
   distanceMeters: number,
   bearingRadians: number
 ): { lat: number; lon: number } {
-  // Turf uses [lon, lat] (GeoJSON format) and bearing in degrees
-  const origin = point([lon, lat]);
-  const bearingDegrees = bearingRadians * 180 / Math.PI;
+  if (distanceMeters === 0) return { lat, lon };
 
-  // Distance in meters
-  const dest = destination(origin, distanceMeters, bearingDegrees, { units: 'meters' });
+  const toRad = Math.PI / 180;
+  const toDeg = 180 / Math.PI;
+  const phi1 = lat * toRad;
+  const alpha1 = bearingRadians;
+  const s = distanceMeters;
 
-  // dest.geometry.coordinates is [lon, lat]
+  const sinAlpha1 = Math.sin(alpha1);
+  const cosAlpha1 = Math.cos(alpha1);
+
+  const tanU1 = (1 - WGS84_F) * Math.tan(phi1);
+  const cosU1 = 1 / Math.sqrt(1 + tanU1 * tanU1);
+  const sinU1 = tanU1 * cosU1;
+
+  const sigma1 = Math.atan2(tanU1, cosAlpha1);
+  const sinAlpha = cosU1 * sinAlpha1;
+  const cosSqAlpha = 1 - sinAlpha * sinAlpha;
+  const uSq = cosSqAlpha * (WGS84_A * WGS84_A - WGS84_B * WGS84_B) / (WGS84_B * WGS84_B);
+  const A = 1 + uSq / 16384 * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq)));
+  const B = uSq / 1024 * (256 + uSq * (-128 + uSq * (74 - 47 * uSq)));
+
+  let sigma = s / (WGS84_B * A);
+  let sigmaP: number;
+  let sinSigma: number, cosSigma: number, cos2SigmaM: number;
+  let iterLimit = 100;
+
+  do {
+    cos2SigmaM = Math.cos(2 * sigma1 + sigma);
+    sinSigma = Math.sin(sigma);
+    cosSigma = Math.cos(sigma);
+    const deltaSigma = B * sinSigma * (cos2SigmaM + B / 4 * (
+      cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM) -
+      B / 6 * cos2SigmaM * (-3 + 4 * sinSigma * sinSigma) * (-3 + 4 * cos2SigmaM * cos2SigmaM)
+    ));
+    sigmaP = sigma;
+    sigma = s / (WGS84_B * A) + deltaSigma;
+  } while (Math.abs(sigma - sigmaP) > 1e-12 && --iterLimit > 0);
+
+  sinSigma = Math.sin(sigma);
+  cosSigma = Math.cos(sigma);
+  cos2SigmaM = Math.cos(2 * sigma1 + sigma);
+
+  const tmp = sinU1 * sinSigma - cosU1 * cosSigma * cosAlpha1;
+  const phi2 = Math.atan2(
+    sinU1 * cosSigma + cosU1 * sinSigma * cosAlpha1,
+    (1 - WGS84_F) * Math.sqrt(sinAlpha * sinAlpha + tmp * tmp)
+  );
+  const lambda = Math.atan2(
+    sinSigma * sinAlpha1,
+    cosU1 * cosSigma - sinU1 * sinSigma * cosAlpha1
+  );
+  const C = WGS84_F / 16 * cosSqAlpha * (4 + WGS84_F * (4 - 3 * cosSqAlpha));
+  const L = lambda - (1 - C) * WGS84_F * sinAlpha * (
+    sigma + C * sinSigma * (cos2SigmaM + C * cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM))
+  );
+
   return {
-    lat: dest.geometry.coordinates[1],
-    lon: dest.geometry.coordinates[0],
+    lat: phi2 * toDeg,
+    lon: lon + L * toDeg,
   };
 }
 
@@ -169,7 +220,7 @@ export function getBoundingBox(fixes: LatLonPoint[]): {
 }
 
 /**
- * Sum haversine distances over consecutive fixes in a slice.
+ * Sum distances over consecutive fixes in a slice.
  *
  * @param fixes - Array of IGC fixes (must have latitude/longitude)
  * @param startIndex - First index in the range (inclusive, default 0)

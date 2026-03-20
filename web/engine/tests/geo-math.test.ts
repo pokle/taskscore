@@ -338,16 +338,16 @@ describe('Snapshot Tests for Known Values', () => {
   });
 });
 
-describe('destinationPoint tests', () => {
+describe('destinationPoint tests (WGS84 Vincenty direct)', () => {
   it('should calculate correct destination going north', () => {
     const result = destinationPoint(47.0, 11.0, 1000, 0);
     expect(result.lat).toBeGreaterThan(47.0);
-    expect(result.lon).toBeCloseTo(11.0, 4);
+    expect(result.lon).toBeCloseTo(11.0, 8); // longitude unchanged for due north
   });
 
   it('should calculate correct destination going east', () => {
     const result = destinationPoint(47.0, 11.0, 1000, Math.PI / 2);
-    expect(result.lat).toBeCloseTo(47.0, 4);
+    expect(result.lat).toBeCloseTo(47.0, 5);
     expect(result.lon).toBeGreaterThan(11.0);
   });
 
@@ -358,8 +358,34 @@ describe('destinationPoint tests', () => {
     const dest = destinationPoint(47.0, 11.0, distance, bearing);
     const returnTrip = destinationPoint(dest.lat, dest.lon, distance, bearing + Math.PI);
 
-    expect(returnTrip.lat).toBeCloseTo(47.0, 2);
-    expect(returnTrip.lon).toBeCloseTo(11.0, 2);
+    // On an ellipsoid, the reverse azimuth isn't exactly bearing+π, so the
+    // round trip doesn't return perfectly. Within ~10m for 10km is expected.
+    expect(returnTrip.lat).toBeCloseTo(47.0, 3);
+    expect(returnTrip.lon).toBeCloseTo(11.0, 3);
+  });
+
+  it('should be consistent with andoyerDistance (<0.1m at 5km, <0.5m at 50km)', () => {
+    // Place a point away, then measure with andoyerDistance — both use WGS84
+    // but Vincenty direct and Andoyer inverse are different algorithms,
+    // so they agree to ~10 ppm (0.05m per 5km, 0.5m per 50km)
+    const testCases = [
+      { lat: 47.0, lon: 11.0, dist: 5000, bearing: 0, tol: 0.1 },
+      { lat: 47.0, lon: 11.0, dist: 5000, bearing: Math.PI / 2, tol: 0.1 },
+      { lat: -36.0, lon: 148.0, dist: 5000, bearing: Math.PI / 4, tol: 0.1 },
+      { lat: 0.0, lon: 0.0, dist: 50000, bearing: 1.0, tol: 0.5 },
+    ];
+
+    for (const tc of testCases) {
+      const dest = destinationPoint(tc.lat, tc.lon, tc.dist, tc.bearing);
+      const measured = andoyerDistance(tc.lat, tc.lon, dest.lat, dest.lon);
+      expect(Math.abs(measured - tc.dist)).toBeLessThan(tc.tol);
+    }
+  });
+
+  it('should return identity for zero distance', () => {
+    const result = destinationPoint(47.0, 11.0, 0, Math.PI / 3);
+    expect(result.lat).toBe(47.0);
+    expect(result.lon).toBe(11.0);
   });
 });
 
@@ -407,7 +433,7 @@ describe('calculateBearingRadians tests', () => {
   });
 });
 
-describe('getCirclePoints tests', () => {
+describe('getCirclePoints tests (WGS84)', () => {
   it('should return correct number of points (numPoints + 1 for closure)', () => {
     const points = getCirclePoints(47.0, 11.0, 1000, 64);
     expect(points).toHaveLength(65);
@@ -421,7 +447,7 @@ describe('getCirclePoints tests', () => {
     expect(first.lon).toBeCloseTo(last.lon, 10);
   });
 
-  it('should generate points at correct distance from center', () => {
+  it('should generate points within 0.1m of target radius (WGS84)', () => {
     const centerLat = 47.0;
     const centerLon = 11.0;
     const radius = 1000;
@@ -430,7 +456,7 @@ describe('getCirclePoints tests', () => {
 
     for (let i = 0; i < points.length - 1; i++) {
       const dist = andoyerDistance(centerLat, centerLon, points[i].lat, points[i].lon);
-      expect(dist).toBeCloseTo(radius, -1);
+      expect(Math.abs(dist - radius)).toBeLessThan(0.1);
     }
   });
 
@@ -438,57 +464,56 @@ describe('getCirclePoints tests', () => {
     const points = getCirclePoints(47.0, 11.0, 1000, 4);
     expect(points).toHaveLength(5);
 
+    // First point is north (bearing=0)
     expect(points[0].lat).toBeGreaterThan(47.0);
-    expect(points[0].lon).toBeCloseTo(11.0, 3);
+    expect(points[0].lon).toBeCloseTo(11.0, 6);
 
-    expect(points[1].lat).toBeCloseTo(47.0, 3);
+    // Second point is east (bearing=π/2)
+    expect(points[1].lat).toBeCloseTo(47.0, 4);
     expect(points[1].lon).toBeGreaterThan(11.0);
 
+    // Third point is south (bearing=π)
     expect(points[2].lat).toBeLessThan(47.0);
-    expect(points[2].lon).toBeCloseTo(11.0, 3);
+    expect(points[2].lon).toBeCloseTo(11.0, 6);
 
-    expect(points[3].lat).toBeCloseTo(47.0, 3);
+    // Fourth point is west (bearing=3π/2)
+    expect(points[3].lat).toBeCloseTo(47.0, 4);
     expect(points[3].lon).toBeLessThan(11.0);
   });
 
-  it('should handle small radius', () => {
+  it('should handle small radius (100m) within 0.01m', () => {
     const points = getCirclePoints(47.0, 11.0, 100, 8);
     expect(points).toHaveLength(9);
 
-    for (const point of points) {
-      const dist = andoyerDistance(47.0, 11.0, point.lat, point.lon);
-      expect(dist).toBeCloseTo(100, -1);
+    for (let i = 0; i < points.length - 1; i++) {
+      const dist = andoyerDistance(47.0, 11.0, points[i].lat, points[i].lon);
+      expect(Math.abs(dist - 100)).toBeLessThan(0.01);
     }
   });
 
-  it('should handle large radius', () => {
+  it('should handle large radius (50km) within 0.5m', () => {
     const points = getCirclePoints(47.0, 11.0, 50000, 8);
     expect(points).toHaveLength(9);
 
-    // destinationPoint uses Turf (spherical), andoyerDistance uses WGS84 ellipsoid
-    // so there's an inherent ~0.3% mismatch at large radii
+    // Vincenty direct and Andoyer inverse agree to ~10 ppm
     for (let i = 0; i < points.length - 1; i++) {
       const dist = andoyerDistance(47.0, 11.0, points[i].lat, points[i].lon);
-      expect(dist).toBeGreaterThan(49800);
-      expect(dist).toBeLessThan(50200);
+      expect(Math.abs(dist - 50000)).toBeLessThan(0.5);
     }
   });
 
-  it('should work at different latitudes', () => {
+  it('should be accurate at different latitudes within 0.1m', () => {
     const equatorPoints = getCirclePoints(0.0, 11.0, 1000, 8);
-    expect(equatorPoints).toHaveLength(9);
-
     const highLatPoints = getCirclePoints(70.0, 11.0, 1000, 8);
-    expect(highLatPoints).toHaveLength(9);
+    const southPoints = getCirclePoints(-36.0, 148.0, 1000, 8);
 
     for (let i = 0; i < 8; i++) {
       const equatorDist = andoyerDistance(0.0, 11.0, equatorPoints[i].lat, equatorPoints[i].lon);
       const highLatDist = andoyerDistance(70.0, 11.0, highLatPoints[i].lat, highLatPoints[i].lon);
-      // ~0.3% tolerance for spherical vs ellipsoidal mismatch
-      expect(equatorDist).toBeGreaterThan(990);
-      expect(equatorDist).toBeLessThan(1010);
-      expect(highLatDist).toBeGreaterThan(990);
-      expect(highLatDist).toBeLessThan(1010);
+      const southDist = andoyerDistance(-36.0, 148.0, southPoints[i].lat, southPoints[i].lon);
+      expect(Math.abs(equatorDist - 1000)).toBeLessThan(0.1);
+      expect(Math.abs(highLatDist - 1000)).toBeLessThan(0.1);
+      expect(Math.abs(southDist - 1000)).toBeLessThan(0.1);
     }
   });
 
