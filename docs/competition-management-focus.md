@@ -11,7 +11,7 @@ Scorers (Admins):
     - scorer
     - admin
     - committee 
-  - scoring parameters
+  - scoring parameters (from `web/engine/cli/score-task.ts` CLI help)
     - `--nominal-distance <m>` — Nominal distance in meters (default: 70% of task distance)
     - `--nominal-time <s>` — Nominal time in seconds (default: 5400)
     - `--nominal-goal <ratio>` — Nominal goal ratio 0-1 (default: 0.2)
