@@ -1592,12 +1592,15 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           right: '8px',
           width: '160px',
           height: '160px',
-          pointerEvents: 'none',
+          pointerEvents: 'auto',
           perspective: '300px',
           zIndex: '10',
+          cursor: 'grab',
+          touchAction: 'none',
         });
         const img = document.createElement('img');
         img.src = '/compass.svg';
+        img.draggable = false;
         Object.assign(img.style, {
           width: '100%',
           height: '100%',
@@ -1607,6 +1610,54 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         map.getContainer().appendChild(wrapper);
         compassElement = wrapper;
         updateCompassTransform();
+
+        // Drag support
+        let dragging = false;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        function onPointerDown(e: PointerEvent) {
+          dragging = true;
+          offsetX = e.clientX - wrapper.getBoundingClientRect().left;
+          offsetY = e.clientY - wrapper.getBoundingClientRect().top;
+          wrapper.setPointerCapture(e.pointerId);
+          wrapper.style.cursor = 'grabbing';
+          // Clear anchored positioning so left/top take effect
+          wrapper.style.right = '';
+          wrapper.style.bottom = '';
+          const rect = wrapper.getBoundingClientRect();
+          const containerRect = map.getContainer().getBoundingClientRect();
+          wrapper.style.left = `${rect.left - containerRect.left}px`;
+          wrapper.style.top = `${rect.top - containerRect.top}px`;
+          e.preventDefault();
+          e.stopPropagation();
+        }
+
+        function onPointerMove(e: PointerEvent) {
+          if (!dragging) return;
+          const containerRect = map.getContainer().getBoundingClientRect();
+          let newLeft = e.clientX - containerRect.left - offsetX;
+          let newTop = e.clientY - containerRect.top - offsetY;
+          // Clamp within container
+          newLeft = Math.max(0, Math.min(newLeft, containerRect.width - wrapper.offsetWidth));
+          newTop = Math.max(0, Math.min(newTop, containerRect.height - wrapper.offsetHeight));
+          wrapper.style.left = `${newLeft}px`;
+          wrapper.style.top = `${newTop}px`;
+          e.preventDefault();
+          e.stopPropagation();
+        }
+
+        function onPointerUp(e: PointerEvent) {
+          if (!dragging) return;
+          dragging = false;
+          wrapper.releasePointerCapture(e.pointerId);
+          wrapper.style.cursor = 'grab';
+          e.stopPropagation();
+        }
+
+        wrapper.addEventListener('pointerdown', onPointerDown);
+        wrapper.addEventListener('pointermove', onPointerMove);
+        wrapper.addEventListener('pointerup', onPointerUp);
       }
 
       function updateCompassTransform(): void {
