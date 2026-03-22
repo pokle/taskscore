@@ -1,15 +1,10 @@
 # <img src="web/frontend/public/icon.svg" alt="GlideComp logo" width="32" height="32" /> GlideComp
 
-> Formerly known as **TaskScore**. The Cloudflare D1 database is still named `taskscore-auth` because D1 databases cannot be renamed.
-
 Helps you analyse hanggliding / paragliding competition tasks.
 
 For pilots and scorers, it provides:
 
 - Detailed analysis of flight performance
-  - Explains scores
-  - Task segments encountered
-  - Re-flies
 - Thermals encountered during the task:
 - Where pilots found their first thermal (left or right of the launch hill?)
 - Was the valley working for the task?
@@ -17,18 +12,6 @@ For pilots and scorers, it provides:
 
 Tasks can be loaded from XContest, or other sources such as a QR code.
 
-Maps can be annotated with information that is used during analysis. For example, if you mark segments near the launch hill (e.g. left spine, front bowl), then analysis will be able to tell if the first thermal was found in one of those segments (e.g. most pilots found their first thermal in the front bowl).
-
-Example of flight analysis:
-
-- 12:30pm launched in tp ELLIOT
-- 12:35pm found first thermal in the front bowl
-- 1:05pm exited start tp ELLIOT at 7000ft from behind the hill.
-- 1:10pm re-entered start tp ELLIOT
-- 1:15pm exited start tp ELLIOT
-- 1:20pm low save
-- 1:30pm tagged tp TOWONG
-- 1:40pm landed in bombout paddock, 7km from NCORGL (30 bombout points)
 
 In the last example, it's useful to know the distance to the next waypoint in the task set.
 

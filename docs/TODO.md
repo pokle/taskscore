@@ -2,28 +2,20 @@
 
 ## Features for pilots
 
-- [ ] Analyse a tracklog against a task
-  - Visualise task on the map
+- [x] Analyse a tracklog against a task
+  - [x] Visualise task on the map
   - [x] Calculate task score (CIVL GAP scoring engine — `web/engine/src/gap-scoring.ts`, CLI via `bun run score-task`)
   - [ ] Explain the scores on the map
 - [ ] Submit tracklogs
-  - IGC files via drag-and-drop (implemented)
-  - (Future) email with IGC file attachment, and text containing pilot's thoughts
-- [ ] View all previously submitted tracklogs
+  - [x] IGC files via drag-and-drop (implemented)
+  - [ ] Pilots can send email with IGC file attachment, and text containing pilot's thoughts
+- Annotate map
+  - [x] Draw basic lines on the map
+  - [ ] Add regions to the map that used for event detection. E.g. 'elliot left bowl'. Aggregate analysis can then work out how many pilots caught their first thermal from 'elliot left bowl'.
 
 ## Features for scorers
 
-- [ ] Bulk upload of tracklogs
-- [ ] Manage pilot accounts
-- [ ] Manage competition
-  - Manage scoring rules
-- [ ] Manage tasks
-- [ ] Manage maps
-- [ ] Manage turnpoints
-
-## Features for admins
-
-- [ ] Manage scorer accounts
+See [competition-management-focus.md](competition-management-focus.md)
 
 # Analysis page TODOs
 
