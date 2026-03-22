@@ -87,6 +87,12 @@ async function init() {
     return;
   }
 
+  // Redirect /u/me/ to the user's actual page
+  if (window.location.pathname === "/u/me/") {
+    window.location.replace(`/u/${user.username}/`);
+    return;
+  }
+
   // Show dashboard
   const container = document.getElementById("dashboard")!;
   container.classList.remove("hidden");
