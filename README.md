@@ -1,19 +1,16 @@
 # <img src="web/frontend/public/icon.svg" alt="GlideComp logo" width="32" height="32" /> GlideComp
 
-Helps you analyse hanggliding / paragliding competition tasks.
+Competition track log analysis for hanggliding and paragliding. Load IGC files and tasks, and get instant in-browser analysis.
 
-For pilots and scorers, it provides:
-
-- Detailed analysis of flight performance
-- Thermals encountered during the task:
-- Where pilots found their first thermal (left or right of the launch hill?)
-- Was the valley working for the task?
-- Aggregate statistics for the entire task, such as information about how many bombed out, reached goal, landed out etc.
-
-Tasks can be loaded from XContest, or other sources such as a QR code.
-
-
-In the last example, it's useful to know the distance to the next waypoint in the task set.
+- **Flight event detection** — automatic detection of takeoff, landing, thermals, glides, start/goal crossings, and turnpoint tagging
+- **Thermal analysis** — entry/exit times, altitude gain, average climb rate
+- **Glide analysis** — distance, altitude lost, L/D ratio, plus sink detection for poor glides
+- **Task scoring** — CIVL GAP scoring with distance, time, leading, and arrival points
+- **Task editor** — create and edit tasks with drag-to-reorder turnpoints, waypoint database search, and click-on-map placement
+- **Multiple data sources** — drag & drop IGC/XCTSK files, import from XContest by task code, or import from AirScore by URL
+- **Interactive map** — 2D (Mapbox/Leaflet) and 3D views with track overlay, task cylinders, and map annotations
+- **Altitude sparkline** — clickable time-series chart linked to events and map position
+- **Configurable units & detection** — speed, altitude, distance, climb rate units; adjustable thermal/glide detection thresholds
 
 ## Web Development
 
