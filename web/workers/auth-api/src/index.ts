@@ -89,6 +89,25 @@ app.post("/api/auth/delete-account", async (c) => {
     return c.json({ error: "Not authenticated" }, 401);
   }
 
+  // Revoke Google OAuth grant so re-login shows consent screen
+  const account = await c.env.glidecomp_auth.prepare(
+    'SELECT "accessToken" FROM "account" WHERE "userId" = ? AND "providerId" = ?'
+  )
+    .bind(session.user.id, "google")
+    .first<{ accessToken: string | null }>();
+
+  if (account?.accessToken) {
+    // Best-effort revocation — don't block deletion if it fails
+    try {
+      await fetch(
+        `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(account.accessToken)}`,
+        { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+      );
+    } catch {
+      // Revocation failed (network error, expired token, etc.) — proceed with deletion
+    }
+  }
+
   // Delete user row — CASCADE rules auto-delete session and account rows
   await c.env.glidecomp_auth.prepare('DELETE FROM "user" WHERE id = ?')
     .bind(session.user.id)

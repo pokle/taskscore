@@ -290,6 +290,7 @@ async function init() {
     const result = await deleteAccount();
     if (result.success) {
       localStorage.clear();
+      storage.close();
       indexedDB.deleteDatabase("glidecomp");
       window.location.href = "/";
     } else {

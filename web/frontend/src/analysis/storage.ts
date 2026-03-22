@@ -130,6 +130,11 @@ class StorageService {
         resolve(); // Resolve anyway - storage will be disabled
       };
 
+      request.onblocked = () => {
+        console.warn('IndexedDB open blocked - another connection is still open');
+        resolve(); // Don't hang forever - proceed without storage
+      };
+
       request.onsuccess = () => {
         this.db = request.result;
         resolve();
@@ -164,6 +169,17 @@ class StorageService {
     });
 
     return this.initPromise;
+  }
+
+  /**
+   * Close the database connection (must be called before deleteDatabase).
+   */
+  close(): void {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+      this.initPromise = null;
+    }
   }
 
   /**
