@@ -21,7 +21,7 @@ Browser                    Cloudflare
 ## OAuth Flow
 
 ```
-1. User clicks "Log in to GlideComp with Google" on index or dashboard
+1. User clicks "Login with Google" on index or dashboard
 2. Better Auth client calls signIn.social({ provider: "google" })
 3. Browser redirects to Google consent screen
 4. Google redirects back to /api/auth/callback/google
