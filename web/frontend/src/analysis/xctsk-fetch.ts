@@ -1,9 +1,9 @@
 /**
  * XContest task fetch functions (browser-only, uses fetch API).
- * Pure parsing logic lives in @taskscore/engine.
+ * Pure parsing logic lives in @glidecomp/engine.
  */
 
-import { parseXCTask, isValidTask, type XCTask } from '@taskscore/engine';
+import { parseXCTask, isValidTask, type XCTask } from '@glidecomp/engine';
 
 export interface FetchTaskResult {
   task: XCTask;

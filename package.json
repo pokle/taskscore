@@ -1,30 +1,30 @@
 {
-  "name": "taskscore",
+  "name": "glidecomp",
   "version": "1.0.0",
   "private": true,
   "license": "MIT",
   "author": "Tushar Pokle",
   "description": "Hanggliding/paragliding competition track log analysis",
   "keywords": ["hanggliding", "paragliding", "igc", "competition", "scoring", "flight-analysis"],
-  "homepage": "https://taskscore.shonky.info",
+  "homepage": "https://glidecomp.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pokle/taskscore.git"
+    "url": "https://github.com/pokle/glidecomp.git"
   },
   "bugs": {
-    "url": "https://github.com/pokle/taskscore/issues"
+    "url": "https://github.com/pokle/glidecomp/issues"
   },
   "type": "module",
   "scripts": {
-    "dev": "[ -d node_modules ] || bun install && bun run dev:auth & bun run --filter '@taskscore/frontend' dev",
-    "dev:frontend": "bun run --filter '@taskscore/frontend' dev",
-    "build": "bun run --filter '@taskscore/frontend' build",
-    "deploy": "bun run --filter '@taskscore/frontend' deploy",
+    "dev": "[ -d node_modules ] || bun install && bun run dev:auth & bun run --filter '@glidecomp/frontend' dev",
+    "dev:frontend": "bun run --filter '@glidecomp/frontend' dev",
+    "build": "bun run --filter '@glidecomp/frontend' build",
+    "deploy": "bun run --filter '@glidecomp/frontend' deploy",
     "dev:auth": "bun run --filter auth-api dev",
     "deploy:worker": "bun run --filter airscore-api deploy",
     "deploy:auth": "bun run --filter auth-api deploy",
     "deploy:all": "bun run deploy && bun run deploy:worker",
-    "deployments": "wrangler pages deployment list --project-name=taskscore --json | jq .",
+    "deployments": "wrangler pages deployment list --project-name=glidecomp --json | jq .",
     "typecheck": "tsc --noEmit",
     "typecheck:engine": "tsc --noEmit -p web/engine/tsconfig.json",
     "typecheck:worker": "bun run --filter airscore-api typecheck",

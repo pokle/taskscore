@@ -8,7 +8,7 @@
  * - Event detection and display
  */
 
-import { parseIGC, parseXCTask, detectFlightEvents, calculateOptimizedTaskDistance, igcTaskToXCTask, resolveTurnpointSequence, maxBy, parseThresholdInput, formatThresholdForDisplay, DEFAULT_THRESHOLDS, type IGCFile, type IGCFix, type XCTask, type FlightEvent, type WaypointRecord, type DetectionThresholds, type PartialThresholds, type ThresholdDimension } from '@taskscore/engine';
+import { parseIGC, parseXCTask, detectFlightEvents, calculateOptimizedTaskDistance, igcTaskToXCTask, resolveTurnpointSequence, maxBy, parseThresholdInput, formatThresholdForDisplay, DEFAULT_THRESHOLDS, type IGCFile, type IGCFix, type XCTask, type FlightEvent, type WaypointRecord, type DetectionThresholds, type PartialThresholds, type ThresholdDimension } from '@glidecomp/engine';
 import { getCurrentUser } from '../auth/client';
 import { fetchTaskByCodeWithRaw } from './xctsk-fetch';
 import { createMapProvider, type MapProvider, type MapProviderType } from './map-provider';
@@ -730,7 +730,7 @@ async function init(): Promise<void> {
   });
 
   // First-visit tooltip on Analysis button
-  if (!localStorage.getItem('taskscore-seen-analysis-hint')) {
+  if (!localStorage.getItem('glidecomp-seen-analysis-hint')) {
     // Find the panel toggle button container in the DOM (top-right control)
     const panelToggleContainer = document.querySelector('.mapboxgl-ctrl-top-right .mapboxgl-ctrl:first-child, .leaflet-top.leaflet-right .leaflet-bar:first-child');
     if (panelToggleContainer) {
@@ -742,7 +742,7 @@ async function init(): Promise<void> {
 
       const dismissTooltip = () => {
         tooltip.remove();
-        localStorage.setItem('taskscore-seen-analysis-hint', '1');
+        localStorage.setItem('glidecomp-seen-analysis-hint', '1');
         document.removeEventListener('click', dismissTooltip);
       };
 
@@ -788,7 +788,7 @@ async function init(): Promise<void> {
   // Feedback menu item opens mailto link
   menuFeedback?.addEventListener('click', () => {
     commandDialog?.close();
-    window.location.href = 'mailto:tushar.pokle@gmail.com?subject=TaskScore%20Feedback%20for%20you';
+    window.location.href = 'mailto:tushar.pokle@gmail.com?subject=GlideComp%20Feedback%20for%20you';
   });
 
   // Open IGC menu item triggers hidden file input

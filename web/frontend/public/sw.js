@@ -1,5 +1,5 @@
 /**
- * TaskScore Service Worker
+ * GlideComp Service Worker
  *
  * Handles the Web Share Target API so that IGC / XCTSK files shared from other
  * apps on mobile (Android) are received, cached, and then picked up by the

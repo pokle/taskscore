@@ -109,12 +109,12 @@ For tasks, we store both `rawJson` and parsed `task` because:
 
 ## IndexedDB Schema
 
-### Database: `taskscore`
+### Database: `glidecomp`
 
 ### Object Stores
 
 ```
-taskscore (database)
+glidecomp (database)
 ├── tasks (object store)
 │   ├── keyPath: "id"
 │   └── indexes:
@@ -522,7 +522,7 @@ This covers effectively all browsers in current use.
 
 1. **No sensitive data** - Only flight data and task definitions
 2. **Same-origin policy** - IndexedDB is origin-scoped
-3. **No cross-site access** - Data stays local to taskscore.shonky.info
+3. **No cross-site access** - Data stays local to glidecomp.com
 
 ## Implementation Status
 

@@ -94,9 +94,9 @@ When units are changed:
 The `ConfigStore` class provides an abstraction over localStorage:
 
 **Key Features:**
-- Stores preferences under `taskscore:preferences` localStorage key
+- Stores preferences under `glidecomp:preferences` localStorage key
 - Provides `getPreferences()`, `setPreferences()`, `getUnits()`, `setUnit()` methods
-- Dispatches `taskscore:preferences-changed` custom event when preferences change
+- Dispatches `glidecomp:preferences-changed` custom event when preferences change
 - Designed for future migration to backend API (same interface)
 
 **Types:**

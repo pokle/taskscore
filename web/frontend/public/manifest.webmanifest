@@ -1,6 +1,6 @@
 {
-  "name": "TaskScore",
-  "short_name": "TaskScore",
+  "name": "GlideComp",
+  "short_name": "GlideComp",
   "description": "Competition track log analysis for hanggliding and paragliding",
   "start_url": "/analysis.html",
   "display": "standalone",

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-TaskScore is a web application for analyzing hanggliding/paragliding competition track logs (IGC files). It provides task analysis, scoring explanations, glide and thermal analysis.
+GlideComp is a web application for analyzing hanggliding/paragliding competition track logs (IGC files). It provides task analysis, scoring explanations, glide and thermal analysis.
 
 ## Architecture
 
@@ -26,7 +26,7 @@ Frontend (Cloudflare Pages) ← user loads IGC + task files via drag-and-drop or
 
 If `node_modules/` is missing or a dependency can't be resolved, run `bun install` before proceeding. Build commands are in `package.json` scripts. Key ones: `bun run dev`, `bun run test`, `bun run typecheck:all`.
 
-**Production:** https://taskscore.shonky.info
+**Production:** https://glidecomp.com
 
 ## Coding Rules
 

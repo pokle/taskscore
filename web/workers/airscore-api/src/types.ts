@@ -97,7 +97,7 @@ export interface AirScoreRawResponse {
 }
 
 // ============================================================================
-// Transformed Types (compatible with TaskScore analysis tool)
+// Transformed Types (compatible with GlideComp analysis tool)
 // ============================================================================
 
 export interface Waypoint {

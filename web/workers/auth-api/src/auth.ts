@@ -3,7 +3,7 @@ import { Kysely } from "kysely";
 import { D1Dialect } from "kysely-d1";
 
 export type AuthEnv = {
-  taskscore_auth: D1Database;
+  glidecomp_auth: D1Database;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   BETTER_AUTH_SECRET: string;
@@ -11,7 +11,7 @@ export type AuthEnv = {
 };
 
 export function createAuth(env: AuthEnv) {
-  const db = new Kysely({ dialect: new D1Dialect({ database: env.taskscore_auth }) });
+  const db = new Kysely({ dialect: new D1Dialect({ database: env.glidecomp_auth }) });
 
   return betterAuth({
     database: {

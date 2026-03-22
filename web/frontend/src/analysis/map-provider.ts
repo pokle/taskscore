@@ -5,7 +5,7 @@
  * Supports MapBox GL JS and Leaflet 2.0 providers.
  */
 
-import type { IGCFix, XCTask, FlightEvent } from '@taskscore/engine';
+import type { IGCFix, XCTask, FlightEvent } from '@glidecomp/engine';
 import type { MapAnnotationLayer } from './map-annotations';
 
 export type MapProviderType = 'mapbox' | 'leaflet';

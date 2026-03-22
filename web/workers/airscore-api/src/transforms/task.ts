@@ -2,7 +2,7 @@
  * Transform AirScore task data to XCTask format
  */
 
-import { sanitizeText } from '@taskscore/engine';
+import { sanitizeText } from '@glidecomp/engine';
 import type {
   AirScoreTask,
   AirScoreWaypoint,

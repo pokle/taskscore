@@ -2,7 +2,7 @@
  * AirScore API Worker
  *
  * A caching proxy for the AirScore API that transforms task and track data
- * into a format compatible with the TaskScore analysis tool.
+ * into a format compatible with the GlideComp analysis tool.
  *
  * Endpoints:
  * - GET /api/airscore/task?comPk={comPk}&tasPk={tasPk}

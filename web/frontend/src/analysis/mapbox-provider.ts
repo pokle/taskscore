@@ -8,7 +8,7 @@
 
 import mapboxgl from 'mapbox-gl';
 import { Threebox } from 'threebox-plugin';
-import { getBoundingBox, getEventStyle, calculateGlideMarkers, calculateGlidePositions, getSegmentLengthMeters, calculateOptimizedTaskLine, getOptimizedSegmentDistances, calculateBearing, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@taskscore/engine';
+import { getBoundingBox, getEventStyle, calculateGlideMarkers, calculateGlidePositions, getSegmentLengthMeters, calculateOptimizedTaskLine, getOptimizedSegmentDistances, calculateBearing, type IGCFix, type XCTask, type FlightEvent, type GlideContext, type TurnpointSequenceResult } from '@glidecomp/engine';
 import type { MapProvider } from './map-provider';
 import { config } from './config';
 import {

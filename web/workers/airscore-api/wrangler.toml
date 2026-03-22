@@ -21,5 +21,5 @@ port = 8787
 
 # Production route (uncomment and configure when deploying)
 [[routes]]
-pattern = "taskscore.shonky.info/api/airscore/*"
-zone_name = "shonky.info"
+pattern = "glidecomp.com/api/airscore/*"
+zone_name = "glidecomp.com"

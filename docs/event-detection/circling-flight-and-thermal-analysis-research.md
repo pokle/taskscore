@@ -304,7 +304,7 @@ Only positive lift values contribute. A "center angle" is displayed showing the 
 
 ## 6. Key Threshold Comparison
 
-| Parameter | XCSoar | igc_lib | ArduSoar | Current TaskScore |
+| Parameter | XCSoar | igc_lib | ArduSoar | Current GlideComp |
 |-----------|--------|---------|----------|-------------------|
 | Turn rate threshold | 4 deg/s | 6 deg/s | N/A (uses vario) | Not implemented |
 | Bearing lookback window | Adjacent fixes (smoothed) | 5 seconds | N/A | Not implemented |
@@ -355,7 +355,7 @@ Only positive lift values contribute. A "center angle" is displayed showing the 
 
 ## 9. Recommended Implementation Approach
 
-Practical upgrade path for TaskScore, leveraging existing `geo.ts` primitives (`calculateBearing`, `andoyerDistance`):
+Practical upgrade path for GlideComp, leveraging existing `geo.ts` primitives (`calculateBearing`, `andoyerDistance`):
 
 ### Phase 1: Circling Detection
 

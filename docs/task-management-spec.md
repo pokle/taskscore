@@ -373,7 +373,7 @@ When multiple tasks match, show a selection dialog:
 
 ## Verification Steps
 
-1. **Database setup**: Run `wrangler d1 execute taskscore --file=schema.sql`
+1. **Database setup**: Run `wrangler d1 execute glidecomp --file=schema.sql`
 2. **Worker deployment**: Run `wrangler deploy` in web/workers/api
 3. **Create task**: Use command menu → Create Task → fill form
 4. **Verify storage**: Check D1 database has the task

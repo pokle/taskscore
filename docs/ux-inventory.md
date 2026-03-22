@@ -1,4 +1,4 @@
-# TaskScore UX Inventory
+# GlideComp UX Inventory
 
 Complete inventory of all UX elements, jobs to be done, commands, buttons, and flows — excluding map-internal interactions.
 

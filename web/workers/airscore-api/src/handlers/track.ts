@@ -29,7 +29,7 @@ async function fetchTrackFromAirScore(
 
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'TaskScore-AirScoreAPI/1.0',
+      'User-Agent': 'GlideComp-AirScoreAPI/1.0',
     },
   });
 

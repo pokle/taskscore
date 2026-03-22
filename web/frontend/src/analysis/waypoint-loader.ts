@@ -1,9 +1,9 @@
 /**
  * Waypoint loader (browser-only, uses fetch API).
- * Pure parsing logic lives in @taskscore/engine.
+ * Pure parsing logic lives in @glidecomp/engine.
  */
 
-import { parseWaypointsCSV, type WaypointRecord } from '@taskscore/engine';
+import { parseWaypointsCSV, type WaypointRecord } from '@glidecomp/engine';
 
 /**
  * Fetch and parse the default Corryong waypoints file.

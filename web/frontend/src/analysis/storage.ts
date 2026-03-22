@@ -3,9 +3,9 @@
  * Backed by IndexedDB for capacity and performance.
  */
 
-import type { XCTask, IGCFile } from '@taskscore/engine';
+import type { XCTask, IGCFile } from '@glidecomp/engine';
 
-const DB_NAME = 'taskscore';
+const DB_NAME = 'glidecomp';
 const DB_VERSION = 2;
 const TASKS_STORE = 'tasks';
 const TRACKS_STORE = 'tracks';

@@ -18,7 +18,7 @@ function airscoreWorkerCheck(): Plugin {
           `\n  ⚠ AirScore API worker is not running at ${workerUrl}` +
           `\n  AirScore features will not work. To fix, either:` +
           `\n    • Start the worker:  bun run --filter airscore-api dev` +
-          `\n    • Use production:    VITE_AIRSCORE_URL=https://taskscore.shonky.info/api/airscore bun run dev\n`
+          `\n    • Use production:    VITE_AIRSCORE_URL=https://glidecomp.com/api/airscore bun run dev\n`
         );
       });
     },

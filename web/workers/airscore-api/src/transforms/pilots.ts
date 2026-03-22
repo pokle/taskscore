@@ -2,7 +2,7 @@
  * Extract pilot results from AirScore data array
  */
 
-import { sanitizeText } from '@taskscore/engine';
+import { sanitizeText } from '@glidecomp/engine';
 import type { AirScoreDataRow, PilotResult } from '../types';
 
 /**

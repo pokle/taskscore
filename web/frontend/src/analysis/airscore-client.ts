@@ -5,7 +5,7 @@
  * via the caching proxy worker.
  */
 
-import type { XCTask } from '@taskscore/engine';
+import type { XCTask } from '@glidecomp/engine';
 
 // ============================================================================
 // Types matching the worker's response format

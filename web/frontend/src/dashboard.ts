@@ -1,6 +1,6 @@
 import { getCurrentUser, signOut, deleteAccount } from "./auth/client";
 import { storage, type StoredTask, type StoredTrack } from "./analysis/storage";
-import { parseIGC, parseXCTask, sanitizeText } from "@taskscore/engine";
+import { parseIGC, parseXCTask, sanitizeText } from "@glidecomp/engine";
 
 // ── Relative time formatting ──────────────────────────────────────────────
 
@@ -284,7 +284,7 @@ async function init() {
     const result = await deleteAccount();
     if (result.success) {
       localStorage.clear();
-      indexedDB.deleteDatabase("taskscore");
+      indexedDB.deleteDatabase("glidecomp");
       window.location.href = "/";
     } else {
       btn.disabled = false;

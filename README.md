@@ -1,4 +1,4 @@
-# TaskScore
+# GlideComp
 
 Helps you analyse hanggliding / paragliding competition tasks.
 
@@ -72,7 +72,7 @@ bun run --filter airscore-api dev
 The frontend automatically detects the local worker. If you'd rather skip the worker and use the production API instead:
 
 ```bash
-VITE_AIRSCORE_URL=https://taskscore.shonky.info/api/airscore bun run dev
+VITE_AIRSCORE_URL=https://glidecomp.com/api/airscore bun run dev
 ```
 
 ### Tests and type checking
@@ -99,8 +99,8 @@ bun run deploy:all       # Deploy Pages + all Workers
 ```
 
 **URLs:**
-- Production: https://taskscore.shonky.info
-- Previews: https://{branch}.taskscore.pages.dev
+- Production: https://glidecomp.com
+- Previews: https://{branch}.glidecomp.pages.dev
 
 ### CLI Scripts
 

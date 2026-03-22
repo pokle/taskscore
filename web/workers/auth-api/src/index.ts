@@ -59,7 +59,7 @@ app.post("/api/auth/set-username", async (c) => {
   }
 
   // Check uniqueness
-  const existing = await c.env.taskscore_auth.prepare(
+  const existing = await c.env.glidecomp_auth.prepare(
     'SELECT id FROM "user" WHERE username = ? AND id != ?'
   )
     .bind(username, session.user.id)
@@ -70,7 +70,7 @@ app.post("/api/auth/set-username", async (c) => {
   }
 
   // Update user
-  await c.env.taskscore_auth.prepare(
+  await c.env.glidecomp_auth.prepare(
     'UPDATE "user" SET username = ?, "updatedAt" = ? WHERE id = ?'
   )
     .bind(username, new Date().toISOString(), session.user.id)
@@ -90,7 +90,7 @@ app.post("/api/auth/delete-account", async (c) => {
   }
 
   // Delete user row — CASCADE rules auto-delete session and account rows
-  await c.env.taskscore_auth.prepare('DELETE FROM "user" WHERE id = ?')
+  await c.env.glidecomp_auth.prepare('DELETE FROM "user" WHERE id = ?')
     .bind(session.user.id)
     .run();
 

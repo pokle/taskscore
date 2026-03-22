@@ -1,12 +1,12 @@
 # Task Optimization Algorithm Comparison
 
-Comparison of shortest-route-through-cylinders algorithms: TaskScore engine vs AirScore vs FAI/CIVL GAP specification.
+Comparison of shortest-route-through-cylinders algorithms: GlideComp engine vs AirScore vs FAI/CIVL GAP specification.
 
 ## Summary
 
 All three systems solve the same geometric problem: find the shortest path from start through a sequence of turnpoint cylinders to goal. The differences are in optimization method, coordinate system, distance formula, and iteration strategy.
 
-| Aspect | TaskScore | AirScore (Python) | FAI/CIVL GAP Spec |
+| Aspect | GlideComp | AirScore (Python) | FAI/CIVL GAP Spec |
 |---|---|---|---|
 | **Optimization method** | Golden section search per cylinder | Angle bisector projection + iteration | Iterative projection (Annex A) |
 | **Coordinate system** | Geographic (lat/lon) | Planar (transverse Mercator projection) | Planar (UTM projection) |
@@ -15,7 +15,7 @@ All three systems solve the same geometric problem: find the shortest path from 
 | **Earth model** | WGS84 ellipsoid | WGS84 ellipsoid | WGS84 ellipsoid (Cat 1) or FAI sphere |
 | **Cylinder tolerance** | 0.5% default (configurable) | 0.5% | 0.1% (Cat 1), 0.5% (Cat 2) |
 
-## 1. TaskScore Engine Algorithm
+## 1. GlideComp Engine Algorithm
 
 **Source:** [`web/engine/src/task-optimizer.ts`](../../web/engine/src/task-optimizer.ts)
 
@@ -143,31 +143,31 @@ For each control zone circle, given incoming point A and outgoing point B:
 
 ### Optimization Method
 
-| | TaskScore | AirScore | CIVL Spec |
+| | GlideComp | AirScore | CIVL Spec |
 |---|---|---|---|
 | Core technique | 1D golden section search on angle θ | 2D angle bisector geometry | 2D angle bisector geometry |
 | Search space | Circle perimeter (0 to 2π) | Direct geometric construction | Direct geometric construction |
 | Per-cylinder work | ~30 iterations of cost function | Single geometric operation | Single geometric operation |
 | Re-optimization | Until convergence (< 1m) | Until convergence | Until convergence |
 
-**Analysis:** TaskScore's golden section search and AirScore's angle bisector both find the same optimal point for a single cylinder, but they find it differently. The golden section search numerically minimizes the cost function, while the angle bisector geometrically constructs the optimal point directly. For a single cylinder with fixed predecessor and successor, both produce the same result.
+**Analysis:** GlideComp's golden section search and AirScore's angle bisector both find the same optimal point for a single cylinder, but they find it differently. The golden section search numerically minimizes the cost function, while the angle bisector geometrically constructs the optimal point directly. For a single cylinder with fixed predecessor and successor, both produce the same result.
 
 All three systems now use iterative convergence: each re-runs the optimization pass with updated touching points until the total path distance stabilises. On `face.xctsk` (Corryong Cup 2026 — 7 km cylinder, acute angles), iterative convergence shortened the task distance by 209 m compared to a single-pass approach.
 
 ### Distance Formula
 
-| | TaskScore | AirScore | CIVL Spec |
+| | GlideComp | AirScore | CIVL Spec |
 |---|---|---|---|
 | Optimization distances | Andoyer-Lambert (WGS84 ellipsoid) | Euclidean (projected plane) | Euclidean (projected plane) |
 | Final reported distance | Andoyer-Lambert (WGS84 ellipsoid) | Geodesic (WGS84 ellipsoid) | Andoyer-Lambert (WGS84) |
 | Earth model | WGS84 ellipsoid | WGS84 ellipsoid | WGS84 ellipsoid (Cat 1) |
 | Max error vs WGS84 | ~2 ppm vs Vincenty | < 0.01% | Reference standard |
 
-All three systems now use the WGS84 ellipsoid for distance calculation. TaskScore uses the Andoyer-Lambert formula, which is accurate to ~2 ppm vs Vincenty's iterative solution — well within the tolerance needed for competition scoring. The remaining difference between TaskScore and AirScore/CIVL is in the optimization method (geographic coordinates vs projected plane), not the distance formula.
+All three systems now use the WGS84 ellipsoid for distance calculation. GlideComp uses the Andoyer-Lambert formula, which is accurate to ~2 ppm vs Vincenty's iterative solution — well within the tolerance needed for competition scoring. The remaining difference between GlideComp and AirScore/CIVL is in the optimization method (geographic coordinates vs projected plane), not the distance formula.
 
 ### Coordinate System
 
-TaskScore works directly in geographic coordinates (lat/lon), computing WGS84 ellipsoid distances (Andoyer-Lambert) for each golden section iteration. AirScore and the CIVL spec project to a 2D plane first, then work in Euclidean geometry.
+GlideComp works directly in geographic coordinates (lat/lon), computing WGS84 ellipsoid distances (Andoyer-Lambert) for each golden section iteration. AirScore and the CIVL spec project to a 2D plane first, then work in Euclidean geometry.
 
 **Trade-offs:**
 - Planar projection: Fast Euclidean math, but introduces projection distortion (< 0.04% in UTM)
@@ -187,7 +187,7 @@ TaskScore works directly in geographic coordinates (lat/lon), computing WGS84 el
 
 ### Current Status
 
-TaskScore is intended for scoring HG and PG competitions. The algorithm now matches the CIVL specification in all key areas:
+GlideComp is intended for scoring HG and PG competitions. The algorithm now matches the CIVL specification in all key areas:
 
 **Done:**
 - WGS84 ellipsoid distances (Andoyer-Lambert) — matches the FAI distance formula

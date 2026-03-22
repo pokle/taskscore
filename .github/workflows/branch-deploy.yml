@@ -65,7 +65,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy web/frontend/dist --project-name=taskscore --branch=${{ github.ref_name }}
+          command: pages deploy web/frontend/dist --project-name=glidecomp --branch=${{ github.ref_name }}
 
       - name: Deploy AirScore API Worker
         uses: cloudflare/wrangler-action@v3
@@ -89,4 +89,4 @@ jobs:
           BRANCH_SLUG=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
           echo "## Preview Deployment" >> $GITHUB_STEP_SUMMARY
           echo "Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "Preview URL: https://${BRANCH_SLUG}.taskscore.pages.dev" >> $GITHUB_STEP_SUMMARY
+          echo "Preview URL: https://${BRANCH_SLUG}.glidecomp.pages.dev" >> $GITHUB_STEP_SUMMARY

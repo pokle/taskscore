@@ -1,7 +1,7 @@
 /**
  * Browser-specific unit formatting wrappers.
  *
- * Re-exports all formatting functions from @taskscore/engine, but wired
+ * Re-exports all formatting functions from @glidecomp/engine, but wired
  * to read unit preferences from the browser config singleton.
  * Also provides onUnitsChanged() for reactive UI updates.
  */
@@ -16,7 +16,7 @@ import {
   formatRadius as _formatRadius,
   type FormattedValue,
   type DetectionThresholds,
-} from '@taskscore/engine';
+} from '@glidecomp/engine';
 
 export type { FormattedValue, UnitPreferences };
 
@@ -61,8 +61,8 @@ export function onUnitsChanged(
     callback(newUnits);
   };
 
-  window.addEventListener('taskscore:preferences-changed', handler);
-  return () => window.removeEventListener('taskscore:preferences-changed', handler);
+  window.addEventListener('glidecomp:preferences-changed', handler);
+  return () => window.removeEventListener('glidecomp:preferences-changed', handler);
 }
 
 /**
@@ -79,6 +79,6 @@ export function onPreferencesChanged(
   callback: () => void
 ): () => void {
   const handler = () => callback();
-  window.addEventListener('taskscore:preferences-changed', handler);
-  return () => window.removeEventListener('taskscore:preferences-changed', handler);
+  window.addEventListener('glidecomp:preferences-changed', handler);
+  return () => window.removeEventListener('glidecomp:preferences-changed', handler);
 }

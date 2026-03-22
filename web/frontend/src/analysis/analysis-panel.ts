@@ -5,7 +5,7 @@
  * Provides a unified interface for flight analysis data.
  */
 
-import { getEventStyle, getOptimizedSegmentDistances, resolveTurnpointSequence, extractGlides, extractClimbs, extractSinks, type FlightEvent, type FlightEventType, type XCTask, type TurnpointType, type Turnpoint, type TurnpointSequenceResult, type GlideData, type ClimbData, type SinkData, type FixIndexDetails, type GlideEventDetails, type WaypointRecord } from '@taskscore/engine';
+import { getEventStyle, getOptimizedSegmentDistances, resolveTurnpointSequence, extractGlides, extractClimbs, extractSinks, type FlightEvent, type FlightEventType, type XCTask, type TurnpointType, type Turnpoint, type TurnpointSequenceResult, type GlideData, type ClimbData, type SinkData, type FixIndexDetails, type GlideEventDetails, type WaypointRecord } from '@glidecomp/engine';
 import { formatAltitude, formatSpeed, formatDistance, formatClimbRate } from './units-browser';
 import { config } from './config';
 import { createTaskEditor, type TaskEditor } from './task-editor';
@@ -339,7 +339,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   let filteredEvents: FlightEvent[] = [];
   let currentTask: XCTask | null = null;
   let isPanelHidden = true;
-  const TAB_STORAGE_KEY = 'taskscore-active-tab';
+  const TAB_STORAGE_KEY = 'glidecomp-active-tab';
   const validTabs: PanelTabType[] = ['task', 'score', 'events', 'glides', 'climbs', 'sinks'];
   const savedTab = localStorage.getItem(TAB_STORAGE_KEY) as PanelTabType | null;
   let currentTab: PanelTabType = savedTab && validTabs.includes(savedTab) ? savedTab : 'events';

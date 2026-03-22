@@ -1,5 +1,5 @@
 {
-  "name": "@taskscore/frontend",
+  "name": "@glidecomp/frontend",
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "vite build && wrangler pages deploy dist --project-name=taskscore",
+    "deploy": "vite build && wrangler pages deploy dist --project-name=glidecomp",
     "typecheck": "tsc --noEmit"
   },
   "//": "Basecoat fork - see docs/basecoat-fork.md for build/publish instructions",
@@ -22,7 +22,7 @@
     "wrangler": "^4.73.0"
   },
   "dependencies": {
-    "@taskscore/engine": "workspace:*",
+    "@glidecomp/engine": "workspace:*",
     "better-auth": "^1.2.8",
     "leaflet": "2.0.0-alpha.1",
     "mapbox-gl": "^3.20.0",

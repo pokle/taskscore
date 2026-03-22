@@ -19,7 +19,7 @@
       },
     },
     "web/engine": {
-      "name": "@taskscore/engine",
+      "name": "@glidecomp/engine",
       "version": "0.1.0",
       "dependencies": {
         "@turf/bbox": "^7.3.4",
@@ -28,10 +28,10 @@
       },
     },
     "web/frontend": {
-      "name": "@taskscore/frontend",
+      "name": "@glidecomp/frontend",
       "version": "0.1.0",
       "dependencies": {
-        "@taskscore/engine": "workspace:*",
+        "@glidecomp/engine": "workspace:*",
         "better-auth": "^1.2.8",
         "leaflet": "2.0.0-alpha.1",
         "mapbox-gl": "^3.20.0",
@@ -51,7 +51,7 @@
       "name": "airscore-api",
       "version": "1.0.0",
       "dependencies": {
-        "@taskscore/engine": "workspace:*",
+        "@glidecomp/engine": "workspace:*",
       },
       "devDependencies": {
         "@cloudflare/workers-types": "^4.20260313.1",
@@ -170,6 +170,10 @@
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.27.4", "", { "os": "win32", "cpu": "x64" }, "sha512-+knoa0BDoeXgkNvvV1vvbZX4+hizelrkwmGJBdT17t8FNPwG2lKemmuMZlmaNQ3ws3DKKCxpb4zRZEIp3UxFCg=="],
 
     "@fontsource/atkinson-hyperlegible-next": ["@fontsource/atkinson-hyperlegible-next@5.2.7", "", {}, "sha512-FDRsNkqauNRBRiTD3YF6FV8yOVFjkcBqUjwrv6KnooEIRjsTuePUnahPsLHApWNtp1riztVCOPnr9RMHUZU3TQ=="],
+
+    "@glidecomp/engine": ["@glidecomp/engine@workspace:web/engine"],
+
+    "@glidecomp/frontend": ["@glidecomp/frontend@workspace:web/frontend"],
 
     "@img/colour": ["@img/colour@1.1.0", "", {}, "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ=="],
 
@@ -342,10 +346,6 @@
     "@tailwindcss/oxide-win32-x64-msvc": ["@tailwindcss/oxide-win32-x64-msvc@4.2.2", "", { "os": "win32", "cpu": "x64" }, "sha512-1T/37VvI7WyH66b+vqHj/cLwnCxt7Qt3WFu5Q8hk65aOvlwAhs7rAp1VkulBJw/N4tMirXjVnylTR72uI0HGcA=="],
 
     "@tailwindcss/vite": ["@tailwindcss/vite@4.2.2", "", { "dependencies": { "@tailwindcss/node": "4.2.2", "@tailwindcss/oxide": "4.2.2", "tailwindcss": "4.2.2" }, "peerDependencies": { "vite": "^5.2.0 || ^6 || ^7 || ^8" } }, "sha512-mEiF5HO1QqCLXoNEfXVA1Tzo+cYsrqV7w9Juj2wdUFyW07JRenqMG225MvPwr3ZD9N1bFQj46X7r33iHxLUW0w=="],
-
-    "@taskscore/engine": ["@taskscore/engine@workspace:web/engine"],
-
-    "@taskscore/frontend": ["@taskscore/frontend@workspace:web/frontend"],
 
     "@turf/bbox": ["@turf/bbox@7.3.4", "", { "dependencies": { "@turf/helpers": "7.3.4", "@turf/meta": "7.3.4", "@types/geojson": "^7946.0.10", "tslib": "^2.8.1" } }, "sha512-D5ErVWtfQbEPh11yzI69uxqrcJmbPU/9Y59f1uTapgwAwQHQztDWgsYpnL3ns8r1GmPWLP8sGJLVTIk2TZSiYA=="],
 

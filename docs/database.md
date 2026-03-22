@@ -2,7 +2,7 @@
 
 ## D1 Database
 
-TaskScore uses Cloudflare D1 (SQLite) for auth storage.
+GlideComp uses Cloudflare D1 (SQLite) for auth storage.
 
 - **Database name:** `taskscore-auth`
 - **Database ID:** `aa8b644f-368e-493a-8b49-1af0d756aff4`
@@ -20,7 +20,7 @@ bun run wrangler2 d1 execute taskscore-auth --remote --file=web/workers/auth-api
 
 ## Account Deletion
 
-`POST /api/auth/delete-account` deletes the `user` row from D1. CASCADE foreign keys automatically clean up `session` and `account` rows. The frontend also clears `localStorage` and deletes the `taskscore` IndexedDB database (which stores tracks and tasks).
+`POST /api/auth/delete-account` deletes the `user` row from D1. CASCADE foreign keys automatically clean up `session` and `account` rows. The frontend also clears `localStorage` and deletes the `glidecomp` IndexedDB database (which stores tracks and tasks).
 
 ### Future storage checklist
 

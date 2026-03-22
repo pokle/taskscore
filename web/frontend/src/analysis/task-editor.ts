@@ -5,8 +5,8 @@
  * Features: inline editing, drag-and-drop reorder, add/delete waypoints.
  */
 
-import type { XCTask, Turnpoint, TurnpointType, WaypointRecord } from '@taskscore/engine';
-import { getOptimizedSegmentDistances } from '@taskscore/engine';
+import type { XCTask, Turnpoint, TurnpointType, WaypointRecord } from '@glidecomp/engine';
+import { getOptimizedSegmentDistances } from '@glidecomp/engine';
 import { formatDistance, formatAltitude } from './units-browser';
 
 // ---------------------------------------------------------------------------

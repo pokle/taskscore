@@ -52,7 +52,7 @@
 
 # AirScore TODOs
 
-These aren't items for taskscore, but ideas for feature requests in AirScore.
+These aren't items for glidecomp, but ideas for feature requests in AirScore.
 
 - [ ] Dockerise AirScore so that I can run it locally and test it easily.
 - [ ] AirScore should load XContest tasks while creating tasks

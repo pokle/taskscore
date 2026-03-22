@@ -2,7 +2,7 @@
  * Command menu integration for stored tasks and tracks.
  */
 
-import { sanitizeText } from '@taskscore/engine';
+import { sanitizeText } from '@glidecomp/engine';
 import { storage, type StoredTask, type StoredTrack } from './storage';
 
 const MAX_MENU_ITEMS = 10;

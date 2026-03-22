@@ -21,7 +21,7 @@ async function fetchFromAirScore(
   const response = await fetch(url, {
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'TaskScore-AirScoreAPI/1.0',
+      'User-Agent': 'GlideComp-AirScoreAPI/1.0',
     },
   });
 

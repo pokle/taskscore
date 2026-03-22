@@ -1,6 +1,6 @@
 # Authentication Architecture
 
-Google OAuth authentication for TaskScore using Better Auth, Hono, and Cloudflare D1.
+Google OAuth authentication for GlideComp using Better Auth, Hono, and Cloudflare D1.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ Browser                    Cloudflare
 └─────────────┘           └──────────────────────┘
 ```
 
-- **Auth worker** at `taskscore.shonky.info/api/auth/*` (same origin, so cookies work)
+- **Auth worker** at `glidecomp.com/api/auth/*` (same origin, so cookies work)
 - **Frontend pages** served by Cloudflare Pages (static)
 - **`/u/*`** rewritten to `dashboard.html` via `_redirects` (200 rewrite, URL preserved)
 
@@ -99,13 +99,13 @@ Set in `wrangler.toml` (production) or `.dev.vars` (local dev override):
 
 | Variable | Production Value | Dev Value |
 |----------|-----------------|-----------|
-| `BETTER_AUTH_URL` | `https://taskscore.shonky.info` | `http://localhost:3000` |
+| `BETTER_AUTH_URL` | `https://glidecomp.com` | `http://localhost:3000` |
 
 ### Google Cloud Console
 
 1. Create OAuth 2.0 credentials in Google Cloud Console
 2. Set authorized redirect URIs:
-   - Production: `https://taskscore.shonky.info/api/auth/callback/google`
+   - Production: `https://glidecomp.com/api/auth/callback/google`
    - Development: `http://localhost:3000/api/auth/callback/google`
 
 ### D1 Database

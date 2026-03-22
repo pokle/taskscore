@@ -2,11 +2,11 @@
 
 ## Overview
 
-TaskScore is a client-heavy web application for analyzing hang gliding and paragliding competition track logs (IGC files) against defined tasks. The architecture prioritizes simplicity, minimal operational overhead, and generous free-tier usage.
+GlideComp is a client-heavy web application for analyzing hang gliding and paragliding competition track logs (IGC files) against defined tasks. The architecture prioritizes simplicity, minimal operational overhead, and generous free-tier usage.
 
 ## Current Architecture
 
-TaskScore is currently a **storage-free, client-side application** hosted on Cloudflare Pages. Users load IGC track files and XCTask task files directly in the browser via drag-and-drop or file picker. Browser local storage (IndexedDB) provides optional persistence.
+GlideComp is currently a **storage-free, client-side application** hosted on Cloudflare Pages. Users load IGC track files and XCTask task files directly in the browser via drag-and-drop or file picker. Browser local storage (IndexedDB) provides optional persistence.
 
 ```
 ┌─────────────────────────────────────┐

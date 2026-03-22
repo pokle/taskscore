@@ -11,7 +11,7 @@
     "clear-cache": "rm -rf .wrangler/state"
   },
   "dependencies": {
-    "@taskscore/engine": "workspace:*"
+    "@glidecomp/engine": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260313.1",

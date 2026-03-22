@@ -6,7 +6,7 @@ The IGC Analysis Tool is a browser-based flight analysis application that allows
 
 Single page app
 - source `web/frontend/src/analysis.html`
-- Deployed to https://taskscore.shonky.info/analysis
+- Deployed to https://glidecomp.com/analysis
 
 ## Features
 

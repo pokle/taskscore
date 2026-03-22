@@ -2,17 +2,17 @@
 
 ## Overview
 
-A Cloudflare Worker that acts as a caching proxy for the AirScore API, fetching task and track information and transforming it into a format compatible with the TaskScore analysis tool.
+A Cloudflare Worker that acts as a caching proxy for the AirScore API, fetching task and track information and transforming it into a format compatible with the GlideComp analysis tool.
 
 **Implementation:** `web/workers/airscore-api/`
 
 ## Problem Statement
 
-The TaskScore analysis tool needs to load competition tasks and pilot track data from AirScore. Direct browser requests face these challenges:
+The GlideComp analysis tool needs to load competition tasks and pilot track data from AirScore. Direct browser requests face these challenges:
 
 1. **CORS restrictions** - Browser security prevents direct cross-origin requests to AirScore
 2. **API efficiency** - Repeatedly fetching the same data wastes bandwidth and loads AirScore unnecessarily
-3. **Data format mismatch** - AirScore returns data in its own format; TaskScore uses XCTask format
+3. **Data format mismatch** - AirScore returns data in its own format; GlideComp uses XCTask format
 
 ## Design Decisions
 
@@ -55,7 +55,7 @@ The TaskScore analysis tool needs to load competition tasks and pilot track data
 
 AirScore returns data optimized for its web UI (HTML in data fields, nested structures). We transform to XCTask format because:
 
-1. **Existing parser support** - TaskScore already handles XCTask from XContest
+1. **Existing parser support** - GlideComp already handles XCTask from XContest
 2. **Clean separation** - Raw AirScore data preserved in `rawTask` for debugging
 3. **Type safety** - XCTask has well-defined TypeScript interfaces
 
@@ -178,11 +178,11 @@ bun run deploy
 
 ### Production Routing
 
-Options for routing `taskscore.shonky.info/api/airscore/*` to the worker:
+Options for routing `glidecomp.com/api/airscore/*` to the worker:
 
 1. **Worker routes** - Configure in `wrangler.toml`
 2. **Pages Functions** - Proxy from Pages to Worker
-3. **Separate subdomain** - `api.taskscore.shonky.info`
+3. **Separate subdomain** - `api.glidecomp.com`
 
 ## Security Considerations
 

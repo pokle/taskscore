@@ -3,7 +3,7 @@
  * Currently backed by localStorage, designed for future migration to backend API.
  */
 
-import { resolveThresholds, type DetectionThresholds, type PartialThresholds } from '@taskscore/engine';
+import { resolveThresholds, type DetectionThresholds, type PartialThresholds } from '@glidecomp/engine';
 
 export interface MapLocation {
   center: [lng: number, lat: number];
@@ -33,7 +33,7 @@ export type AltitudeUnit = 'm' | 'ft';
 export type DistanceUnit = 'km' | 'mi' | 'nmi';
 export type ClimbRateUnit = 'm/s' | 'ft/min' | 'knots';
 
-const STORAGE_KEY = 'taskscore:preferences';
+const STORAGE_KEY = 'glidecomp:preferences';
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   units: {
@@ -90,7 +90,7 @@ class ConfigStore {
 
     // Dispatch event for reactive updates
     window.dispatchEvent(
-      new CustomEvent('taskscore:preferences-changed', {
+      new CustomEvent('glidecomp:preferences-changed', {
         detail: merged,
       })
     );

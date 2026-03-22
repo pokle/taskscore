@@ -1,12 +1,12 @@
-# Contributing to TaskScore
+# Contributing to GlideComp
 
-Thanks for your interest in TaskScore! Here's how you can help.
+Thanks for your interest in GlideComp! Here's how you can help.
 
 ## Ways to Contribute
 
 ### Bug Reports
 
-Found something broken? [Open an issue](https://github.com/pokle/taskscore/issues) with:
+Found something broken? [Open an issue](https://github.com/pokle/glidecomp/issues) with:
 
 - What you were doing
 - What you expected to happen
@@ -16,7 +16,7 @@ Found something broken? [Open an issue](https://github.com/pokle/taskscore/issue
 
 ### Testing
 
-Try TaskScore on different devices, browsers, and screen sizes. Reports on mobile usability, map performance, and IGC file compatibility are especially useful.
+Try GlideComp on different devices, browsers, and screen sizes. Reports on mobile usability, map performance, and IGC file compatibility are especially useful.
 
 ### Ideas and Improvements
 

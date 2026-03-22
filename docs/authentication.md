@@ -1,6 +1,6 @@
 # Authentication
 
-> **Status:** Future Roadmap - Not yet implemented. TaskScore currently has no authentication; all features are public.
+> **Status:** Future Roadmap - Not yet implemented. GlideComp currently has no authentication; all features are public.
 
 # Roles
 
