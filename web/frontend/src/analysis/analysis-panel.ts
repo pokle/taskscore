@@ -278,6 +278,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       </nav>
       <nav role="tablist" class="w-full hidden" id="tab-row-multi">
         <button type="button" role="tab" id="tab-comp-score" aria-selected="true">Competition Score</button>
+        <button type="button" role="tab" id="tab-task-multi" aria-selected="false">Task</button>
         <button type="button" role="tab" id="tab-gap-config" aria-selected="false">Scoring Config</button>
       </nav>
     </div>
@@ -362,9 +363,10 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   const tabClimbs = panel.querySelector('#tab-climbs') as HTMLButtonElement;
   const tabSinks = panel.querySelector('#tab-sinks') as HTMLButtonElement;
   const tabCompScore = panel.querySelector('#tab-comp-score') as HTMLButtonElement;
+  const tabTaskMulti = panel.querySelector('#tab-task-multi') as HTMLButtonElement;
   const tabGapConfig = panel.querySelector('#tab-gap-config') as HTMLButtonElement;
   const tabGapConfigSingle = panel.querySelector('#tab-gap-config-single') as HTMLButtonElement;
-  const allTabs = [tabTask, tabScore, tabEvents, tabGlides, tabClimbs, tabSinks, tabCompScore, tabGapConfig, tabGapConfigSingle];
+  const allTabs = [tabTask, tabScore, tabEvents, tabGlides, tabClimbs, tabSinks, tabCompScore, tabTaskMulti, tabGapConfig, tabGapConfigSingle];
 
   const flightInfoEl = panel.querySelector('.flight-info-content') as HTMLElement;
 
@@ -579,7 +581,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       if (t) t.setAttribute('aria-selected', 'false');
     }
     const tabMap: Record<PanelTabType, HTMLButtonElement | null> = {
-      task: tabTask,
+      task: isMultiTrackMode ? tabTaskMulti : tabTask,
       score: tabScore,
       events: tabEvents,
       glides: tabGlides,
@@ -632,6 +634,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   tabClimbs?.addEventListener('click', () => switchTabInternal('climbs'));
   tabSinks?.addEventListener('click', () => switchTabInternal('sinks'));
   tabCompScore?.addEventListener('click', () => switchTabInternal('comp-score'));
+  tabTaskMulti?.addEventListener('click', () => switchTabInternal('task'));
   tabGapConfig?.addEventListener('click', () => switchTabInternal('gap-config'));
   tabGapConfigSingle?.addEventListener('click', () => switchTabInternal('gap-config'));
 
