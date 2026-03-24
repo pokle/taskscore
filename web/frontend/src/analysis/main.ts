@@ -108,6 +108,9 @@ async function init(): Promise<void> {
 
   // Settings dialog
   const menuConfigureSettings = document.getElementById('menu-configure-settings');
+  const menuCompetitionSettings = document.getElementById('menu-competition-settings');
+  const competitionSettingsDialog = document.getElementById('competition-settings-dialog') as HTMLDialogElement | null;
+  const competitionSettingsContent = document.getElementById('competition-settings-content');
   const menuClearSession = document.getElementById('menu-clear-session');
   const settingsDialog = document.getElementById('settings-dialog') as HTMLDialogElement | null;
   const settingsForm = document.getElementById('settings-form') as HTMLFormElement | null;
@@ -450,6 +453,113 @@ async function init(): Promise<void> {
     populateSettingsDialog();
     settingsDialog?.showModal();
   });
+
+  // Competition settings dialog
+  function populateCompetitionSettings(): void {
+    if (!competitionSettingsContent) return;
+    const params = config.getGAPParameters();
+    competitionSettingsContent.innerHTML = `
+      <form id="competition-settings-form" class="space-y-4">
+        <div class="space-y-3">
+          <label class="text-sm font-medium">Scoring Type</label>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+              <input type="radio" name="gap-scoring" value="PG" ${params.scoring === 'PG' ? 'checked' : ''} class="accent-primary">
+              Paragliding
+            </label>
+            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+              <input type="radio" name="gap-scoring" value="HG" ${params.scoring === 'HG' ? 'checked' : ''} class="accent-primary">
+              Hang Gliding
+            </label>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <label class="text-sm font-medium">Nominal Parameters</label>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label for="gap-nominal-distance" class="text-sm text-muted-foreground">Distance (m)</label>
+              <input type="number" id="gap-nominal-distance" value="${params.nominalDistance}" min="0" step="1000" class="input w-full">
+            </div>
+            <div class="space-y-1">
+              <label for="gap-nominal-time" class="text-sm text-muted-foreground">Time (s)</label>
+              <input type="number" id="gap-nominal-time" value="${params.nominalTime}" min="0" step="300" class="input w-full">
+            </div>
+            <div class="space-y-1">
+              <label for="gap-nominal-launch" class="text-sm text-muted-foreground">Launch ratio</label>
+              <input type="number" id="gap-nominal-launch" value="${params.nominalLaunch}" min="0" max="1" step="0.01" class="input w-full">
+            </div>
+            <div class="space-y-1">
+              <label for="gap-nominal-goal" class="text-sm text-muted-foreground">Goal ratio</label>
+              <input type="number" id="gap-nominal-goal" value="${params.nominalGoal}" min="0" max="1" step="0.01" class="input w-full">
+            </div>
+            <div class="space-y-1">
+              <label for="gap-minimum-distance" class="text-sm text-muted-foreground">Min distance (m)</label>
+              <input type="number" id="gap-minimum-distance" value="${params.minimumDistance}" min="0" step="500" class="input w-full">
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-sm font-medium">Point Categories</label>
+          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="checkbox" id="gap-use-leading" ${params.useLeading ? 'checked' : ''} class="accent-primary">
+            Leading (departure) points
+          </label>
+          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="checkbox" id="gap-use-arrival" ${params.useArrival ? 'checked' : ''} class="accent-primary">
+            Arrival points (HG only)
+          </label>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="submit" class="btn btn-primary flex-1">Save</button>
+          <button type="button" id="gap-reset-btn" class="btn btn-outline">Reset to defaults</button>
+        </div>
+      </form>
+    `;
+
+    const form = competitionSettingsContent.querySelector('#competition-settings-form') as HTMLFormElement;
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const scoring = (form.querySelector('input[name="gap-scoring"]:checked') as HTMLInputElement)?.value as 'PG' | 'HG' || 'PG';
+      config.setGAPParameters({
+        scoring,
+        nominalDistance: parseFloat((form.querySelector('#gap-nominal-distance') as HTMLInputElement).value) || 70000,
+        nominalTime: parseFloat((form.querySelector('#gap-nominal-time') as HTMLInputElement).value) || 5400,
+        nominalLaunch: parseFloat((form.querySelector('#gap-nominal-launch') as HTMLInputElement).value) || 0.96,
+        nominalGoal: parseFloat((form.querySelector('#gap-nominal-goal') as HTMLInputElement).value) || 0.2,
+        minimumDistance: parseFloat((form.querySelector('#gap-minimum-distance') as HTMLInputElement).value) || 5000,
+        useLeading: (form.querySelector('#gap-use-leading') as HTMLInputElement).checked,
+        useArrival: (form.querySelector('#gap-use-arrival') as HTMLInputElement).checked,
+      });
+      competitionSettingsDialog?.close();
+      onCompetitionSettingsChanged();
+    });
+
+    form?.querySelector('#gap-reset-btn')?.addEventListener('click', () => {
+      config.resetGAPParameters();
+      populateCompetitionSettings();
+      onCompetitionSettingsChanged();
+    });
+  }
+
+  function openCompetitionSettings(): void {
+    commandDialog?.close();
+    populateCompetitionSettings();
+    competitionSettingsDialog?.showModal();
+  }
+
+  function onCompetitionSettingsChanged(): void {
+    if (state.selectedTrack === 'all' && state.tracks.length > 1) {
+      computeCompetitionScore();
+      analysisPanel?.setCompetitionScore(state.compScore);
+      const pilotScores = state.compScore?.pilotScores ?? [];
+      mapRenderer?.setMultiTrack?.(state.tracks, pilotScores);
+    }
+  }
+
+  menuCompetitionSettings?.addEventListener('click', () => openCompetitionSettings());
 
   // Clear current task and track (reset to initial state)
   menuClearSession?.addEventListener('click', () => {
@@ -823,23 +933,13 @@ async function init(): Promise<void> {
         mapRenderer?.setMultiTrack?.(filteredTracks, filteredScores);
       }
     },
+    onOpenCompetitionSettings: () => openCompetitionSettings(),
   });
 
   // Pass waypoint database to the analysis panel for task editor search
   if (waypointDatabase.length > 0) {
     analysisPanel.setWaypointDatabase(waypointDatabase);
   }
-
-  // Wire GAP parameters changed callback
-  analysisPanel.onGAPParametersChanged = () => {
-    if (state.selectedTrack === 'all' && state.tracks.length > 1) {
-      computeCompetitionScore();
-      analysisPanel?.setCompetitionScore(state.compScore);
-      // Re-render tracks with updated scores
-      const pilotScores = state.compScore?.pilotScores ?? [];
-      mapRenderer?.setMultiTrack?.(state.tracks, pilotScores);
-    }
-  };
 
   // Wire multi-track click handler
   mapRenderer.onMultiTrackClick?.((trackIndex: number, fixIndex: number) => {

@@ -5,7 +5,7 @@
  * Provides a unified interface for flight analysis data.
  */
 
-import { getEventStyle, getOptimizedSegmentDistances, resolveTurnpointSequence, extractGlides, extractClimbs, extractSinks, scoreTask, DEFAULT_GAP_PARAMETERS, type FlightEvent, type FlightEventType, type XCTask, type TurnpointType, type Turnpoint, type TurnpointSequenceResult, type GlideData, type ClimbData, type SinkData, type FixIndexDetails, type GlideEventDetails, type WaypointRecord, type TaskScoreResult, type GAPParameters, type PilotFlight } from '@glidecomp/engine';
+import { getEventStyle, getOptimizedSegmentDistances, resolveTurnpointSequence, extractGlides, extractClimbs, extractSinks, type FlightEvent, type FlightEventType, type XCTask, type TurnpointType, type Turnpoint, type TurnpointSequenceResult, type GlideData, type ClimbData, type SinkData, type FixIndexDetails, type GlideEventDetails, type WaypointRecord, type TaskScoreResult, type GAPParameters } from '@glidecomp/engine';
 import { formatAltitude, formatSpeed, formatDistance, formatClimbRate } from './units-browser';
 import { config } from './config';
 import { createTaskEditor, type TaskEditor } from './task-editor';
@@ -28,6 +28,8 @@ export interface AnalysisPanelOptions {
   /** Called when pilot selection changes in the competition score tab.
    *  Receives the set of selected pilot names (empty = show all). */
   onPilotSelectionChanged?: (selectedPilots: Set<string> | null) => void;
+  /** Called when user clicks the gear icon in competition score tab */
+  onOpenCompetitionSettings?: () => void;
 }
 
 export interface FlightInfo {
@@ -62,10 +64,6 @@ export interface AnalysisPanel {
   setMultiTrackMode(enabled: boolean): void;
   /** Set competition score result for multi-track scoring */
   setCompetitionScore(result: TaskScoreResult | null): void;
-  /** Get the current GAP parameters from config */
-  getGAPParameters(): GAPParameters;
-  /** Callback when GAP parameters change */
-  onGAPParametersChanged?: (params: GAPParameters) => void;
 }
 
 /**
@@ -274,12 +272,10 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
         <button type="button" role="tab" id="tab-glides" aria-selected="false">Glides</button>
         <button type="button" role="tab" id="tab-climbs" aria-selected="false">Climbs</button>
         <button type="button" role="tab" id="tab-sinks" aria-selected="false">Sinks</button>
-        <button type="button" role="tab" id="tab-gap-config-single" aria-selected="false" style="font-size:0.7em">Config</button>
       </nav>
       <nav role="tablist" class="w-full hidden" id="tab-row-multi">
         <button type="button" role="tab" id="tab-comp-score" aria-selected="true">Competition Score</button>
         <button type="button" role="tab" id="tab-task-multi" aria-selected="false">Task</button>
-        <button type="button" role="tab" id="tab-gap-config" aria-selected="false">Scoring Config</button>
       </nav>
     </div>
 
@@ -327,9 +323,6 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       </div>
     </div>
 
-    <!-- GAP Config content -->
-    <div id="gap-config-panel-content" class="hidden flex-1 overflow-y-auto p-3 scrollbar">
-    </div>
   `;
 
   container.appendChild(panel);
@@ -352,7 +345,6 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   const eventCountEl = panel.querySelector('.event-count') as HTMLElement;
   const taskListContainer = panel.querySelector('#task-panel-content') as HTMLElement;
   const compScorePanelContent = panel.querySelector('#comp-score-panel-content') as HTMLElement;
-  const gapConfigPanelContent = panel.querySelector('#gap-config-panel-content') as HTMLElement;
   const tabRowSingle = panel.querySelector('#tab-row-single') as HTMLElement;
   const tabRowMulti = panel.querySelector('#tab-row-multi') as HTMLElement;
 
@@ -364,9 +356,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   const tabSinks = panel.querySelector('#tab-sinks') as HTMLButtonElement;
   const tabCompScore = panel.querySelector('#tab-comp-score') as HTMLButtonElement;
   const tabTaskMulti = panel.querySelector('#tab-task-multi') as HTMLButtonElement;
-  const tabGapConfig = panel.querySelector('#tab-gap-config') as HTMLButtonElement;
-  const tabGapConfigSingle = panel.querySelector('#tab-gap-config-single') as HTMLButtonElement;
-  const allTabs = [tabTask, tabScore, tabEvents, tabGlides, tabClimbs, tabSinks, tabCompScore, tabTaskMulti, tabGapConfig, tabGapConfigSingle];
+  const allTabs = [tabTask, tabScore, tabEvents, tabGlides, tabClimbs, tabSinks, tabCompScore, tabTaskMulti];
 
   const flightInfoEl = panel.querySelector('.flight-info-content') as HTMLElement;
 
@@ -377,7 +367,6 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   let isPanelHidden = true;
   let isMultiTrackMode = false;
   let currentCompScore: TaskScoreResult | null = null;
-  let gapParamsChangedCallback: ((params: GAPParameters) => void) | undefined;
   /** Selected pilot names in competition score tab (null = all selected) */
   let selectedPilots: Set<string> | null = null;
   const TAB_STORAGE_KEY = 'glidecomp-active-tab';
@@ -588,7 +577,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       climbs: tabClimbs,
       sinks: tabSinks,
       'comp-score': tabCompScore,
-      'gap-config': isMultiTrackMode ? tabGapConfig : tabGapConfigSingle,
+      'gap-config': null, // removed — now a dialog
     };
     tabMap[tab]?.setAttribute('aria-selected', 'true');
 
@@ -597,7 +586,6 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     taskPanelContent.classList.add('hidden');
     scorePanelContent.classList.add('hidden');
     compScorePanelContent.classList.add('hidden');
-    gapConfigPanelContent.classList.add('hidden');
     sparklineContainer.classList.add('hidden');
 
     // Show appropriate content panel
@@ -610,9 +598,6 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     } else if (tab === 'comp-score') {
       compScorePanelContent.classList.remove('hidden');
       renderCompetitionScore();
-    } else if (tab === 'gap-config') {
-      gapConfigPanelContent.classList.remove('hidden');
-      renderGAPConfig();
     } else {
       trackPanelContent.classList.remove('hidden');
       // Show sparkline if we have data
@@ -635,8 +620,6 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   tabSinks?.addEventListener('click', () => switchTabInternal('sinks'));
   tabCompScore?.addEventListener('click', () => switchTabInternal('comp-score'));
   tabTaskMulti?.addEventListener('click', () => switchTabInternal('task'));
-  tabGapConfig?.addEventListener('click', () => switchTabInternal('gap-config'));
-  tabGapConfigSingle?.addEventListener('click', () => switchTabInternal('gap-config'));
 
   // Restore saved tab
   if (currentTab !== 'events') {
@@ -1353,6 +1336,9 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
 
     let html = '<div class="space-y-3">';
 
+    // Settings gear link
+    html += `<div class="flex justify-end"><button type="button" class="comp-settings-btn flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer bg-transparent border-0 p-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>Scoring Config</button></div>`;
+
     // Task validity summary
     html += `
       <div class="rounded-lg border border-border bg-muted/30 p-3">
@@ -1464,97 +1450,10 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
         options.onPilotSelectionChanged?.(selectedPilots);
       });
     });
-  }
 
-  /**
-   * Render the GAP scoring configuration form
-   */
-  function renderGAPConfig(): void {
-    const params = config.getGAPParameters();
-    eventCountEl.textContent = 'Scoring Configuration';
-
-    gapConfigPanelContent.innerHTML = `
-      <div class="space-y-4">
-        <div class="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
-          <div class="text-xs text-muted-foreground font-medium">Scoring Type</div>
-          <div class="flex gap-3">
-            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
-              <input type="radio" name="gap-scoring" value="PG" ${params.scoring === 'PG' ? 'checked' : ''} class="accent-primary">
-              Paragliding
-            </label>
-            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
-              <input type="radio" name="gap-scoring" value="HG" ${params.scoring === 'HG' ? 'checked' : ''} class="accent-primary">
-              Hang Gliding
-            </label>
-          </div>
-        </div>
-
-        <div class="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
-          <div class="text-xs text-muted-foreground font-medium">Nominal Parameters</div>
-          <div class="grid grid-cols-2 gap-2">
-            <label class="text-sm">
-              <span class="text-muted-foreground">Distance (m)</span>
-              <input type="number" id="gap-nominal-distance" value="${params.nominalDistance}" min="0" step="1000" class="input mt-0.5 w-full text-sm">
-            </label>
-            <label class="text-sm">
-              <span class="text-muted-foreground">Time (s)</span>
-              <input type="number" id="gap-nominal-time" value="${params.nominalTime}" min="0" step="300" class="input mt-0.5 w-full text-sm">
-            </label>
-            <label class="text-sm">
-              <span class="text-muted-foreground">Launch ratio</span>
-              <input type="number" id="gap-nominal-launch" value="${params.nominalLaunch}" min="0" max="1" step="0.01" class="input mt-0.5 w-full text-sm">
-            </label>
-            <label class="text-sm">
-              <span class="text-muted-foreground">Goal ratio</span>
-              <input type="number" id="gap-nominal-goal" value="${params.nominalGoal}" min="0" max="1" step="0.01" class="input mt-0.5 w-full text-sm">
-            </label>
-            <label class="text-sm">
-              <span class="text-muted-foreground">Min distance (m)</span>
-              <input type="number" id="gap-minimum-distance" value="${params.minimumDistance}" min="0" step="500" class="input mt-0.5 w-full text-sm">
-            </label>
-          </div>
-        </div>
-
-        <div class="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
-          <div class="text-xs text-muted-foreground font-medium">Point Categories</div>
-          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
-            <input type="checkbox" id="gap-use-leading" ${params.useLeading ? 'checked' : ''} class="accent-primary">
-            Leading (departure) points
-          </label>
-          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
-            <input type="checkbox" id="gap-use-arrival" ${params.useArrival ? 'checked' : ''} class="accent-primary">
-            Arrival points (HG only)
-          </label>
-        </div>
-
-        <div class="flex gap-2">
-          <button type="button" id="gap-save-btn" class="btn btn-sm btn-primary flex-1">Save</button>
-          <button type="button" id="gap-reset-btn" class="btn btn-sm btn-outline">Reset to defaults</button>
-        </div>
-      </div>
-    `;
-
-    // Wire up save/reset
-    gapConfigPanelContent.querySelector('#gap-save-btn')?.addEventListener('click', () => {
-      const scoring = (gapConfigPanelContent.querySelector('input[name="gap-scoring"]:checked') as HTMLInputElement)?.value as 'PG' | 'HG' || 'PG';
-      const newParams: Partial<GAPParameters> = {
-        scoring,
-        nominalDistance: parseFloat((gapConfigPanelContent.querySelector('#gap-nominal-distance') as HTMLInputElement).value) || DEFAULT_GAP_PARAMETERS.nominalDistance,
-        nominalTime: parseFloat((gapConfigPanelContent.querySelector('#gap-nominal-time') as HTMLInputElement).value) || DEFAULT_GAP_PARAMETERS.nominalTime,
-        nominalLaunch: parseFloat((gapConfigPanelContent.querySelector('#gap-nominal-launch') as HTMLInputElement).value) || DEFAULT_GAP_PARAMETERS.nominalLaunch,
-        nominalGoal: parseFloat((gapConfigPanelContent.querySelector('#gap-nominal-goal') as HTMLInputElement).value) || DEFAULT_GAP_PARAMETERS.nominalGoal,
-        minimumDistance: parseFloat((gapConfigPanelContent.querySelector('#gap-minimum-distance') as HTMLInputElement).value) || DEFAULT_GAP_PARAMETERS.minimumDistance,
-        useLeading: (gapConfigPanelContent.querySelector('#gap-use-leading') as HTMLInputElement).checked,
-        useArrival: (gapConfigPanelContent.querySelector('#gap-use-arrival') as HTMLInputElement).checked,
-      };
-      config.setGAPParameters(newParams);
-      gapParamsChangedCallback?.(config.getGAPParameters());
-    });
-
-    gapConfigPanelContent.querySelector('#gap-reset-btn')?.addEventListener('click', () => {
-      config.resetGAPParameters();
-      renderGAPConfig();
-      gapParamsChangedCallback?.(config.getGAPParameters());
+    // Wire gear icon
+    compScorePanelContent.querySelector('.comp-settings-btn')?.addEventListener('click', () => {
+      options.onOpenCompetitionSettings?.();
     });
   }
 
@@ -1705,7 +1604,7 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
         tabRowMulti.classList.add('hidden');
         tabRowSingle.classList.remove('hidden');
         // Switch back to events tab
-        if (currentTab === 'comp-score' || currentTab === 'gap-config') {
+        if (currentTab === 'comp-score') {
           switchTabInternal('events');
         }
       }
@@ -1718,12 +1617,5 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       }
     },
 
-    getGAPParameters() {
-      return config.getGAPParameters();
-    },
-
-    set onGAPParametersChanged(cb: ((params: GAPParameters) => void) | undefined) {
-      gapParamsChangedCallback = cb;
-    },
   };
 }
