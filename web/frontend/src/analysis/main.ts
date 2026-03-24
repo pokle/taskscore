@@ -799,9 +799,16 @@ async function init(): Promise<void> {
 
   // File input handler
   igcFileInput?.addEventListener('change', async (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (file) {
+    const input = e.target as HTMLInputElement;
+    const files = input.files;
+    console.log('[file-input] change event fired, files:', files?.length, Array.from(files || []).map(f => f.name));
+    if (!files?.length) {
+      console.warn('[file-input] No files selected');
+      return;
+    }
+    for (const file of files) {
       const name = file.name.toLowerCase();
+      console.log('[file-input] Processing file:', file.name, 'size:', file.size);
       if (name.endsWith('.xctsk')) {
         await loadXCTaskFile(file);
       } else {
@@ -829,17 +836,24 @@ async function init(): Promise<void> {
     commandDialog?.close();
 
     const files = e.dataTransfer?.files;
-    if (!files?.length) return;
+    console.log('[drop] Drop event fired, files:', files?.length, Array.from(files || []).map(f => f.name));
+    if (!files?.length) {
+      console.warn('[drop] No files in drop event');
+      return;
+    }
 
     let recognized = false;
     for (const file of files) {
       const name = file.name.toLowerCase();
+      console.log('[drop] Processing file:', file.name, 'size:', file.size, 'type:', file.type);
       if (name.endsWith('.igc')) {
         recognized = true;
         await loadIGCFile(file);
       } else if (name.endsWith('.xctsk')) {
         recognized = true;
         await loadXCTaskFile(file);
+      } else {
+        console.warn('[drop] Unrecognized file extension:', name);
       }
     }
 
@@ -1029,13 +1043,15 @@ async function init(): Promise<void> {
    * Load and parse an IGC file
    */
   async function loadIGCFile(file: File): Promise<void> {
-
+    console.log('[loadIGCFile] Starting load for:', file.name, 'size:', file.size);
 
     try {
       const content = await file.text();
+      console.log('[loadIGCFile] Read content, length:', content.length, 'first 100 chars:', content.substring(0, 100));
       await loadIGCContent(content, file.name, true);
+      console.log('[loadIGCFile] Successfully loaded:', file.name);
     } catch (err) {
-      console.error('Failed to parse IGC file:', err);
+      console.error('[loadIGCFile] Failed to parse IGC file:', err);
       showStatus(`Failed to parse IGC file: ${err}`, 'error');
     }
   }
@@ -1045,7 +1061,9 @@ async function init(): Promise<void> {
    * @param shouldStore - whether to store in browser storage (true for new files, false for loading from storage)
    */
   async function loadIGCContent(content: string, filename: string, shouldStore: boolean): Promise<void> {
+    console.log('[loadIGCContent] Parsing:', filename, 'content length:', content.length, 'shouldStore:', shouldStore);
     const igcFile = parseIGC(content);
+    console.log('[loadIGCContent] Parsed OK, fixes:', igcFile.fixes?.length, 'has task:', !!igcFile.task);
 
     // If IGC file has a declared task and no external task is loaded, use it
     if (igcFile.task && igcFile.task.start && !state.task) {
