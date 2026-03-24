@@ -622,26 +622,125 @@ async function init(): Promise<void> {
     }
   });
 
+  // ── Sidebar width management ──
+  // Width presets as fractions: 3/4, 1/2, 1/3, collapsed (0)
+  const SIDEBAR_STORAGE_KEY = 'glidecomp-sidebar-width';
+  const WIDTH_PRESETS = [1/2, 1/3, 0];
+  const DEFAULT_SIDEBAR_WIDTH = 320; // px, default open width
+
+  /** Open the sidebar to a given pixel width (0 = collapsed) */
+  function openSidebar(width?: number): void {
+    if (!sidebar) return;
+    const w = width ?? (parseInt(localStorage.getItem(SIDEBAR_STORAGE_KEY) || '', 10) || DEFAULT_SIDEBAR_WIDTH);
+    sidebar.style.width = w + 'px';
+    sidebar.setAttribute('aria-hidden', 'false');
+    if (window.innerWidth < 768) sidebarBackdrop?.classList.remove('hidden');
+    syncHandlePosition();
+    mapRenderer?.invalidateSize();
+  }
+
+  /** Collapse the sidebar to 0 width */
+  function closeSidebar(): void {
+    if (!sidebar) return;
+    sidebar.style.width = '0px';
+    sidebar.setAttribute('aria-hidden', 'true');
+    sidebarBackdrop?.classList.add('hidden');
+    syncHandlePosition();
+    mapRenderer?.invalidateSize();
+  }
+
+  const resizeHandle = document.getElementById('sidebar-resize-handle');
+
+  /** Keep the drag handle pinned to the sidebar's left edge */
+  function syncHandlePosition(): void {
+    if (!resizeHandle || !sidebar) return;
+    resizeHandle.style.right = sidebar.style.width;
+  }
+
   // Set up sidebar toggle for mobile
   if (sidebar && sidebarBackdrop) {
-    // Listen for Basecoat sidebar events
     document.addEventListener('basecoat:sidebar', ((e: CustomEvent) => {
       const detail = e.detail || {};
-
       if (detail.id && detail.id !== 'waypoint-sidebar') return;
-
       const isOpen = sidebar.getAttribute('aria-hidden') === 'false';
-
       if (detail.action === 'close' || (detail.action === undefined && isOpen)) {
-        sidebar.setAttribute('aria-hidden', 'true');
-        sidebar.classList.add('translate-x-full');
-        sidebarBackdrop.classList.add('hidden');
+        closeSidebar();
       } else {
-        sidebar.setAttribute('aria-hidden', 'false');
-        sidebar.classList.remove('translate-x-full');
-        sidebarBackdrop.classList.remove('hidden');
+        openSidebar();
       }
     }) as EventListener);
+  }
+
+  // Sidebar resize handle (drag + click-to-cycle)
+  if (sidebar && resizeHandle) {
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartWidth = 0;
+    let wasClick = true;
+
+    // Restore saved width on load (sidebar starts collapsed until opened)
+    syncHandlePosition();
+
+    resizeHandle.addEventListener('pointerdown', (e: PointerEvent) => {
+      isDragging = true;
+      wasClick = true;
+      dragStartX = e.clientX;
+      dragStartWidth = sidebar.offsetWidth;
+      resizeHandle.setPointerCapture(e.pointerId);
+      sidebar.style.transition = 'none';
+      resizeHandle.style.transition = 'none';
+      e.preventDefault();
+    });
+
+    resizeHandle.addEventListener('pointermove', (e: PointerEvent) => {
+      if (!isDragging) return;
+      const dx = dragStartX - e.clientX;
+      if (Math.abs(dx) > 3) wasClick = false;
+      const newWidth = Math.max(0, Math.min(window.innerWidth * 0.9, dragStartWidth + dx));
+      sidebar.style.width = newWidth + 'px';
+      syncHandlePosition();
+      mapRenderer?.invalidateSize();
+    });
+
+    resizeHandle.addEventListener('pointerup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      sidebar.style.transition = '';
+      resizeHandle.style.transition = '';
+
+      if (wasClick) {
+        // Cycle to the next smaller preset, wrapping back to largest
+        const currentFraction = sidebar.offsetWidth / window.innerWidth;
+        let nextPreset = WIDTH_PRESETS[0]; // default: wrap to largest
+        for (let i = 0; i < WIDTH_PRESETS.length; i++) {
+          if (currentFraction > WIDTH_PRESETS[i] + 0.03) {
+            nextPreset = WIDTH_PRESETS[i];
+            break;
+          }
+        }
+
+        if (nextPreset === 0) {
+          closeSidebar();
+        } else {
+          const newWidth = Math.round(window.innerWidth * nextPreset);
+          sidebar.setAttribute('aria-hidden', 'false');
+          sidebar.style.width = newWidth + 'px';
+          localStorage.setItem(SIDEBAR_STORAGE_KEY, String(newWidth));
+          syncHandlePosition();
+        }
+      } else {
+        // Save dragged width
+        const w = sidebar.offsetWidth;
+        if (w < 50) {
+          closeSidebar();
+        } else {
+          sidebar.setAttribute('aria-hidden', w > 0 ? 'false' : 'true');
+          localStorage.setItem(SIDEBAR_STORAGE_KEY, String(w));
+        }
+        syncHandlePosition();
+      }
+      mapRenderer?.invalidateSize();
+    });
   }
 
   // Handle event click
@@ -696,23 +795,8 @@ async function init(): Promise<void> {
     onTaskEdited: handleTaskEdited,
     onMapClickModeRequest: handleMapClickModeRequest,
     onToggle: handlePanelToggle,
-    onHide: () => {
-      if (sidebar) {
-        sidebar.setAttribute('aria-hidden', 'true');
-        sidebar.classList.add('translate-x-full');
-        sidebarBackdrop?.classList.add('hidden');
-      }
-    },
-    onShow: () => {
-      if (sidebar) {
-        sidebar.setAttribute('aria-hidden', 'false');
-        sidebar.classList.remove('translate-x-full');
-        // Only show backdrop on mobile
-        if (window.innerWidth < 768) {
-          sidebarBackdrop?.classList.remove('hidden');
-        }
-      }
-    },
+    onHide: () => closeSidebar(),
+    onShow: () => openSidebar(),
     onLoadSampleFlight: () => {
       // Click the first sample flight button in the command menu
       const firstSampleBtn = document.getElementById('sample-tushar');

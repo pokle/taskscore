@@ -19,12 +19,20 @@
 
 <body class="h-screen overflow-hidden bg-background text-foreground">
     <main class="relative h-full overflow-hidden">
+        <!-- Sidebar resize handle (always visible, outside sidebar) -->
+        <div id="sidebar-resize-handle"
+            class="fixed top-0 bottom-0 right-0 z-50 w-1.5 cursor-col-resize group hover:bg-primary/30 active:bg-primary/50 transition-colors"
+            title="Drag to resize, click to cycle widths">
+            <div class="absolute left-0.5 top-1/2 -translate-y-1/2 w-0.5 h-8 rounded-full bg-border group-hover:bg-primary/60 transition-colors"></div>
+        </div>
+
         <!-- Analysis Panel Sidebar (slides in from right) -->
         <aside
             id="waypoint-sidebar"
-            class="fixed top-0 bottom-0 right-0 z-40 w-80 border-l border-border bg-card transition-transform duration-300 translate-x-full"
+            class="fixed top-0 bottom-0 right-0 z-40 border-l border-border bg-card transition-[width] duration-300 overflow-hidden"
             aria-hidden="true"
             data-side="right"
+            style="width: 0px;"
         >
             <nav class="flex h-full flex-col" aria-label="Waypoint panel">
                 <!-- Hidden file input -->
