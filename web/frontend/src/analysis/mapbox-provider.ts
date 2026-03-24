@@ -1710,10 +1710,8 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
         for (let ti = 0; ti < tracks.length; ti++) {
           const track = tracks[ti];
-          const score = pilotScores.find(ps => ps.pilotName === track.pilotName);
-          const rank = score?.rank ?? ti + 1;
-          const totalPilots = pilotScores.length || tracks.length;
-          const color = getRankColor(rank, totalPilots);
+          // Color by position in the visible set, not original rank
+          const color = getRankColor(ti + 1, tracks.length);
 
           for (let i = 1; i < track.fixes.length; i++) {
             const prev = track.fixes[i - 1];
@@ -1787,9 +1785,8 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         for (let ti = 0; ti < trackAlignments.length; ti++) {
           const alignment = trackAlignments[ti];
           const { track } = alignment;
-          const score = pilotScores.find(ps => ps.pilotName === track.pilotName);
-          const rank = score?.rank ?? ti + 1;
-          const color = getRankColor(rank, pilotScores.length || tracks.length);
+          // Color by position in the visible set, not original rank
+          const color = getRankColor(ti + 1, tracks.length);
 
           let pathD = '';
           for (let i = 0; i < track.fixes.length; i++) {
@@ -1871,7 +1868,8 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         const maxDuration = Math.max(...trackAlignments.map(a => a.duration), 1);
         const currentElapsed = fraction * maxDuration;
 
-        for (const ps of top3) {
+        for (let mi = 0; mi < top3.length; mi++) {
+          const ps = top3[mi];
           const alignment = trackAlignments.find(a => a.track.pilotName === ps.pilotName);
           if (!alignment) continue;
 
@@ -1899,7 +1897,7 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
 
           // If in 3D mode, also add a marker
           if (tb) {
-            const color = getRankColor(ps.rank, pilotScores.length);
+            const color = getRankColor(mi + 1, top3.length);
             const marker = tb.line({
               geometry: [
                 [fix.longitude, fix.latitude, fix.gnssAltitude * TERRAIN_EXAGGERATION],
@@ -2695,8 +2693,8 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
             const track = tracks[ti];
             const score = pilotScores.find(ps => ps.pilotName === track.pilotName);
             const rank = score?.rank ?? ti + 1;
-            const totalPilots = pilotScores.length || tracks.length;
-            const color = getRankColor(rank, totalPilots);
+            // Color by position in the visible set, not original rank
+            const color = getRankColor(ti + 1, tracks.length);
 
             // Build one LineString per track
             const coordinates: [number, number][] = [];
