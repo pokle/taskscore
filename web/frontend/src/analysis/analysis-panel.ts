@@ -5,7 +5,7 @@
  * Provides a unified interface for flight analysis data.
  */
 
-import { getEventStyle, getOptimizedSegmentDistances, resolveTurnpointSequence, extractGlides, extractClimbs, extractSinks, type FlightEvent, type FlightEventType, type XCTask, type TurnpointType, type Turnpoint, type TurnpointSequenceResult, type GlideData, type ClimbData, type SinkData, type FixIndexDetails, type GlideEventDetails, type WaypointRecord } from '@glidecomp/engine';
+import { getEventStyle, getOptimizedSegmentDistances, resolveTurnpointSequence, extractGlides, extractClimbs, extractSinks, type FlightEvent, type FlightEventType, type XCTask, type TurnpointType, type Turnpoint, type TurnpointSequenceResult, type GlideData, type ClimbData, type SinkData, type FixIndexDetails, type GlideEventDetails, type WaypointRecord, type TaskScoreResult, type GAPParameters } from '@glidecomp/engine';
 import { formatAltitude, formatSpeed, formatDistance, formatClimbRate } from './units-browser';
 import { config } from './config';
 import { createTaskEditor, type TaskEditor } from './task-editor';
@@ -13,7 +13,7 @@ import { createTaskEditor, type TaskEditor } from './task-editor';
 /**
  * Unified panel tabs
  */
-export type PanelTabType = 'task' | 'score' | 'events' | 'glides' | 'climbs' | 'sinks';
+export type PanelTabType = 'task' | 'score' | 'events' | 'glides' | 'climbs' | 'sinks' | 'comp-score' | 'gap-config';
 
 export interface AnalysisPanelOptions {
   container: HTMLElement;
@@ -25,6 +25,11 @@ export interface AnalysisPanelOptions {
   onHide?: () => void;
   onShow?: () => void;
   onLoadSampleFlight?: () => void;
+  /** Called when pilot selection changes in the competition score tab.
+   *  Receives the set of selected pilot names (empty = show all). */
+  onPilotSelectionChanged?: (selectedPilots: Set<string> | null) => void;
+  /** Called when user clicks the gear icon in competition score tab */
+  onOpenCompetitionSettings?: () => void;
 }
 
 export interface FlightInfo {
@@ -55,6 +60,10 @@ export interface AnalysisPanel {
   selectByFixIndex(fixIndex: number, options?: { skipPan?: boolean }): void;
   selectTurnpoint(turnpointIndex: number): void;
   destroy(): void;
+  /** Set multi-track mode: shows only comp-score tab when 'all' selected */
+  setMultiTrackMode(enabled: boolean): void;
+  /** Set competition score result for multi-track scoring */
+  setCompetitionScore(result: TaskScoreResult | null): void;
 }
 
 /**
@@ -256,13 +265,17 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
 
     <!-- Unified tab row -->
     <div class="tabs w-full border-b border-border">
-      <nav role="tablist" class="w-full">
+      <nav role="tablist" class="w-full" id="tab-row-single">
         <button type="button" role="tab" id="tab-task" aria-selected="false">Task</button>
         <button type="button" role="tab" id="tab-score" aria-selected="false">Score</button>
         <button type="button" role="tab" id="tab-events" aria-selected="true">Events</button>
         <button type="button" role="tab" id="tab-glides" aria-selected="false">Glides</button>
         <button type="button" role="tab" id="tab-climbs" aria-selected="false">Climbs</button>
         <button type="button" role="tab" id="tab-sinks" aria-selected="false">Sinks</button>
+      </nav>
+      <nav role="tablist" class="w-full hidden" id="tab-row-multi">
+        <button type="button" role="tab" id="tab-comp-score" aria-selected="true">Competition Score</button>
+        <button type="button" role="tab" id="tab-task-multi" aria-selected="false">Task</button>
       </nav>
     </div>
 
@@ -302,6 +315,14 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
         Load a task and track to see scoring
       </div>
     </div>
+
+    <!-- Competition Score content (multi-track) -->
+    <div id="comp-score-panel-content" class="hidden flex-1 overflow-y-auto p-2 scrollbar">
+      <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
+        Load multiple tracks and a task to see competition scores
+      </div>
+    </div>
+
   `;
 
   container.appendChild(panel);
@@ -323,6 +344,9 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   const listContainer = trackPanelContent;
   const eventCountEl = panel.querySelector('.event-count') as HTMLElement;
   const taskListContainer = panel.querySelector('#task-panel-content') as HTMLElement;
+  const compScorePanelContent = panel.querySelector('#comp-score-panel-content') as HTMLElement;
+  const tabRowSingle = panel.querySelector('#tab-row-single') as HTMLElement;
+  const tabRowMulti = panel.querySelector('#tab-row-multi') as HTMLElement;
 
   const tabTask = panel.querySelector('#tab-task') as HTMLButtonElement;
   const tabScore = panel.querySelector('#tab-score') as HTMLButtonElement;
@@ -330,7 +354,9 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   const tabGlides = panel.querySelector('#tab-glides') as HTMLButtonElement;
   const tabClimbs = panel.querySelector('#tab-climbs') as HTMLButtonElement;
   const tabSinks = panel.querySelector('#tab-sinks') as HTMLButtonElement;
-  const allTabs = [tabTask, tabScore, tabEvents, tabGlides, tabClimbs, tabSinks];
+  const tabCompScore = panel.querySelector('#tab-comp-score') as HTMLButtonElement;
+  const tabTaskMulti = panel.querySelector('#tab-task-multi') as HTMLButtonElement;
+  const allTabs = [tabTask, tabScore, tabEvents, tabGlides, tabClimbs, tabSinks, tabCompScore, tabTaskMulti];
 
   const flightInfoEl = panel.querySelector('.flight-info-content') as HTMLElement;
 
@@ -339,8 +365,12 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   let filteredEvents: FlightEvent[] = [];
   let currentTask: XCTask | null = null;
   let isPanelHidden = true;
+  let isMultiTrackMode = false;
+  let currentCompScore: TaskScoreResult | null = null;
+  /** Selected pilot names in competition score tab (null = all selected) */
+  let selectedPilots: Set<string> | null = null;
   const TAB_STORAGE_KEY = 'glidecomp-active-tab';
-  const validTabs: PanelTabType[] = ['task', 'score', 'events', 'glides', 'climbs', 'sinks'];
+  const validTabs: PanelTabType[] = ['task', 'score', 'events', 'glides', 'climbs', 'sinks', 'comp-score', 'gap-config'];
   const savedTab = localStorage.getItem(TAB_STORAGE_KEY) as PanelTabType | null;
   let currentTab: PanelTabType = savedTab && validTabs.includes(savedTab) ? savedTab : 'events';
   let selectedSegment: { startIndex: number; endIndex: number } | null = null;
@@ -540,31 +570,35 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       if (t) t.setAttribute('aria-selected', 'false');
     }
     const tabMap: Record<PanelTabType, HTMLButtonElement | null> = {
-      task: tabTask,
+      task: isMultiTrackMode ? tabTaskMulti : tabTask,
       score: tabScore,
       events: tabEvents,
       glides: tabGlides,
       climbs: tabClimbs,
       sinks: tabSinks,
+      'comp-score': tabCompScore,
+      'gap-config': null, // removed — now a dialog
     };
     tabMap[tab]?.setAttribute('aria-selected', 'true');
 
+    // Hide all content panels first
+    trackPanelContent.classList.add('hidden');
+    taskPanelContent.classList.add('hidden');
+    scorePanelContent.classList.add('hidden');
+    compScorePanelContent.classList.add('hidden');
+    sparklineContainer.classList.add('hidden');
+
     // Show appropriate content panel
     if (tab === 'task') {
-      trackPanelContent.classList.add('hidden');
-      scorePanelContent.classList.add('hidden');
-      sparklineContainer.classList.add('hidden');
       taskPanelContent.classList.remove('hidden');
       renderTask();
     } else if (tab === 'score') {
-      trackPanelContent.classList.add('hidden');
-      taskPanelContent.classList.add('hidden');
-      sparklineContainer.classList.add('hidden');
       scorePanelContent.classList.remove('hidden');
       renderScore();
+    } else if (tab === 'comp-score') {
+      compScorePanelContent.classList.remove('hidden');
+      renderCompetitionScore();
     } else {
-      taskPanelContent.classList.add('hidden');
-      scorePanelContent.classList.add('hidden');
       trackPanelContent.classList.remove('hidden');
       // Show sparkline if we have data
       if (sparklineDataUri) {
@@ -584,6 +618,8 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
   tabGlides?.addEventListener('click', () => switchTabInternal('glides'));
   tabClimbs?.addEventListener('click', () => switchTabInternal('climbs'));
   tabSinks?.addEventListener('click', () => switchTabInternal('sinks'));
+  tabCompScore?.addEventListener('click', () => switchTabInternal('comp-score'));
+  tabTaskMulti?.addEventListener('click', () => switchTabInternal('task'));
 
   // Restore saved tab
   if (currentTab !== 'events') {
@@ -1278,6 +1314,149 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     }
   }
 
+  /**
+   * Render the competition score table (multi-track mode)
+   */
+  function renderCompetitionScore(): void {
+    if (!currentCompScore) {
+      eventCountEl.textContent = 'No competition score';
+      compScorePanelContent.innerHTML = `
+        <div class="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
+          Load multiple tracks and a task to see competition scores
+        </div>
+      `;
+      return;
+    }
+
+    const result = currentCompScore;
+    const params = result.parameters;
+    const stats = result.stats;
+
+    eventCountEl.textContent = `${result.pilotScores.length} pilots \u00b7 ${stats.numInGoal} in goal`;
+
+    let html = '<div class="space-y-3">';
+
+    // Settings gear link
+    html += `<div class="flex justify-end"><button type="button" class="comp-settings-btn flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer bg-transparent border-0 p-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>Scoring Config</button></div>`;
+
+    // Task validity summary
+    html += `
+      <div class="rounded-lg border border-border bg-muted/30 p-3">
+        <div class="text-xs text-muted-foreground mb-1">Task Validity</div>
+        <div class="flex gap-3 text-sm">
+          <span>Launch: ${(result.taskValidity.launch * 100).toFixed(1)}%</span>
+          <span>Dist: ${(result.taskValidity.distance * 100).toFixed(1)}%</span>
+          <span>Time: ${(result.taskValidity.time * 100).toFixed(1)}%</span>
+          <span class="font-medium">Task: ${(result.taskValidity.task * 100).toFixed(1)}%</span>
+        </div>
+      </div>
+    `;
+
+    // Available points
+    html += `
+      <div class="rounded-lg border border-border bg-muted/30 p-3">
+        <div class="text-xs text-muted-foreground mb-1">Available Points (${result.availablePoints.total.toFixed(0)})</div>
+        <div class="flex gap-3 text-sm flex-wrap">
+          <span>Distance: ${result.availablePoints.distance.toFixed(0)}</span>
+          <span>Time: ${result.availablePoints.time.toFixed(0)}</span>
+          <span>Leading: ${result.availablePoints.leading.toFixed(0)}</span>
+          ${params.scoring === 'HG' ? `<span>Arrival: ${result.availablePoints.arrival.toFixed(0)}</span>` : ''}
+        </div>
+      </div>
+    `;
+
+    // Stats
+    html += `
+      <div class="rounded-lg border border-border bg-muted/30 p-3">
+        <div class="text-xs text-muted-foreground mb-1">Stats</div>
+        <div class="flex gap-3 text-sm flex-wrap">
+          <span>Pilots: ${stats.numFlying}</span>
+          <span>In goal: ${stats.numInGoal}</span>
+          <span>ESS: ${stats.numReachedESS}</span>
+          <span>Best dist: ${formatDistance(stats.bestDistance).withUnit}</span>
+          ${stats.bestTime ? `<span>Best time: ${formatHMS(stats.bestTime)}</span>` : ''}
+        </div>
+      </div>
+    `;
+
+    // Ranked scores table
+    const allSelected = selectedPilots === null;
+    html += `<div class="rounded-lg border border-border overflow-hidden">`;
+    html += `<table class="w-full text-sm">`;
+    html += `<thead class="bg-muted/50"><tr>
+      <th class="px-2 py-1.5 text-left font-medium"><input type="checkbox" id="comp-select-all" class="accent-primary" ${allSelected ? 'checked' : ''}></th>
+      <th class="px-2 py-1.5 text-left font-medium">#</th>
+      <th class="px-2 py-1.5 text-left font-medium">Pilot</th>
+      <th class="px-2 py-1.5 text-right font-medium">Dist</th>
+      <th class="px-2 py-1.5 text-right font-medium">Time</th>
+      <th class="px-2 py-1.5 text-right font-medium">Lead</th>
+      ${params.scoring === 'HG' ? `<th class="px-2 py-1.5 text-right font-medium">Arr</th>` : ''}
+      <th class="px-2 py-1.5 text-right font-medium">Total</th>
+    </tr></thead>`;
+    html += `<tbody>`;
+
+    for (const ps of result.pilotScores) {
+      const isChecked = allSelected || selectedPilots!.has(ps.pilotName);
+      const goalIcon = ps.madeGoal ? '<span class="text-green-600 ml-1" title="Goal">&#10003;</span>' : '';
+      html += `<tr class="border-t border-border hover:bg-muted/30${!isChecked ? ' opacity-40' : ''}">
+        <td class="px-2 py-1.5"><input type="checkbox" class="comp-pilot-cb accent-primary" data-pilot="${ps.pilotName}" ${isChecked ? 'checked' : ''}></td>
+        <td class="px-2 py-1.5 font-medium">${ps.rank}</td>
+        <td class="px-2 py-1.5 truncate max-w-[120px]" title="${ps.pilotName}">${ps.pilotName}${goalIcon}</td>
+        <td class="px-2 py-1.5 text-right tabular-nums">${ps.distancePoints.toFixed(1)}</td>
+        <td class="px-2 py-1.5 text-right tabular-nums">${ps.timePoints.toFixed(1)}</td>
+        <td class="px-2 py-1.5 text-right tabular-nums">${ps.leadingPoints.toFixed(1)}</td>
+        ${params.scoring === 'HG' ? `<td class="px-2 py-1.5 text-right tabular-nums">${ps.arrivalPoints.toFixed(1)}</td>` : ''}
+        <td class="px-2 py-1.5 text-right font-medium tabular-nums">${ps.totalScore}</td>
+      </tr>`;
+    }
+
+    html += `</tbody></table></div>`;
+    html += '</div>';
+    compScorePanelContent.innerHTML = html;
+
+    // Wire checkbox handlers
+    const selectAllCb = compScorePanelContent.querySelector('#comp-select-all') as HTMLInputElement;
+    selectAllCb?.addEventListener('change', () => {
+      if (selectAllCb.checked) {
+        selectedPilots = null; // all selected
+      } else {
+        selectedPilots = new Set(); // none selected
+      }
+      renderCompetitionScore();
+      options.onPilotSelectionChanged?.(selectedPilots);
+    });
+
+    compScorePanelContent.querySelectorAll('.comp-pilot-cb').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const input = cb as HTMLInputElement;
+        const pilot = input.dataset.pilot!;
+
+        if (selectedPilots === null) {
+          // Transitioning from "all selected" to individual selection:
+          // populate the set with everyone, then toggle this one off
+          selectedPilots = new Set(result.pilotScores.map(ps => ps.pilotName));
+          selectedPilots.delete(pilot);
+        } else if (input.checked) {
+          selectedPilots.add(pilot);
+          // If all are now checked, go back to null (= all selected)
+          if (selectedPilots.size === result.pilotScores.length) {
+            selectedPilots = null;
+          }
+        } else {
+          selectedPilots.delete(pilot);
+        }
+
+        renderCompetitionScore();
+        options.onPilotSelectionChanged?.(selectedPilots);
+      });
+    });
+
+    // Wire gear icon
+    compScorePanelContent.querySelector('.comp-settings-btn')?.addEventListener('click', () => {
+      options.onOpenCompetitionSettings?.();
+    });
+  }
+
   return {
     setEvents(events: FlightEvent[]) {
       allEvents = events;
@@ -1412,5 +1591,31 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
     destroy() {
       panel.remove();
     },
+
+    setMultiTrackMode(enabled: boolean) {
+      isMultiTrackMode = enabled;
+      selectedPilots = null;
+      if (enabled) {
+        tabRowSingle.classList.add('hidden');
+        tabRowMulti.classList.remove('hidden');
+        // Switch to comp-score tab
+        switchTabInternal('comp-score');
+      } else {
+        tabRowMulti.classList.add('hidden');
+        tabRowSingle.classList.remove('hidden');
+        // Switch back to events tab
+        if (currentTab === 'comp-score') {
+          switchTabInternal('events');
+        }
+      }
+    },
+
+    setCompetitionScore(result: TaskScoreResult | null) {
+      currentCompScore = result;
+      if (currentTab === 'comp-score') {
+        renderCompetitionScore();
+      }
+    },
+
   };
 }

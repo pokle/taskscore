@@ -19,16 +19,24 @@
 
 <body class="h-screen overflow-hidden bg-background text-foreground">
     <main class="relative h-full overflow-hidden">
+        <!-- Sidebar resize handle (always visible, outside sidebar) -->
+        <div id="sidebar-resize-handle"
+            class="fixed top-0 bottom-0 right-0 z-50 w-1.5 cursor-col-resize group hover:bg-primary/30 active:bg-primary/50 transition-colors"
+            title="Drag to resize, click to cycle widths">
+            <div class="absolute left-0.5 top-1/2 -translate-y-1/2 w-0.5 h-8 rounded-full bg-border group-hover:bg-primary/60 transition-colors"></div>
+        </div>
+
         <!-- Analysis Panel Sidebar (slides in from right) -->
         <aside
             id="waypoint-sidebar"
-            class="fixed top-0 bottom-0 right-0 z-40 w-80 border-l border-border bg-card transition-transform duration-300 translate-x-full"
+            class="fixed top-0 bottom-0 right-0 z-40 border-l border-border bg-card transition-[width] duration-300 overflow-hidden"
             aria-hidden="true"
             data-side="right"
+            style="width: 0px;"
         >
             <nav class="flex h-full flex-col" aria-label="Waypoint panel">
                 <!-- Hidden file input -->
-                <input type="file" id="igc-file" accept=".igc,.xctsk" class="hidden">
+                <input type="file" id="igc-file" accept=".igc,.xctsk" class="hidden" multiple>
 
                 <!-- Event panel container -->
                 <div id="event-panel-container" class="flex flex-1 flex-col overflow-hidden"></div>
@@ -223,6 +231,12 @@
                 <!-- Settings -->
                 <div role="group" aria-labelledby="settings-heading">
                     <div role="heading" id="settings-heading">Settings</div>
+                    <div role="menuitem" id="menu-competition-settings" data-keywords="competition scoring gap parameters paragliding hang gliding nominal distance time leading arrival">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+                        </svg>
+                        <span>Competition Settings...</span>
+                    </div>
                     <div role="menuitem" id="menu-configure-settings" data-keywords="units configure settings speed altitude distance climb rate vario thresholds detection thermal glide circle">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
@@ -572,6 +586,22 @@
                     <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>
+        </div>
+    </dialog>
+
+    <!-- Competition Settings Dialog -->
+    <dialog id="competition-settings-dialog" class="fixed inset-0 m-auto max-h-[100dvh] sm:max-h-[80vh] h-fit w-full sm:max-w-lg rounded-lg border border-border bg-card p-0 shadow-lg backdrop:bg-black/50 overflow-y-auto" onclick="if (event.target === this) this.close()">
+        <div class="p-4 sm:p-6">
+            <div class="mb-4 flex items-center justify-between sticky top-0 bg-card pt-0 pb-2 z-10">
+                <h2 class="text-lg font-semibold">Competition Settings</h2>
+                <button class="btn btn-ghost btn-icon -mr-2" onclick="this.closest('dialog').close()" aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 6 6 18"/>
+                        <path d="m6 6 12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="competition-settings-content"></div>
         </div>
     </dialog>
 

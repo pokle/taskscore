@@ -3,7 +3,7 @@
  * Currently backed by localStorage, designed for future migration to backend API.
  */
 
-import { resolveThresholds, type DetectionThresholds, type PartialThresholds } from '@glidecomp/engine';
+import { resolveThresholds, DEFAULT_GAP_PARAMETERS, type DetectionThresholds, type PartialThresholds, type GAPParameters } from '@glidecomp/engine';
 
 export interface MapLocation {
   center: [lng: number, lat: number];
@@ -19,6 +19,10 @@ export interface UserPreferences {
   mapLocation?: MapLocation;
   mapStyle?: string;
   mapProvider?: 'mapbox' | 'leaflet';
+  gapParameters?: Partial<GAPParameters>;
+  /** Nominal distance as percentage of task distance (default 70). Stored separately
+   *  from gapParameters.nominalDistance because it's resolved at scoring time. */
+  nominalDistancePct?: number;
 }
 
 export interface UnitPreferences {
@@ -195,6 +199,44 @@ class ConfigStore {
    */
   resetAllThresholds(): void {
     this.setPreferences({ thresholds: undefined });
+  }
+
+  /**
+   * Get GAP scoring parameters (defaults merged with user overrides).
+   * Note: nominalDistance here is the raw default/override — callers should
+   * use getNominalDistancePct() and compute actual meters from task distance.
+   */
+  getGAPParameters(): GAPParameters {
+    return { ...DEFAULT_GAP_PARAMETERS, ...this.getPreferences().gapParameters };
+  }
+
+  /**
+   * Set GAP scoring parameters (partial update supported)
+   */
+  setGAPParameters(params: Partial<GAPParameters>): void {
+    const current = this.getPreferences().gapParameters || {};
+    this.setPreferences({ gapParameters: { ...current, ...params } });
+  }
+
+  /**
+   * Get nominal distance as a percentage of task distance (default 70)
+   */
+  getNominalDistancePct(): number {
+    return this.getPreferences().nominalDistancePct ?? 70;
+  }
+
+  /**
+   * Set nominal distance percentage
+   */
+  setNominalDistancePct(pct: number): void {
+    this.setPreferences({ nominalDistancePct: pct });
+  }
+
+  /**
+   * Reset GAP parameters to defaults
+   */
+  resetGAPParameters(): void {
+    this.setPreferences({ gapParameters: undefined, nominalDistancePct: undefined });
   }
 
   /**

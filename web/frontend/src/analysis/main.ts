@@ -8,10 +8,10 @@
  * - Event detection and display
  */
 
-import { parseIGC, parseXCTask, detectFlightEvents, calculateOptimizedTaskDistance, igcTaskToXCTask, resolveTurnpointSequence, maxBy, parseThresholdInput, formatThresholdForDisplay, DEFAULT_THRESHOLDS, type IGCFile, type IGCFix, type XCTask, type FlightEvent, type WaypointRecord, type DetectionThresholds, type PartialThresholds, type ThresholdDimension } from '@glidecomp/engine';
+import { parseIGC, parseXCTask, detectFlightEvents, calculateOptimizedTaskDistance, igcTaskToXCTask, resolveTurnpointSequence, scoreTask, maxBy, parseThresholdInput, formatThresholdForDisplay, DEFAULT_THRESHOLDS, type IGCFile, type IGCFix, type XCTask, type FlightEvent, type WaypointRecord, type DetectionThresholds, type PartialThresholds, type ThresholdDimension, type PilotFlight, type TaskScoreResult } from '@glidecomp/engine';
 import { getCurrentUser } from '../auth/client';
 import { fetchTaskByCodeWithRaw } from './xctsk-fetch';
-import { createMapProvider, type MapProvider, type MapProviderType } from './map-provider';
+import { createMapProvider, type MapProvider, type MapProviderType, type LoadedTrack } from './map-provider';
 import { createAnalysisPanel, AnalysisPanel, FlightInfo } from './analysis-panel';
 import { loadCorryongWaypoints } from './waypoint-loader';
 import { config, type UnitPreferences } from './config';
@@ -34,6 +34,12 @@ interface AppState {
   task: XCTask | null;
   fixes: IGCFix[];
   events: FlightEvent[];
+  /** All loaded tracks (for multi-track mode) */
+  tracks: LoadedTrack[];
+  /** Currently selected track index, or 'all' for multi-track view */
+  selectedTrack: number | 'all';
+  /** Competition score result (computed when 'all' is selected with a task) */
+  compScore: TaskScoreResult | null;
 }
 
 const state: AppState = {
@@ -41,6 +47,9 @@ const state: AppState = {
   task: null,
   fixes: [],
   events: [],
+  tracks: [],
+  selectedTrack: 0,
+  compScore: null,
 };
 
 let mapRenderer: MapProvider | null = null;
@@ -99,6 +108,9 @@ async function init(): Promise<void> {
 
   // Settings dialog
   const menuConfigureSettings = document.getElementById('menu-configure-settings');
+  const menuCompetitionSettings = document.getElementById('menu-competition-settings');
+  const competitionSettingsDialog = document.getElementById('competition-settings-dialog') as HTMLDialogElement | null;
+  const competitionSettingsContent = document.getElementById('competition-settings-content');
   const menuClearSession = document.getElementById('menu-clear-session');
   const settingsDialog = document.getElementById('settings-dialog') as HTMLDialogElement | null;
   const settingsForm = document.getElementById('settings-form') as HTMLFormElement | null;
@@ -442,6 +454,114 @@ async function init(): Promise<void> {
     settingsDialog?.showModal();
   });
 
+  // Competition settings dialog
+  function populateCompetitionSettings(): void {
+    if (!competitionSettingsContent) return;
+    const params = config.getGAPParameters();
+    const nominalPct = config.getNominalDistancePct();
+    competitionSettingsContent.innerHTML = `
+      <form id="competition-settings-form" class="space-y-4">
+        <div class="space-y-3">
+          <label class="text-sm font-medium">Scoring Type</label>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+              <input type="radio" name="gap-scoring" value="HG" ${params.scoring === 'HG' ? 'checked' : ''} class="accent-primary">
+              Hang Gliding
+            </label>
+            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+              <input type="radio" name="gap-scoring" value="PG" ${params.scoring === 'PG' ? 'checked' : ''} class="accent-primary">
+              Paragliding
+            </label>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <label class="text-sm font-medium">Nominal Parameters</label>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label for="gap-nominal-distance-pct" class="text-sm text-muted-foreground">Distance (% of task)</label>
+              <input type="number" id="gap-nominal-distance-pct" value="${nominalPct}" min="1" max="100" step="5" class="input w-full">
+            </div>
+            <div class="space-y-1">
+              <label for="gap-nominal-time" class="text-sm text-muted-foreground">Time (s)</label>
+              <input type="number" id="gap-nominal-time" value="${params.nominalTime}" min="0" step="300" class="input w-full">
+            </div>
+            <div class="space-y-1">
+              <label for="gap-nominal-launch" class="text-sm text-muted-foreground">Launch ratio</label>
+              <input type="number" id="gap-nominal-launch" value="${params.nominalLaunch}" min="0" max="1" step="0.01" class="input w-full">
+            </div>
+            <div class="space-y-1">
+              <label for="gap-nominal-goal" class="text-sm text-muted-foreground">Goal ratio</label>
+              <input type="number" id="gap-nominal-goal" value="${params.nominalGoal}" min="0" max="1" step="0.01" class="input w-full">
+            </div>
+            <div class="space-y-1">
+              <label for="gap-minimum-distance" class="text-sm text-muted-foreground">Min distance (m)</label>
+              <input type="number" id="gap-minimum-distance" value="${params.minimumDistance}" min="0" step="500" class="input w-full">
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-sm font-medium">Point Categories</label>
+          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="checkbox" id="gap-use-leading" ${params.useLeading ? 'checked' : ''} class="accent-primary">
+            Leading (departure) points
+          </label>
+          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="checkbox" id="gap-use-arrival" ${params.useArrival ? 'checked' : ''} class="accent-primary">
+            Arrival points (HG only)
+          </label>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="submit" class="btn btn-primary flex-1">Save</button>
+          <button type="button" id="gap-reset-btn" class="btn btn-secondary">Reset to defaults</button>
+        </div>
+      </form>
+    `;
+
+    const form = competitionSettingsContent.querySelector('#competition-settings-form') as HTMLFormElement;
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const scoring = (form.querySelector('input[name="gap-scoring"]:checked') as HTMLInputElement)?.value as 'PG' | 'HG' || 'HG';
+      config.setNominalDistancePct(parseFloat((form.querySelector('#gap-nominal-distance-pct') as HTMLInputElement).value) || 70);
+      config.setGAPParameters({
+        scoring,
+        nominalTime: parseFloat((form.querySelector('#gap-nominal-time') as HTMLInputElement).value) || 5400,
+        nominalLaunch: parseFloat((form.querySelector('#gap-nominal-launch') as HTMLInputElement).value) || 0.96,
+        nominalGoal: parseFloat((form.querySelector('#gap-nominal-goal') as HTMLInputElement).value) || 0.2,
+        minimumDistance: parseFloat((form.querySelector('#gap-minimum-distance') as HTMLInputElement).value) || 5000,
+        useLeading: (form.querySelector('#gap-use-leading') as HTMLInputElement).checked,
+        useArrival: (form.querySelector('#gap-use-arrival') as HTMLInputElement).checked,
+      });
+      competitionSettingsDialog?.close();
+      onCompetitionSettingsChanged();
+    });
+
+    form?.querySelector('#gap-reset-btn')?.addEventListener('click', () => {
+      config.resetGAPParameters();
+      populateCompetitionSettings();
+      onCompetitionSettingsChanged();
+    });
+  }
+
+  function openCompetitionSettings(): void {
+    commandDialog?.close();
+    populateCompetitionSettings();
+    competitionSettingsDialog?.showModal();
+  }
+
+  function onCompetitionSettingsChanged(): void {
+    if (state.selectedTrack === 'all' && state.tracks.length > 1) {
+      computeCompetitionScore();
+      analysisPanel?.setCompetitionScore(state.compScore);
+      const pilotScores = state.compScore?.pilotScores ?? [];
+      mapRenderer?.setMultiTrack?.(state.tracks, pilotScores);
+    }
+  }
+
+  menuCompetitionSettings?.addEventListener('click', () => openCompetitionSettings());
+
   // Clear current task and track (reset to initial state)
   menuClearSession?.addEventListener('click', () => {
     commandDialog?.close();
@@ -451,12 +571,17 @@ async function init(): Promise<void> {
     state.task = null;
     state.fixes = [];
     state.events = [];
+    state.tracks = [];
+    state.selectedTrack = 0;
+    state.compScore = null;
 
     // Clear map
     if (mapRenderer) {
       mapRenderer.clearTrack();
       mapRenderer.clearTask();
       mapRenderer.clearEvents();
+      mapRenderer.clearMultiTrack?.();
+      mapRenderer.removeTrackSelector?.();
     }
 
     // Reset speed overlay state (must call setSpeedOverlay to clear provider flag)
@@ -467,11 +592,13 @@ async function init(): Promise<void> {
     updateUrlParam('speed', null);
 
     // Clear analysis panel
+    analysisPanel?.setMultiTrackMode(false);
     analysisPanel?.setEvents([]);
     analysisPanel?.setAltitudes([]);
     analysisPanel?.setFlightInfo({});
     analysisPanel?.setTask(null);
     analysisPanel?.setScore(null);
+    analysisPanel?.setCompetitionScore(null);
   });
 
   // Handle threshold reset buttons
@@ -606,26 +733,125 @@ async function init(): Promise<void> {
     }
   });
 
+  // ── Sidebar width management ──
+  // Width presets as fractions: 3/4, 1/2, 1/3, collapsed (0)
+  const SIDEBAR_STORAGE_KEY = 'glidecomp-sidebar-width';
+  const WIDTH_PRESETS = [1/2, 1/3, 0];
+  const DEFAULT_SIDEBAR_WIDTH = 320; // px, default open width
+
+  /** Open the sidebar to a given pixel width (0 = collapsed) */
+  function openSidebar(width?: number): void {
+    if (!sidebar) return;
+    const w = width ?? (parseInt(localStorage.getItem(SIDEBAR_STORAGE_KEY) || '', 10) || DEFAULT_SIDEBAR_WIDTH);
+    sidebar.style.width = w + 'px';
+    sidebar.setAttribute('aria-hidden', 'false');
+    if (window.innerWidth < 768) sidebarBackdrop?.classList.remove('hidden');
+    syncHandlePosition();
+    mapRenderer?.invalidateSize();
+  }
+
+  /** Collapse the sidebar to 0 width */
+  function closeSidebar(): void {
+    if (!sidebar) return;
+    sidebar.style.width = '0px';
+    sidebar.setAttribute('aria-hidden', 'true');
+    sidebarBackdrop?.classList.add('hidden');
+    syncHandlePosition();
+    mapRenderer?.invalidateSize();
+  }
+
+  const resizeHandle = document.getElementById('sidebar-resize-handle');
+
+  /** Keep the drag handle pinned to the sidebar's left edge */
+  function syncHandlePosition(): void {
+    if (!resizeHandle || !sidebar) return;
+    resizeHandle.style.right = sidebar.style.width;
+  }
+
   // Set up sidebar toggle for mobile
   if (sidebar && sidebarBackdrop) {
-    // Listen for Basecoat sidebar events
     document.addEventListener('basecoat:sidebar', ((e: CustomEvent) => {
       const detail = e.detail || {};
-
       if (detail.id && detail.id !== 'waypoint-sidebar') return;
-
       const isOpen = sidebar.getAttribute('aria-hidden') === 'false';
-
       if (detail.action === 'close' || (detail.action === undefined && isOpen)) {
-        sidebar.setAttribute('aria-hidden', 'true');
-        sidebar.classList.add('translate-x-full');
-        sidebarBackdrop.classList.add('hidden');
+        closeSidebar();
       } else {
-        sidebar.setAttribute('aria-hidden', 'false');
-        sidebar.classList.remove('translate-x-full');
-        sidebarBackdrop.classList.remove('hidden');
+        openSidebar();
       }
     }) as EventListener);
+  }
+
+  // Sidebar resize handle (drag + click-to-cycle)
+  if (sidebar && resizeHandle) {
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartWidth = 0;
+    let wasClick = true;
+
+    // Restore saved width on load (sidebar starts collapsed until opened)
+    syncHandlePosition();
+
+    resizeHandle.addEventListener('pointerdown', (e: PointerEvent) => {
+      isDragging = true;
+      wasClick = true;
+      dragStartX = e.clientX;
+      dragStartWidth = sidebar.offsetWidth;
+      resizeHandle.setPointerCapture(e.pointerId);
+      sidebar.style.transition = 'none';
+      resizeHandle.style.transition = 'none';
+      e.preventDefault();
+    });
+
+    resizeHandle.addEventListener('pointermove', (e: PointerEvent) => {
+      if (!isDragging) return;
+      const dx = dragStartX - e.clientX;
+      if (Math.abs(dx) > 3) wasClick = false;
+      const newWidth = Math.max(0, Math.min(window.innerWidth * 0.9, dragStartWidth + dx));
+      sidebar.style.width = newWidth + 'px';
+      syncHandlePosition();
+      mapRenderer?.invalidateSize();
+    });
+
+    resizeHandle.addEventListener('pointerup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      sidebar.style.transition = '';
+      resizeHandle.style.transition = '';
+
+      if (wasClick) {
+        // Cycle to the next smaller preset, wrapping back to largest
+        const currentFraction = sidebar.offsetWidth / window.innerWidth;
+        let nextPreset = WIDTH_PRESETS[0]; // default: wrap to largest
+        for (let i = 0; i < WIDTH_PRESETS.length; i++) {
+          if (currentFraction > WIDTH_PRESETS[i] + 0.03) {
+            nextPreset = WIDTH_PRESETS[i];
+            break;
+          }
+        }
+
+        if (nextPreset === 0) {
+          closeSidebar();
+        } else {
+          const newWidth = Math.round(window.innerWidth * nextPreset);
+          sidebar.setAttribute('aria-hidden', 'false');
+          sidebar.style.width = newWidth + 'px';
+          localStorage.setItem(SIDEBAR_STORAGE_KEY, String(newWidth));
+          syncHandlePosition();
+        }
+      } else {
+        // Save dragged width
+        const w = sidebar.offsetWidth;
+        if (w < 50) {
+          closeSidebar();
+        } else {
+          sidebar.setAttribute('aria-hidden', w > 0 ? 'false' : 'true');
+          localStorage.setItem(SIDEBAR_STORAGE_KEY, String(w));
+        }
+        syncHandlePosition();
+      }
+      mapRenderer?.invalidateSize();
+    });
   }
 
   // Handle event click
@@ -680,23 +906,8 @@ async function init(): Promise<void> {
     onTaskEdited: handleTaskEdited,
     onMapClickModeRequest: handleMapClickModeRequest,
     onToggle: handlePanelToggle,
-    onHide: () => {
-      if (sidebar) {
-        sidebar.setAttribute('aria-hidden', 'true');
-        sidebar.classList.add('translate-x-full');
-        sidebarBackdrop?.classList.add('hidden');
-      }
-    },
-    onShow: () => {
-      if (sidebar) {
-        sidebar.setAttribute('aria-hidden', 'false');
-        sidebar.classList.remove('translate-x-full');
-        // Only show backdrop on mobile
-        if (window.innerWidth < 768) {
-          sidebarBackdrop?.classList.remove('hidden');
-        }
-      }
-    },
+    onHide: () => closeSidebar(),
+    onShow: () => openSidebar(),
     onLoadSampleFlight: () => {
       // Click the first sample flight button in the command menu
       const firstSampleBtn = document.getElementById('sample-tushar');
@@ -704,12 +915,40 @@ async function init(): Promise<void> {
         firstSampleBtn.click();
       }
     },
+    onPilotSelectionChanged: (selected: Set<string> | null) => {
+      if (state.selectedTrack !== 'all' || state.tracks.length <= 1) return;
+      const pilotScores = state.compScore?.pilotScores ?? [];
+      if (selected === null) {
+        // All selected — show all tracks, no event markers
+        mapRenderer?.clearEvents();
+        mapRenderer?.setMultiTrack?.(state.tracks, pilotScores);
+      } else {
+        const filteredTracks = state.tracks.filter(t => selected.has(t.pilotName));
+        const filteredScores = pilotScores.filter(ps => selected.has(ps.pilotName));
+        if (filteredTracks.length === 1) {
+          // Single pilot selected — show their event markers
+          mapRenderer?.setEvents(filteredTracks[0].events);
+        } else {
+          mapRenderer?.clearEvents();
+        }
+        mapRenderer?.setMultiTrack?.(filteredTracks, filteredScores);
+      }
+    },
+    onOpenCompetitionSettings: () => openCompetitionSettings(),
   });
 
   // Pass waypoint database to the analysis panel for task editor search
   if (waypointDatabase.length > 0) {
     analysisPanel.setWaypointDatabase(waypointDatabase);
   }
+
+  // Wire multi-track click handler
+  mapRenderer.onMultiTrackClick?.((trackIndex: number, fixIndex: number) => {
+    const track = state.tracks[trackIndex];
+    if (!track) return;
+    // Show HUD with pilot name for the clicked track
+    mapRenderer?.showTrackPointHUDWithName?.(fixIndex, track.pilotName);
+  });
 
   // Wire map click handler for task editor "click on map" mode
   mapRenderer.onMapClick?.((lat: number, lon: number) => {
@@ -797,16 +1036,23 @@ async function init(): Promise<void> {
     igcFileInput?.click();
   });
 
-  // File input handler
+  // File input handler (supports multiple file selection)
   igcFileInput?.addEventListener('change', async (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (file) {
+    const files = (e.target as HTMLInputElement).files;
+    if (!files || files.length === 0) return;
+
+    const igcFiles: File[] = [];
+    for (const file of files) {
       const name = file.name.toLowerCase();
       if (name.endsWith('.xctsk')) {
         await loadXCTaskFile(file);
-      } else {
-        await loadIGCFile(file);
+      } else if (name.endsWith('.igc')) {
+        igcFiles.push(file);
       }
+    }
+
+    if (igcFiles.length > 0) {
+      await loadMultipleIGCFiles(igcFiles);
     }
   });
 
@@ -832,15 +1078,21 @@ async function init(): Promise<void> {
     if (!files?.length) return;
 
     let recognized = false;
+    const igcFiles: File[] = [];
+
     for (const file of files) {
       const name = file.name.toLowerCase();
       if (name.endsWith('.igc')) {
         recognized = true;
-        await loadIGCFile(file);
+        igcFiles.push(file);
       } else if (name.endsWith('.xctsk')) {
         recognized = true;
         await loadXCTaskFile(file);
       }
+    }
+
+    if (igcFiles.length > 0) {
+      await loadMultipleIGCFiles(igcFiles);
     }
 
     if (!recognized) {
@@ -997,11 +1249,41 @@ async function init(): Promise<void> {
     mapRenderer?.setTask(task);
     analysisPanel?.setTask(task);
     redetectEvents();
+
+    // Re-compute competition score if in all-tracks mode
+    if (state.selectedTrack === 'all' && state.tracks.length > 1) {
+      // Re-detect events for all tracks with the new task
+      for (const track of state.tracks) {
+        track.events = detectFlightEvents(track.fixes, task, config.getPartialThresholds());
+      }
+      computeCompetitionScore();
+      analysisPanel?.setCompetitionScore(state.compScore);
+      const pilotScores = state.compScore?.pilotScores ?? [];
+      mapRenderer?.setMultiTrack?.(state.tracks, pilotScores);
+    }
   }
 
   function applyTrack(igcFile: IGCFile): void {
     state.igcFile = igcFile;
     state.fixes = igcFile.fixes;
+
+    // Also update multi-track state for single-track legacy flow
+    const events = detectFlightEvents(igcFile.fixes, state.task || undefined, config.getPartialThresholds());
+    state.tracks = [{
+      pilotName: igcFile.header.pilot || 'Unknown',
+      date: igcFile.header.date || null,
+      filename: '',
+      fixes: igcFile.fixes,
+      events,
+    }];
+    state.selectedTrack = 0;
+    state.compScore = null;
+
+    // Clear any multi-track rendering
+    mapRenderer?.clearMultiTrack?.();
+    mapRenderer?.removeTrackSelector?.();
+    analysisPanel?.setMultiTrackMode(false);
+
     mapRenderer?.setTrack(igcFile.fixes);
     redetectEvents();
     analysisPanel?.setAltitudes(igcFile.fixes.map(f => f.gnssAltitude), igcFile.fixes.map(f => f.time));
@@ -1067,6 +1349,195 @@ async function init(): Promise<void> {
       }
     }
 
+  }
+
+  /**
+   * Load multiple IGC files at once (replaces the full track set)
+   */
+  async function loadMultipleIGCFiles(files: File[]): Promise<void> {
+    const tracks: LoadedTrack[] = [];
+
+    for (const file of files) {
+      try {
+        const content = await file.text();
+        const igcFile = parseIGC(content);
+
+        // Auto-detect task from first file that has one
+        if (igcFile.task && igcFile.task.start && !state.task) {
+          const xcTask = igcTaskToXCTask(igcFile.task, { waypoints: waypointDatabase });
+          applyTask(xcTask);
+        }
+
+        const events = detectFlightEvents(igcFile.fixes, state.task || undefined, config.getPartialThresholds());
+
+        tracks.push({
+          pilotName: igcFile.header.pilot || file.name.replace(/\.igc$/i, ''),
+          date: igcFile.header.date || null,
+          filename: file.name,
+          fixes: igcFile.fixes,
+          events,
+        });
+
+        // Store in browser storage
+        try {
+          await storage.storeTrack(file.name, content, igcFile);
+          await storageMenu?.refresh();
+        } catch (err) {
+          console.warn('Failed to store track:', err);
+        }
+      } catch (err) {
+        console.error(`Failed to parse ${file.name}:`, err);
+        showStatus(`Failed to parse ${file.name}: ${err}`, 'error');
+      }
+    }
+
+    if (tracks.length === 0) return;
+
+    // Replace the full track set
+    state.tracks = tracks;
+
+    if (tracks.length === 1) {
+      // Single track: use existing single-track flow
+      state.selectedTrack = 0;
+      selectSingleTrack(0);
+    } else {
+      // Multiple tracks: default to 'all' view
+      state.selectedTrack = 'all';
+      selectAllTracks();
+    }
+
+    // Show track selector if >1 tracks
+    updateTrackSelector();
+  }
+
+  /**
+   * Select a single track for detailed analysis
+   */
+  function selectSingleTrack(index: number): void {
+    const track = state.tracks[index];
+    if (!track) return;
+
+    state.selectedTrack = index;
+
+    // Set up single-track state
+    state.fixes = track.fixes;
+    state.events = track.events;
+
+    // Clear multi-track rendering
+    mapRenderer?.clearMultiTrack?.();
+
+    // Render single track
+    mapRenderer?.setTrack(track.fixes);
+    mapRenderer?.setEvents(track.events);
+
+    // Update analysis panel for single-track mode
+    analysisPanel?.setMultiTrackMode(false);
+    analysisPanel?.setEvents(track.events);
+    analysisPanel?.setAltitudes(track.fixes.map(f => f.gnssAltitude), track.fixes.map(f => f.time));
+
+    // Update flight info
+    const info: FlightInfo = {};
+    info.pilot = track.pilotName;
+    if (track.date) info.date = track.date.toLocaleDateString();
+    if (track.fixes.length > 0) {
+      const duration = track.fixes[track.fixes.length - 1].time.getTime() - track.fixes[0].time.getTime();
+      const hours = Math.floor(duration / 3600000);
+      const mins = Math.floor((duration % 3600000) / 60000);
+      info.duration = `${hours}h ${mins}m`;
+      info.maxAlt = formatAltitude(maxBy(track.fixes, f => f.gnssAltitude)).withUnit;
+    }
+    if (state.task) {
+      info.task = formatDistance(calculateOptimizedTaskDistance(state.task)).withUnit;
+    }
+    analysisPanel?.setFlightInfo(info);
+
+    // Update single-track score
+    if (state.task && track.fixes.length > 0) {
+      analysisPanel?.setScore(resolveTurnpointSequence(state.task, track.fixes));
+    } else {
+      analysisPanel?.setScore(null);
+    }
+
+    updateTrackSelector();
+  }
+
+  /**
+   * Select all tracks for competition view
+   */
+  function selectAllTracks(): void {
+    state.selectedTrack = 'all';
+
+    // Compute competition score
+    computeCompetitionScore();
+
+    const pilotScores = state.compScore?.pilotScores ?? [];
+
+    // Clear single-track event markers (don't make sense for multiple pilots)
+    mapRenderer?.clearEvents();
+
+    // Render all tracks on map with rank colors
+    mapRenderer?.setMultiTrack?.(state.tracks, pilotScores);
+
+    // Switch analysis panel to multi-track mode
+    analysisPanel?.setMultiTrackMode(true);
+    analysisPanel?.setCompetitionScore(state.compScore);
+
+    // Update flight info for all tracks
+    const info: FlightInfo = {};
+    info.pilot = `${state.tracks.length} pilots`;
+    if (state.task) {
+      info.task = formatDistance(calculateOptimizedTaskDistance(state.task)).withUnit;
+    }
+    analysisPanel?.setFlightInfo(info);
+
+    updateTrackSelector();
+  }
+
+  /**
+   * Compute competition scores for all loaded tracks
+   */
+  function computeCompetitionScore(): void {
+    if (!state.task || state.tracks.length === 0) {
+      state.compScore = null;
+      return;
+    }
+
+    const pilots: PilotFlight[] = state.tracks.map(track => ({
+      pilotName: track.pilotName,
+      trackFile: track.filename,
+      fixes: track.fixes,
+    }));
+
+    const gapParams = config.getGAPParameters();
+
+    // Compute nominal distance from percentage of task distance
+    const nominalPct = config.getNominalDistancePct();
+    gapParams.nominalDistance = calculateOptimizedTaskDistance(state.task) * (nominalPct / 100);
+
+    state.compScore = scoreTask(state.task, pilots, gapParams);
+  }
+
+  /**
+   * Update the track selector dropdown on the map
+   */
+  function updateTrackSelector(): void {
+    if (state.tracks.length <= 1) {
+      mapRenderer?.removeTrackSelector?.();
+      return;
+    }
+
+    mapRenderer?.setTrackSelector?.(
+      state.tracks,
+      state.compScore?.pilotScores ?? [],
+      state.selectedTrack,
+      (selection) => {
+        if (selection === 'all') {
+          selectAllTracks();
+        } else {
+          selectSingleTrack(selection);
+        }
+      },
+    );
   }
 
   /**
