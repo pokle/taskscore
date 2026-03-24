@@ -808,12 +808,18 @@ async function init(): Promise<void> {
       if (state.selectedTrack !== 'all' || state.tracks.length <= 1) return;
       const pilotScores = state.compScore?.pilotScores ?? [];
       if (selected === null) {
-        // All selected — show all tracks
+        // All selected — show all tracks, no event markers
+        mapRenderer?.clearEvents();
         mapRenderer?.setMultiTrack?.(state.tracks, pilotScores);
       } else {
-        // Filter to only selected pilots
         const filteredTracks = state.tracks.filter(t => selected.has(t.pilotName));
         const filteredScores = pilotScores.filter(ps => selected.has(ps.pilotName));
+        if (filteredTracks.length === 1) {
+          // Single pilot selected — show their event markers
+          mapRenderer?.setEvents(filteredTracks[0].events);
+        } else {
+          mapRenderer?.clearEvents();
+        }
         mapRenderer?.setMultiTrack?.(filteredTracks, filteredScores);
       }
     },
@@ -1364,6 +1370,9 @@ async function init(): Promise<void> {
     computeCompetitionScore();
 
     const pilotScores = state.compScore?.pilotScores ?? [];
+
+    // Clear single-track event markers (don't make sense for multiple pilots)
+    mapRenderer?.clearEvents();
 
     // Render all tracks on map with rank colors
     mapRenderer?.setMultiTrack?.(state.tracks, pilotScores);
