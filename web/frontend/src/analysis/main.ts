@@ -458,6 +458,11 @@ async function init(): Promise<void> {
   function populateCompetitionSettings(): void {
     if (!competitionSettingsContent) return;
     const params = config.getGAPParameters();
+    // Show effective nominal distance (auto-calculated from task if not overridden)
+    const userOverrides = config.getPreferences().gapParameters;
+    if (!userOverrides?.nominalDistance && state.task) {
+      params.nominalDistance = Math.round(calculateOptimizedTaskDistance(state.task) * 0.7);
+    }
     competitionSettingsContent.innerHTML = `
       <form id="competition-settings-form" class="space-y-4">
         <div class="space-y-3">
@@ -1508,6 +1513,14 @@ async function init(): Promise<void> {
     }));
 
     const gapParams = config.getGAPParameters();
+
+    // Auto-set nominal distance to 70% of task distance if the user hasn't
+    // explicitly overridden it (matches CLI behaviour in score-task.ts)
+    const userOverrides = config.getPreferences().gapParameters;
+    if (!userOverrides?.nominalDistance) {
+      gapParams.nominalDistance = calculateOptimizedTaskDistance(state.task) * 0.7;
+    }
+
     state.compScore = scoreTask(state.task, pilots, gapParams);
   }
 
