@@ -804,6 +804,19 @@ async function init(): Promise<void> {
         firstSampleBtn.click();
       }
     },
+    onPilotSelectionChanged: (selected: Set<string>) => {
+      if (state.selectedTrack !== 'all' || state.tracks.length <= 1) return;
+      const pilotScores = state.compScore?.pilotScores ?? [];
+      if (selected.size === 0) {
+        // All selected — show all tracks
+        mapRenderer?.setMultiTrack?.(state.tracks, pilotScores);
+      } else {
+        // Filter to only selected pilots
+        const filteredTracks = state.tracks.filter(t => selected.has(t.pilotName));
+        const filteredScores = pilotScores.filter(ps => selected.has(ps.pilotName));
+        mapRenderer?.setMultiTrack?.(filteredTracks, filteredScores);
+      }
+    },
   });
 
   // Pass waypoint database to the analysis panel for task editor search
