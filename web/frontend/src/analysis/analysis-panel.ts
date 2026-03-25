@@ -1381,12 +1381,12 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
 
     // Ranked scores table
     const allSelected = selectedPilots === null;
-    html += `<div class="rounded-lg border border-border overflow-hidden">`;
-    html += `<table class="w-full text-sm">`;
+    html += `<div class="rounded-lg border border-border overflow-x-auto overflow-y-hidden">`;
+    html += `<table class="text-sm">`;
     html += `<thead class="bg-muted/50"><tr>
-      <th class="px-2 py-1.5 text-left font-medium"><input type="checkbox" id="comp-select-all" class="accent-primary" ${allSelected ? 'checked' : ''}></th>
-      <th class="px-2 py-1.5 text-left font-medium">#</th>
-      <th class="px-2 py-1.5 text-left font-medium">Pilot</th>
+      <th class="px-2 py-1.5 text-left font-medium sticky left-0 z-10 bg-muted/50"><input type="checkbox" id="comp-select-all" class="accent-primary" ${allSelected ? 'checked' : ''}></th>
+      <th class="px-2 py-1.5 text-left font-medium sticky left-[28px] z-10 bg-muted/50">#</th>
+      <th class="px-2 py-1.5 text-left font-medium sticky left-[52px] z-10 bg-muted/50 after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border">Pilot</th>
       <th class="px-2 py-1.5 text-right font-medium">Dist</th>
       <th class="px-2 py-1.5 text-right font-medium" title="Speed Section Time">SS Time</th>
       <th class="px-2 py-1.5 text-right font-medium">Dist Pts</th>
@@ -1401,9 +1401,9 @@ export function createAnalysisPanel(options: AnalysisPanelOptions): AnalysisPane
       const isChecked = allSelected || selectedPilots!.has(ps.pilotName);
       const goalIcon = ps.madeGoal ? '<span class="text-green-600 ml-1" title="Goal">&#10003;</span>' : '';
       html += `<tr class="border-t border-border hover:bg-muted/30${!isChecked ? ' opacity-40' : ''}">
-        <td class="px-2 py-1.5"><input type="checkbox" class="comp-pilot-cb accent-primary" data-pilot="${ps.pilotName}" ${isChecked ? 'checked' : ''}></td>
-        <td class="px-2 py-1.5 font-medium">${ps.rank}</td>
-        <td class="px-2 py-1.5 truncate max-w-[120px]" title="${ps.pilotName}">${ps.pilotName}${goalIcon}</td>
+        <td class="px-2 py-1.5 sticky left-0 z-10 bg-background"><input type="checkbox" class="comp-pilot-cb accent-primary" data-pilot="${ps.pilotName}" ${isChecked ? 'checked' : ''}></td>
+        <td class="px-2 py-1.5 font-medium sticky left-[28px] z-10 bg-background">${ps.rank}</td>
+        <td class="px-2 py-1.5 truncate max-w-[120px] sticky left-[52px] z-10 bg-background after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border" title="${ps.pilotName}">${ps.pilotName}${goalIcon}</td>
         <td class="px-2 py-1.5 text-right tabular-nums">${formatDistance(ps.flownDistance).withUnit}</td>
         <td class="px-2 py-1.5 text-right tabular-nums">${ps.madeGoal && ps.speedSectionTime !== null ? formatHMS(ps.speedSectionTime) : ps.reachedESS ? 'ESS' : 'LO'}</td>
         <td class="px-2 py-1.5 text-right tabular-nums">${ps.distancePoints.toFixed(1)}</td>
