@@ -139,14 +139,6 @@ export interface MapProvider {
      *  Returns the track index and fix index. */
     onMultiTrackClick?(callback: (trackIndex: number, fixIndex: number) => void): void;
 
-    /** Create/update the track selector dropdown on the map.
-     *  Returns a dispose function. */
-    setTrackSelector?(tracks: LoadedTrack[], pilotScores: PilotScore[], selectedIndex: number | 'all',
-        onSelect: (index: number | 'all') => void): void;
-
-    /** Remove the track selector from the map */
-    removeTrackSelector?(): void;
-
     /** Show pilot name in HUD */
     showTrackPointHUDWithName?(fixIndex: number, pilotName: string): void;
 }

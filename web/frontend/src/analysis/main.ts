@@ -581,7 +581,6 @@ async function init(): Promise<void> {
       mapRenderer.clearTask();
       mapRenderer.clearEvents();
       mapRenderer.clearMultiTrack?.();
-      mapRenderer.removeTrackSelector?.();
     }
 
     // Reset speed overlay state (must call setSpeedOverlay to clear provider flag)
@@ -1281,7 +1280,6 @@ async function init(): Promise<void> {
 
     // Clear any multi-track rendering
     mapRenderer?.clearMultiTrack?.();
-    mapRenderer?.removeTrackSelector?.();
     analysisPanel?.setMultiTrackMode(false);
 
     mapRenderer?.setTrack(igcFile.fixes);
@@ -1405,9 +1403,6 @@ async function init(): Promise<void> {
       state.selectedTrack = 'all';
       selectAllTracks();
     }
-
-    // Show track selector if >1 tracks
-    updateTrackSelector();
   }
 
   /**
@@ -1457,8 +1452,6 @@ async function init(): Promise<void> {
     } else {
       analysisPanel?.setScore(null);
     }
-
-    updateTrackSelector();
   }
 
   /**
@@ -1489,8 +1482,6 @@ async function init(): Promise<void> {
       info.task = formatDistance(calculateOptimizedTaskDistance(state.task)).withUnit;
     }
     analysisPanel?.setFlightInfo(info);
-
-    updateTrackSelector();
   }
 
   /**
@@ -1520,26 +1511,6 @@ async function init(): Promise<void> {
   /**
    * Update the track selector dropdown on the map
    */
-  function updateTrackSelector(): void {
-    if (state.tracks.length <= 1) {
-      mapRenderer?.removeTrackSelector?.();
-      return;
-    }
-
-    mapRenderer?.setTrackSelector?.(
-      state.tracks,
-      state.compScore?.pilotScores ?? [],
-      state.selectedTrack,
-      (selection) => {
-        if (selection === 'all') {
-          selectAllTracks();
-        } else {
-          selectSingleTrack(selection);
-        }
-      },
-    );
-  }
-
   /**
    * Load a stored track by ID
    */

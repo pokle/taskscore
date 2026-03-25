@@ -122,7 +122,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
       let multiTrackData: LoadedTrack[] = [];
       let multiTrackScores: PilotScore[] = [];
       let multiTrackClickCallback: ((trackIndex: number, fixIndex: number) => void) | null = null;
-      let trackSelectorElement: HTMLElement | null = null;
       let isMultiTrackMode = false;
       // 3D multi-track state
       let multiTrack3DObjects: unknown[] = [];
@@ -1688,13 +1687,6 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
         return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
       }
 
-      function removeTrackSelectorElement(): void {
-        if (trackSelectorElement) {
-          trackSelectorElement.remove();
-          trackSelectorElement = null;
-        }
-      }
-
       function clearMulti3DTracks(): void {
         if (tb) {
           for (const obj of multiTrack3DObjects) {
@@ -2749,61 +2741,10 @@ export function createMapBoxProvider(container: HTMLElement): Promise<MapProvide
           if (map.getLayer('track-line')) map.setLayoutProperty('track-line', 'visibility', 'visible');
           if (map.getLayer('track-line-outline')) map.setLayoutProperty('track-line-outline', 'visibility', 'visible');
           clearMulti3DTracks();
-          removeTrackSelectorElement();
         },
 
         onMultiTrackClick(callback: (trackIndex: number, fixIndex: number) => void) {
           multiTrackClickCallback = callback;
-        },
-
-        setTrackSelector(tracks: LoadedTrack[], pilotScores: PilotScore[], selectedIndex: number | 'all',
-            onSelect: (index: number | 'all') => void) {
-          removeTrackSelectorElement();
-
-          if (tracks.length <= 1) return;
-
-          const wrapper = document.createElement('div');
-          wrapper.style.cssText = 'position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:5;';
-
-          const select = document.createElement('select');
-          select.style.cssText = 'padding:4px 8px;border-radius:6px;border:1px solid rgba(0,0,0,0.2);background:#fff;font-size:13px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.2);min-width:180px;';
-
-          // Check if dates differ
-          const dates = new Set(tracks.map(t => t.date?.toLocaleDateString() || ''));
-          const showDate = dates.size > 1;
-
-          // 'All tracks' option
-          const allOpt = document.createElement('option');
-          allOpt.value = 'all';
-          allOpt.textContent = `All tracks (${tracks.length})`;
-          if (selectedIndex === 'all') allOpt.selected = true;
-          select.appendChild(allOpt);
-
-          // Individual tracks
-          for (let i = 0; i < tracks.length; i++) {
-            const opt = document.createElement('option');
-            opt.value = String(i);
-            let label = tracks[i].pilotName || tracks[i].filename;
-            if (showDate && tracks[i].date) {
-              label += ` (${tracks[i].date!.toLocaleDateString()})`;
-            }
-            opt.textContent = label;
-            if (selectedIndex === i) opt.selected = true;
-            select.appendChild(opt);
-          }
-
-          select.addEventListener('change', () => {
-            const val = select.value;
-            onSelect(val === 'all' ? 'all' : parseInt(val, 10));
-          });
-
-          wrapper.appendChild(select);
-          container.appendChild(wrapper);
-          trackSelectorElement = wrapper;
-        },
-
-        removeTrackSelector() {
-          removeTrackSelectorElement();
         },
 
         showTrackPointHUDWithName(fixIndex: number, pilotName: string) {
