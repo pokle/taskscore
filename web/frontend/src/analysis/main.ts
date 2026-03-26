@@ -481,11 +481,11 @@ async function init(): Promise<void> {
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
               <label for="gap-nominal-distance-pct" class="text-sm text-muted-foreground">Distance (% of task)</label>
-              <input type="number" id="gap-nominal-distance-pct" value="${nominalPct}" min="1" max="100" step="5" class="input w-full">
+              <input type="number" id="gap-nominal-distance-pct" value="${nominalPct}" min="1" max="100" step="1" class="input w-full">
             </div>
             <div class="space-y-1">
               <label for="gap-nominal-time" class="text-sm text-muted-foreground">Time (s)</label>
-              <input type="number" id="gap-nominal-time" value="${params.nominalTime}" min="0" step="300" class="input w-full">
+              <input type="number" id="gap-nominal-time" value="${params.nominalTime}" min="0" step="1" class="input w-full">
             </div>
             <div class="space-y-1">
               <label for="gap-nominal-launch" class="text-sm text-muted-foreground">Launch ratio</label>
@@ -497,7 +497,7 @@ async function init(): Promise<void> {
             </div>
             <div class="space-y-1">
               <label for="gap-minimum-distance" class="text-sm text-muted-foreground">Min distance (m)</label>
-              <input type="number" id="gap-minimum-distance" value="${params.minimumDistance}" min="0" step="500" class="input w-full">
+              <input type="number" id="gap-minimum-distance" value="${params.minimumDistance}" min="0" step="1" class="input w-full">
             </div>
           </div>
         </div>
@@ -525,13 +525,17 @@ async function init(): Promise<void> {
     form?.addEventListener('submit', (e) => {
       e.preventDefault();
       const scoring = (form.querySelector('input[name="gap-scoring"]:checked') as HTMLInputElement)?.value as 'PG' | 'HG' || 'HG';
-      config.setNominalDistancePct(parseFloat((form.querySelector('#gap-nominal-distance-pct') as HTMLInputElement).value) || 70);
+      const parseNum = (id: string, fallback: number) => {
+        const v = parseFloat((form.querySelector(id) as HTMLInputElement).value);
+        return Number.isNaN(v) ? fallback : v;
+      };
+      config.setNominalDistancePct(parseNum('#gap-nominal-distance-pct', 70));
       config.setGAPParameters({
         scoring,
-        nominalTime: parseFloat((form.querySelector('#gap-nominal-time') as HTMLInputElement).value) || 5400,
-        nominalLaunch: parseFloat((form.querySelector('#gap-nominal-launch') as HTMLInputElement).value) || 0.96,
-        nominalGoal: parseFloat((form.querySelector('#gap-nominal-goal') as HTMLInputElement).value) || 0.2,
-        minimumDistance: parseFloat((form.querySelector('#gap-minimum-distance') as HTMLInputElement).value) || 5000,
+        nominalTime: parseNum('#gap-nominal-time', 5400),
+        nominalLaunch: parseNum('#gap-nominal-launch', 0.96),
+        nominalGoal: parseNum('#gap-nominal-goal', 0.2),
+        minimumDistance: parseNum('#gap-minimum-distance', 5000),
         useLeading: (form.querySelector('#gap-use-leading') as HTMLInputElement).checked,
         useArrival: (form.querySelector('#gap-use-arrival') as HTMLInputElement).checked,
       });
