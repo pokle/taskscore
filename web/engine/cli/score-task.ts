@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 /**
  * score-task CLI — Score multiple tracks against a single task using CIVL GAP.
  *

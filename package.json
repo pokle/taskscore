@@ -31,9 +31,9 @@
     "typecheck:auth": "bun run --filter auth-api typecheck",
     "typecheck:all": "bun run typecheck && bun run typecheck:engine && bun run typecheck:worker && bun run typecheck:auth",
     "test": "bun test",
-    "detect-events": "tsx web/engine/cli/detect-events.ts",
-    "get-xcontest-task": "tsx web/engine/cli/get-xcontest-task.ts",
-    "score-task": "tsx web/engine/cli/score-task.ts"
+    "detect-events": "bun web/engine/cli/detect-events.ts",
+    "get-xcontest-task": "bun web/engine/cli/get-xcontest-task.ts",
+    "score-task": "bun web/engine/cli/score-task.ts"
   },
   "workspaces": [
     "web/engine",
@@ -45,7 +45,6 @@
     "@cloudflare/workers-types": "^4.20260317.1",
     "@types/bun": "^1.3.11",
     "@types/node": "^25.5.0",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "wrangler": "^4.77.0"
   },
