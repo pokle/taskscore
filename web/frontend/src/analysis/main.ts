@@ -488,12 +488,12 @@ async function init(): Promise<void> {
               <input type="number" id="gap-nominal-time" value="${params.nominalTime}" min="0" step="1" class="input w-full">
             </div>
             <div class="space-y-1">
-              <label for="gap-nominal-launch" class="text-sm text-muted-foreground">Launch ratio</label>
-              <input type="number" id="gap-nominal-launch" value="${params.nominalLaunch}" min="0" max="1" step="0.01" class="input w-full">
+              <label for="gap-nominal-launch" class="text-sm text-muted-foreground">Launch (%)</label>
+              <input type="number" id="gap-nominal-launch" value="${Math.round(params.nominalLaunch * 100)}" min="0" max="100" step="1" class="input w-full">
             </div>
             <div class="space-y-1">
-              <label for="gap-nominal-goal" class="text-sm text-muted-foreground">Goal ratio</label>
-              <input type="number" id="gap-nominal-goal" value="${params.nominalGoal}" min="0" max="1" step="0.01" class="input w-full">
+              <label for="gap-nominal-goal" class="text-sm text-muted-foreground">Goal (%)</label>
+              <input type="number" id="gap-nominal-goal" value="${Math.round(params.nominalGoal * 100)}" min="0" max="100" step="1" class="input w-full">
             </div>
             <div class="space-y-1">
               <label for="gap-minimum-distance" class="text-sm text-muted-foreground">Min distance (m)</label>
@@ -537,8 +537,8 @@ async function init(): Promise<void> {
       config.setGAPParameters({
         scoring,
         nominalTime: parseNum('#gap-nominal-time', 5400),
-        nominalLaunch: parseNum('#gap-nominal-launch', 0.96),
-        nominalGoal: parseNum('#gap-nominal-goal', 0.2),
+        nominalLaunch: parseNum('#gap-nominal-launch', 96) / 100,
+        nominalGoal: parseNum('#gap-nominal-goal', 20) / 100,
         minimumDistance: parseNum('#gap-minimum-distance', 5000),
         useLeading: (form.querySelector('#gap-use-leading') as HTMLInputElement).checked,
         useArrival: (form.querySelector('#gap-use-arrival') as HTMLInputElement).checked,
