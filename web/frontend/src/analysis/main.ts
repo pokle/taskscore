@@ -20,6 +20,7 @@ import { formatAltitude, formatDistance, onUnitsChanged } from './units-browser'
 import { storage } from './storage';
 import { StorageMenu } from './storage-menu';
 import { fetchAirScoreTask, fetchAirScoreTrack } from './airscore-client';
+import { downloadTask } from './task-editor';
 
 // Import styles
 import '../styles.css';
@@ -105,6 +106,7 @@ async function init(): Promise<void> {
   const menuOpenIgc = document.getElementById('menu-open-igc');
   const menuImportTask = document.getElementById('menu-import-task');
   const menuImportAirscore = document.getElementById('menu-import-airscore');
+  const menuDownloadTask = document.getElementById('menu-download-task');
   const showSpeedLabel = document.getElementById('show-speed-label');
 
   // Settings dialog
@@ -585,6 +587,7 @@ async function init(): Promise<void> {
     state.tracks = [];
     state.selectedTrack = 0;
     state.compScore = null;
+    updateDownloadTaskVisibility();
 
     // Clear map
     if (mapRenderer) {
@@ -899,6 +902,7 @@ async function init(): Promise<void> {
   const handleTaskEdited = (task: XCTask) => {
     // Apply without re-setting on the panel (it already has the task)
     state.task = task;
+    updateDownloadTaskVisibility();
     mapRenderer?.setTask(task);
     redetectEvents();
   };
@@ -1039,6 +1043,16 @@ async function init(): Promise<void> {
     commandDialog?.close();
     window.location.href = 'mailto:tushar.pokle@gmail.com?subject=GlideComp%20Feedback%20for%20you';
   });
+
+  // Download task menu item
+  menuDownloadTask?.addEventListener('click', () => {
+    commandDialog?.close();
+    if (state.task) downloadTask(state.task);
+  });
+
+  function updateDownloadTaskVisibility(): void {
+    menuDownloadTask?.classList.toggle('hidden', !state.task);
+  }
 
   // Open IGC menu item triggers hidden file input
   menuOpenIgc?.addEventListener('click', () => {
@@ -1256,6 +1270,7 @@ async function init(): Promise<void> {
 
   function applyTask(task: XCTask): void {
     state.task = task;
+    updateDownloadTaskVisibility();
     mapRenderer?.setTask(task);
     analysisPanel?.setTask(task);
     redetectEvents();
