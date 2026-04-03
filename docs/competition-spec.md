@@ -38,6 +38,8 @@ Tables referenced from the auth-api worker:
   - close_date (TEXT) — after this date, no more track submissions are accepted. NULL means submissions are open indefinitely.
   - category (TEXT NOT NULL) — one of 'hg' or 'pg'
   - test (INTEGER NOT NULL DEFAULT 0) — boolean. Test comps are only visible to admins.
+  - pilot_classes (TEXT NOT NULL) — JSON array of valid pilot class strings for this comp, e.g. `["open", "sport", "floater"]`. Defines the universe of classes. Must contain at least one entry.
+  - default_pilot_class (TEXT NOT NULL) — the class assigned to auto-registered pilots. Must be one of the values in `pilot_classes`.
   - gap_params (TEXT) — JSON object matching the GAPParameters interface
 
 - **comp_admin**: Join table for competition administrators. Replaces the previous `admin_ids` column on comp.
@@ -51,16 +53,17 @@ Tables referenced from the auth-api worker:
   - comp_id (INTEGER NOT NULL REFERENCES comp(comp_id) ON DELETE CASCADE)
   - pilot_id (INTEGER NOT NULL REFERENCES pilot(pilot_id) ON DELETE CASCADE)
   - UNIQUE(comp_id, pilot_id)
-  - pilot_class (TEXT) — e.g. 'open', 'novice', 'sport', 'floater'. A pilot belongs to exactly one class per competition. NULL when auto-registered (admin assigns later).
+  - pilot_class (TEXT NOT NULL) — e.g. 'open', 'novice', 'sport', 'floater'. Must be one of the comp's `pilot_classes` values. A pilot belongs to exactly one class per competition. Set to `comp.default_pilot_class` when auto-registered.
   - team_name (TEXT)
   - driver_contact (TEXT) — driver name, phone, radio channel
   - civl_ranking (INTEGER) — CIVL world ranking snapshot at time of competition
   - starting_order (INTEGER) — pilot's starting order for tasks
 
-- **task**: Represents a task within a competition. Belongs to a single comp. A task is scored for one or more pilot classes.
+- **task**: Represents a task within a competition. Belongs to a single comp. A task is for a specific date and is scored for one or more pilot classes.
   - task_id (INTEGER PRIMARY KEY AUTOINCREMENT)
   - comp_id (INTEGER NOT NULL REFERENCES comp(comp_id) ON DELETE CASCADE)
   - name (TEXT NOT NULL) — public name
+  - task_date (TEXT NOT NULL) — ISO date (e.g. "2026-01-15"). The competition day this task belongs to. Multiple tasks can share the same date (e.g. different classes flying different routes on the same day).
   - creation_date (TEXT NOT NULL)
   - xctsk (TEXT) — the XCTask JSON object. Stored directly in D1 (typically < 5KB). NULL until the task is defined.
 
@@ -105,10 +108,11 @@ Tables referenced from the auth-api worker:
 
 Competitions operate with open registration by default. When an authenticated user uploads a track to a task:
 
-1. Look up the user's `pilot` profile (create one from `user.name` if it doesn't exist yet).
-2. Check if a `comp_pilot` entry exists for this pilot + comp.
-3. If not, auto-create a `comp_pilot` with `pilot_class = NULL`. The admin can assign a class later.
-4. If `comp.close_date` is set and the current date is past it, reject the upload.
+1. If `comp.close_date` is set and the current date is past it, reject the upload.
+2. Look up the user's `pilot` profile (create one from `user.name` if it doesn't exist yet).
+3. Check if a `comp_pilot` entry exists for this pilot + comp.
+4. If not, auto-create a `comp_pilot` with `pilot_class` set to `comp.default_pilot_class`.
+5. Preprocess the IGC and trigger GAP rescoring (see Scoring Pipeline).
 
 ### Cascade deletes
 
@@ -238,11 +242,9 @@ Scoring is triggered manually via `POST .../score` when:
 
 **Class-based scoring:** Only pilots whose `comp_pilot.pilot_class` matches one of the task's `task_class` entries are included. Pilots are ranked within their own class.
 
-**Unscored pilot validation:** The API and UI must flag mismatches where registered pilots would not be scored by any task. This happens when:
-- A pilot's `pilot_class` is NULL (auto-registered, not yet assigned)
-- A pilot's `pilot_class` doesn't match any `task_class` entry across all tasks in the comp
+**Day coverage validation:** The API and UI must flag days where not all pilot classes are covered by tasks. For each distinct `task_date` in the comp, collect the union of all `task_class` entries for that date. If any of the comp's `pilot_classes` are missing, flag a warning.
 
-`GET /api/comp/:comp_id` should include an `unscored_pilots` list in its response — pilots who are registered but would not be scored by any task. The comp UI must display this prominently so admins can fix class assignments or task class configuration before scoring.
+`GET /api/comp/:comp_id` should include a `class_coverage_warnings` list in its response — one entry per day that has gaps, e.g. `{ date: "2026-01-15", missing_classes: ["floater"] }`. The comp UI must display these prominently so admins can add tasks or adjust task class assignments.
 
 #### Pilots
 
