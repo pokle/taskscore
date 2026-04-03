@@ -51,19 +51,23 @@ Tables referenced from the auth-api worker:
   - comp_id (INTEGER NOT NULL REFERENCES comp(comp_id) ON DELETE CASCADE)
   - pilot_id (INTEGER NOT NULL REFERENCES pilot(pilot_id) ON DELETE CASCADE)
   - UNIQUE(comp_id, pilot_id)
-  - pilot_class (TEXT) — e.g. 'open', 'novice', 'sport', 'floater'. NULL when auto-registered (admin assigns later).
+  - pilot_class (TEXT) — e.g. 'open', 'novice', 'sport', 'floater'. A pilot belongs to exactly one class per competition. NULL when auto-registered (admin assigns later).
   - team_name (TEXT)
   - driver_contact (TEXT) — driver name, phone, radio channel
   - civl_ranking (INTEGER) — CIVL world ranking snapshot at time of competition
   - starting_order (INTEGER) — pilot's starting order for tasks
 
-- **task**: Represents a task within a competition. Belongs to a single comp.
+- **task**: Represents a task within a competition. Belongs to a single comp. A task is scored for one or more pilot classes.
   - task_id (INTEGER PRIMARY KEY AUTOINCREMENT)
   - comp_id (INTEGER NOT NULL REFERENCES comp(comp_id) ON DELETE CASCADE)
   - name (TEXT NOT NULL) — public name
   - creation_date (TEXT NOT NULL)
-  - category (TEXT) — user assignable string. E.g. 'novice', 'veteran', 'pro'
   - xctsk (TEXT) — the XCTask JSON object. Stored directly in D1 (typically < 5KB). NULL until the task is defined.
+
+- **task_class**: Join table linking tasks to the pilot classes they score. A task can score multiple classes (e.g. both 'open' and 'novice' fly the same task). A pilot is only scored in a task if their `comp_pilot.pilot_class` matches one of the task's classes.
+  - task_id (INTEGER NOT NULL REFERENCES task(task_id) ON DELETE CASCADE)
+  - pilot_class (TEXT NOT NULL) — must match a `comp_pilot.pilot_class` value
+  - PRIMARY KEY (task_id, pilot_class)
 
 - **task_score**: Server-computed scores for a task. One row per task. Recalculation overwrites the previous score.
   - task_score_id (INTEGER PRIMARY KEY AUTOINCREMENT)
@@ -168,9 +172,9 @@ Admin management is handled via `PATCH` — the client sends the desired admin l
 
 | Method | Route | Auth | Description |
 |--------|-------|------|-------------|
-| POST | `/api/comp/:comp_id/task` | Admin | Create task (name, category). Returns new task with task_id. |
+| POST | `/api/comp/:comp_id/task` | Admin | Create task (name, pilot classes). Returns new task with task_id. |
 | GET | `/api/comp/:comp_id/task/:task_id` | Optional | Get task details including xctsk data and track list. Public for non-test. |
-| PATCH | `/api/comp/:comp_id/task/:task_id` | Admin | Update task name, category, **and/or xctsk data**. |
+| PATCH | `/api/comp/:comp_id/task/:task_id` | Admin | Update task name, pilot classes (via `task_class`), **and/or xctsk data**. |
 | DELETE | `/api/comp/:comp_id/task/:task_id` | Admin | Delete task and its R2 files (all IGCs). |
 
 The xctsk object is stored in the `task.xctsk` D1 column — no R2 involved. The task editor UI sends `PATCH` with the updated `xctsk` field on each change (debounced). Returned inline with `GET`.
@@ -203,8 +207,16 @@ No separate download endpoint — the list response includes signed R2 URLs that
 
 | Method | Route | Auth | Description |
 |--------|-------|------|-------------|
-| POST | `/api/comp/:comp_id/task/:task_id/score` | Admin | Trigger server-side scoring. The Worker runs the GAP engine against all IGC files + xctsk for this task. Overwrites any existing `task_score` and `task_score_rank` rows. |
+| POST | `/api/comp/:comp_id/task/:task_id/score` | Admin | Trigger server-side scoring. The Worker runs the GAP engine against IGC files for pilots whose class matches the task's `task_class` entries. Overwrites any existing `task_score` and `task_score_rank` rows. |
 | GET | `/api/comp/:comp_id/scores` | Public | Get scores for all tasks in a competition. Returns ranked pilot lists per task plus overall competition standings. No auth required. |
+
+**Class-based scoring:** When scoring is triggered for a task, only pilots whose `comp_pilot.pilot_class` matches one of the task's `task_class` entries are included. Pilots are ranked within their own class.
+
+**Unscored pilot validation:** The API and UI must flag mismatches where registered pilots would not be scored by any task. This happens when:
+- A pilot's `pilot_class` is NULL (auto-registered, not yet assigned)
+- A pilot's `pilot_class` doesn't match any `task_class` entry across all tasks in the comp
+
+`GET /api/comp/:comp_id` should include an `unscored_pilots` list in its response — pilots who are registered but would not be scored by any task. The comp UI must display this prominently so admins can fix class assignments or task class configuration before scoring.
 
 #### Pilots
 
