@@ -69,6 +69,15 @@ Tables referenced from the auth-api worker:
   - pilot_class (TEXT NOT NULL) — must match a `comp_pilot.pilot_class` value
   - PRIMARY KEY (task_id, pilot_class)
 
+- **task_track**: Links an IGC file to a pilot for a specific task. Enforces one track per pilot per task — re-uploading replaces the previous track.
+  - task_track_id (INTEGER PRIMARY KEY AUTOINCREMENT)
+  - task_id (INTEGER NOT NULL REFERENCES task(task_id) ON DELETE CASCADE)
+  - comp_pilot_id (INTEGER NOT NULL REFERENCES comp_pilot(comp_pilot_id) ON DELETE CASCADE)
+  - UNIQUE(task_id, comp_pilot_id) — one track per pilot per task
+  - igc_filename (TEXT NOT NULL) — filename in R2
+  - uploaded_at (TEXT NOT NULL) — ISO timestamp
+  - file_size (INTEGER NOT NULL) — bytes
+
 - **task_score**: Server-computed scores for a task. One row per task. Recalculation overwrites the previous score.
   - task_score_id (INTEGER PRIMARY KEY AUTOINCREMENT)
   - task_id (INTEGER NOT NULL REFERENCES task(task_id) ON DELETE CASCADE UNIQUE)
@@ -193,13 +202,13 @@ taskEditor.onTaskChanged = debounce((xctsk: XCTask) => {
 
 #### Tracks
 
-Tracks are uploaded one-by-one, typically by pilots after the competition. Each IGC file is a separate upload. Uploading a track auto-registers the pilot for the competition (see Open Registration above).
+Tracks are uploaded one-by-one, typically by pilots after the competition. Uploading a track auto-registers the pilot for the competition (see Open Registration above). One track per pilot per task — re-uploading replaces the previous track (old file deleted from R2).
 
 | Method | Route | Auth | Description |
 |--------|-------|------|-------------|
-| POST | `/api/comp/:comp_id/task/:task_id/igc` | User | Upload one IGC file (max 5MB, compressed in browser). Auto-registers pilot if needed. Rejected if past comp close_date. Enforces max 250 per task. Returns filename + metadata. |
-| GET | `/api/comp/:comp_id/task/:task_id/igc` | Optional | List IGC files with metadata (pilot name, filename, size, upload date). Public for non-test. Each entry includes a time-limited signed R2 URL for direct download. |
-| DELETE | `/api/comp/:comp_id/task/:task_id/igc/:filename` | Admin | Delete a single IGC file. |
+| POST | `/api/comp/:comp_id/task/:task_id/igc` | User | Upload one IGC file (max 5MB, compressed in browser). Auto-registers pilot if needed. Rejected if past comp close_date. If the pilot already has a track for this task, replaces it. Enforces max 250 unique pilots per task. Returns track metadata. |
+| GET | `/api/comp/:comp_id/task/:task_id/igc` | Optional | List tracks with metadata (pilot name, filename, size, upload date). Public for non-test. Each entry includes a time-limited signed R2 URL for direct download. |
+| DELETE | `/api/comp/:comp_id/task/:task_id/igc/:comp_pilot_id` | Admin | Delete a pilot's track for this task. |
 
 No separate download endpoint — the list response includes signed R2 URLs that the browser can fetch directly.
 
