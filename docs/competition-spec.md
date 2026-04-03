@@ -57,7 +57,7 @@ Tables referenced from the auth-api worker:
   - team_name (TEXT)
   - driver_contact (TEXT) — driver name, phone, radio channel
   - civl_ranking (INTEGER) — CIVL world ranking snapshot at time of competition
-  - starting_order (INTEGER) — pilot's starting order for tasks
+  - starting_order (INTEGER) — pilot's starting order for the first competition day only (typically reverse CIVL ranking). For subsequent days, starting order is computed on-demand: reverse the previous day's top N scores for the same pilot classes, where N = the number of pilots with a day-1 `starting_order` set.
 
 - **task**: Represents a task within a competition. Belongs to a single comp. A task is for a specific date and is scored for one or more pilot classes.
   - task_id (INTEGER PRIMARY KEY AUTOINCREMENT)
