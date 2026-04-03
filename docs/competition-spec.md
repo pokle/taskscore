@@ -110,7 +110,7 @@ IGC files are stored on Cloudflare R2. XCTSK data is stored in D1 (in the `task.
 
 - Future (out of scope): `/u/{user_id}/*.igc` and `/u/{user_id}/*.xctsk` paths for a personal track library where users upload their own tracks and tasks for personal analysis outside of a competition context.
 
-- If a competition is deleted, all its R2 files must be deleted.
+- If a competition is deleted, all its R2 files must be deleted. D1 rows are cascade-deleted immediately. R2 cleanup is async via Cloudflare Queue — one message per task, each Queue Consumer lists and deletes all objects under `/c/{comp_id}/t/{task_id}/`. Same pattern for task deletion.
 
 ## API design
 
@@ -156,7 +156,7 @@ Auth verification via service binding to auth-api (Option A in `docs/auth.md`). 
 | GET | `/api/comp` | Optional | List comps. Authenticated: includes caller's admin comps (incl. test). Public: non-test only. |
 | GET | `/api/comp/:comp_id` | Optional | Get comp details (incl. tasks summary, admin list, pilot count). Public for non-test. Test requires admin. |
 | PATCH | `/api/comp/:comp_id` | Admin | Update name, category, test flag, close_date, gap_params, **and admin list**. Reject if update would remove the last admin. |
-| DELETE | `/api/comp/:comp_id` | Admin | Delete comp and all child data (tasks, pilots, scores, R2 files). |
+| DELETE | `/api/comp/:comp_id` | Admin | Delete comp. D1 rows are cascade-deleted immediately. R2 file cleanup is enqueued via Cloudflare Queue (one message per task with its R2 prefix). |
 
 `GET /api/comp/:comp_id` returns the comp with its tasks array and admin list inline, avoiding separate requests.
 
@@ -169,7 +169,7 @@ Admin management is handled via `PATCH` — the client sends the desired admin l
 | POST | `/api/comp/:comp_id/task` | Admin | Create task (name, pilot classes). Returns new task with task_id. |
 | GET | `/api/comp/:comp_id/task/:task_id` | Optional | Get task details including xctsk data and track list. Public for non-test. |
 | PATCH | `/api/comp/:comp_id/task/:task_id` | Admin | Update task name, pilot classes (via `task_class`), **and/or xctsk data**. |
-| DELETE | `/api/comp/:comp_id/task/:task_id` | Admin | Delete task and its R2 files (all IGCs). |
+| DELETE | `/api/comp/:comp_id/task/:task_id` | Admin | Delete task. D1 rows cascade-deleted immediately. R2 cleanup enqueued via Queue. |
 
 The xctsk object is stored in the `task.xctsk` D1 column — no R2 involved. The task editor UI sends `PATCH` with the updated `xctsk` field on each change (debounced). Returned inline with `GET`.
 
