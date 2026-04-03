@@ -220,6 +220,58 @@ trustedOrigins: ["https://*.glidecomp.pages.dev"],
 
 The `branch-deploy.yml` workflow only deploys Cloudflare Pages — it does **not** deploy the auth-api or airscore-api workers. Workers are only deployed from `master` via `deploy.yml`. This prevents branches from overwriting production workers with untested code.
 
+## Cross-worker auth verification
+
+Other workers (e.g. competition-api) need to verify authentication status for incoming requests. There are three approaches, in order of complexity:
+
+### Option A: Service binding to auth-api (current approach)
+
+Add a service binding in the worker's `wrangler.toml` and forward the session cookie to `/api/auth/me`:
+
+```toml
+[[services]]
+binding = "AUTH_API"
+service = "auth-api"
+```
+
+```ts
+const res = await env.AUTH_API.fetch(new Request("https://auth/api/auth/me", {
+  headers: { cookie: request.headers.get("cookie") || "" }
+}));
+const { user } = await res.json();
+if (!user) return new Response("Unauthorized", { status: 401 });
+```
+
+- No shared secrets or new dependencies
+- All auth logic stays centralised in auth-api
+- ~5-10ms subrequest per authed call (hits D1 each time)
+- Pages already uses this pattern (see `functions/api/auth/[[path]].ts`)
+
+### Option B: Shared D1 binding (verify session directly)
+
+Give the worker its own D1 binding to `taskscore-auth` plus `BETTER_AUTH_SECRET`. Parse the signed `better-auth.session_token` cookie, unsign it, and query the session table directly.
+
+- No inter-worker subrequest
+- Duplicates auth logic and must exactly match Better Auth's cookie signing (HMAC-SHA256 via `better-call`)
+- Breaks if Better Auth changes its cookie format
+
+### Option C: Cookie caching with JWT (stateless)
+
+Enable Better Auth's cookie caching with JWT strategy in auth-api, then verify the signed `better-auth.session_data` cookie in the calling worker without any DB or network call:
+
+```ts
+// In auth-api config:
+session: { cookieCache: { enabled: true, maxAge: 5 * 60, strategy: "jwt" } }
+
+// In competition-api:
+import { getCookieCache } from "better-auth/cookies";
+const session = await getCookieCache(request, { secret: env.BETTER_AUTH_SECRET, strategy: "jwt" });
+```
+
+- Zero latency — truly stateless verification
+- Requires `better-auth` as a dependency and sharing `BETTER_AUTH_SECRET`
+- Revoked sessions remain valid until `maxAge` expires (e.g. 5 min window)
+
 ## Deployment
 
 ```bash

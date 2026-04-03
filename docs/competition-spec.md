@@ -26,8 +26,8 @@ Tables:
   - name (public name)
   - creation_date
   - category (One of 'hg', or 'pg')
-  - test (boolean - indicates that this is a test and should not be shown to the public)
-  - admin_list
+  - test (boolean - indicates that this is a test and should not be shown to the public - it should only be visible to admins of the comp)
+  - admin_ids
     - list of user.id that are allowed to administer this comp, and its child entites and objects.
     - Initialised to creator's user.id.
     - Enforce a minimum of 1 admin. The last admin is not allowed to be deleted.
@@ -56,9 +56,44 @@ When a user's account is deleted, all the entities above MUST be deleted if they
 
 ## Cloudflare worker API design
 
-Use a cloudflare worker called competition-api.
+Use a cloudflare worker called competition-api, routed on `glidecomp.com/api/comp/*` (matching the existing pattern: auth-api → `/api/auth/*`, airscore-api → `/api/airscore/*`).
 
-It should ensure all requests are from authenticated callers.
+Auth verification via service binding to auth-api (Option A in `docs/auth.md`). All endpoints require authentication except where noted. Admin endpoints require the caller to be in the comp's `admin_ids`.
+
+### Competitions
+
+- `POST /api/comp` — Create a competition. Caller becomes first admin.
+- `GET /api/comp` — List competitions. Authenticated: includes caller's admin comps (including test). Public: only non-test comps.
+- `GET /api/comp/:comp_id` — Get competition details. Public for non-test comps. Test comps require admin.
+- `PATCH /api/comp/:comp_id` — Update competition name, category, test flag, gap_params. (Admin only)
+- `DELETE /api/comp/:comp_id` — Delete competition and all child data (tasks, R2 files). (Admin only)
+
+### Competition admins
+
+- `GET /api/comp/:comp_id/admins` — List admins. (Admin only)
+- `POST /api/comp/:comp_id/admins` — Add admin by email. (Admin only)
+- `DELETE /api/comp/:comp_id/admins/:user_id` — Remove admin. Reject if last admin. (Admin only)
+
+### Tasks
+
+- `POST /api/comp/:comp_id/task` — Create a task. (Admin only)
+- `GET /api/comp/:comp_id/task/:task_id` — Get task details. Public for non-test comps. Test comps require admin.
+- `PATCH /api/comp/:comp_id/task/:task_id` — Update task name, category. (Admin only)
+- `DELETE /api/comp/:comp_id/task/:task_id` — Delete task and its R2 files. (Admin only)
+
+### Task files (R2)
+
+- `POST /api/comp/:comp_id/task/:task_id/xctsk` — Upload XCTSK file (max 1 per task, max 1MB). (Admin only)
+- `GET /api/comp/:comp_id/task/:task_id/xctsk` — Download XCTSK file. Public for non-test comps.
+- `DELETE /api/comp/:comp_id/task/:task_id/xctsk` — Delete XCTSK file. (Admin only)
+- `POST /api/comp/:comp_id/task/:task_id/igc` — Upload IGC file (max 250 per task, max 5MB each). (Admin only)
+- `GET /api/comp/:comp_id/task/:task_id/igc` — List IGC files. Public for non-test comps.
+- `GET /api/comp/:comp_id/task/:task_id/igc/:filename` — Download IGC file. Public for non-test comps.
+- `DELETE /api/comp/:comp_id/task/:task_id/igc/:filename` — Delete IGC file. (Admin only)
+
+### Public scores
+
+- `GET /api/comp/:comp_id/scores` — Get scores for a competition. (Public, no auth required)
 
 ## URL design
 
@@ -77,8 +112,9 @@ It should ensure all requests are from authenticated callers.
 # Security design 
 - Ensure that all user entered fields are sanitised before storing them.
 - Ensure only admins of a comp can modify it and any associated child data (task, igc, xctsk, …)
-- Ensure only authenticated users can visit all pages except for the score page.
-- The score page is the only public page. 
+- Non-test competitions, their tasks, tracks, and scores are publicly readable (no auth required).
+- Test competitions and all write/modify operations require authentication.
+- Only admins can see test competitions. 
 - Enforce limits on the size of user supplied data to avoid abuse
   - Limit the size of user entered text fields to 128 chars (approx)
   - Limit the size of IGC files uploaded and stored to 5mb each.
