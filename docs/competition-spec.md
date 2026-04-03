@@ -218,7 +218,8 @@ No separate download endpoint — the list response includes signed R2 URLs that
 | Method | Route | Auth | Description |
 |--------|-------|------|-------------|
 | POST | `/api/comp/:comp_id/task/:task_id/score` | Admin | Manually trigger a full rescore for this task. Reprocesses all `task_track.flight_data` and runs GAP. Useful after changing task xctsk, gap_params, pilot classes, or fixing issues. |
-| GET | `/api/comp/:comp_id/scores` | Public | Get scores for all tasks in a competition. Returns ranked pilot lists per task plus overall competition standings. No auth required. |
+| GET | `/api/comp/:comp_id/task/:task_id/score` | Public | Get scores for a single task. Returns ranked pilot list with individual point breakdowns. No auth required. |
+| GET | `/api/comp/:comp_id/scores` | Public | Get competition-level standings. Returns overall pilot rankings (sum of task points), plus per-task score summaries. No auth required. |
 
 **Scoring pipeline:** Scoring is split into two phases to stay within Worker CPU limits:
 
